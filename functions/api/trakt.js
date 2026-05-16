@@ -7,6 +7,7 @@ const MAX_PAGE = 25;
 const MAX_ITEM_LIMIT = 50;
 const MAX_QUERY_LENGTH = 220;
 const SUCCESS_CACHE_SECONDS = 300;
+const USER_FILTER_LIMIT = 100;
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -81,13 +82,44 @@ async function searchLists(query, page, clientId) {
 }
 
 async function getUserLists(username, page, clientId) {
-  const safeUsername = encodeURIComponent(username.replace(/^@/, ""));
+  const parsed = parseUserListQuery(username);
+  if (!isSafePathSegment(parsed.username)) {
+    throw httpError("Invalid Trakt username.", 400);
+  }
+
+  if (parsed.filter) {
+    return getFilteredUserLists(parsed.username, parsed.filter, clientId);
+  }
+
+  const safeUsername = encodeURIComponent(parsed.username);
   const params = new URLSearchParams({
     page: String(page),
     limit: String(RESULT_LIMIT),
     extended: "full",
   });
   return traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
+}
+
+async function getFilteredUserLists(username, filter, clientId) {
+  const safeUsername = encodeURIComponent(username);
+  const params = new URLSearchParams({
+    page: "1",
+    limit: String(USER_FILTER_LIMIT),
+    extended: "full",
+  });
+  const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
+  const terms = normalizeSearchText(filter).split(" ").filter(Boolean);
+  const results = payload.data.filter((list) => listMatchesTerms(list, terms));
+
+  return {
+    data: results.slice(0, RESULT_LIMIT),
+    pagination: {
+      page: 1,
+      limit: RESULT_LIMIT,
+      page_count: 1,
+      item_count: results.length,
+    },
+  };
 }
 
 async function resolveListUrl(value, clientId) {
@@ -156,6 +188,31 @@ async function traktFetch(path, clientId) {
 
 function getClientId(env) {
   return String(env.TRAKT_CLIENT_ID || "").trim();
+}
+
+function parseUserListQuery(value) {
+  const parts = value.replace(/^@/, "").trim().split(/\s+/);
+  return {
+    username: parts.shift() || "",
+    filter: parts.join(" ").trim(),
+  };
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function listMatchesTerms(list, terms) {
+  if (!terms.length) return true;
+  const haystack = normalizeSearchText([
+    list.name,
+    list.ids?.slug,
+    list.description,
+  ].filter(Boolean).join(" "));
+  return terms.every((term) => haystack.includes(term));
 }
 
 function getPositiveInteger(value, fallback) {

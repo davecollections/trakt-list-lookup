@@ -23,7 +23,7 @@ const state = {
 
 const placeholders = {
   search: "Search public lists by title or description",
-  user: "Enter a Trakt username to list their public lists",
+  user: "Enter a username, or username plus keywords",
   url: "Paste a Trakt list URL",
 };
 
