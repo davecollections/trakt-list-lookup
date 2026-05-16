@@ -4,6 +4,7 @@ const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
 const clearButton = document.querySelector("#clear-button");
 const template = document.querySelector("#result-template");
+const DESCRIPTION_LIMIT = 360;
 
 const placeholders = {
   search: "Search public lists by title or description",
@@ -97,7 +98,7 @@ function renderResults(results) {
     node.querySelector(".trakt-id").textContent = result.ids?.trakt || "n/a";
     node.querySelector(".slug").textContent = result.ids?.slug || "n/a";
     node.querySelector(".items").textContent = formatNumber(result.item_count);
-    node.querySelector(".likes").textContent = formatNumber(result.like_count);
+    node.querySelector(".comments").textContent = formatNumber(result.comment_count);
 
     const openLink = node.querySelector(".open-link");
     openLink.href = url;
@@ -122,7 +123,20 @@ function renderResults(results) {
 
 function cleanDescription(value) {
   if (!value) return "No description provided.";
-  return String(value).replace(/:[a-z0-9_+-]+:/gi, "").replace(/\s+/g, " ").trim();
+  const text = String(value)
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\*\*|__|[_`~]/g, "")
+    .replace(/\[[^\]]+\]\([^)]+\)/g, "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/:[a-z0-9_+-]+:/gi, "")
+    .replace(/[-_]{5,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return "No description provided.";
+  if (text.length <= DESCRIPTION_LIMIT) return text;
+  return `${text.slice(0, DESCRIPTION_LIMIT).trim()}...`;
 }
 
 function formatNumber(value) {

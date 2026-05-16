@@ -239,6 +239,10 @@ h2 {
 .description {
   max-width: 900px;
   line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
 }
 
 .meta-grid {
@@ -254,6 +258,15 @@ h2 {
   border-radius: 8px;
 }
 
+.meta-grid div:first-child {
+  background: #17191f;
+  color: white;
+}
+
+.meta-grid div:first-child dt {
+  color: rgba(255, 255, 255, 0.68);
+}
+
 .meta-grid dt {
   font-size: 0.72rem;
   font-weight: 800;
@@ -264,6 +277,10 @@ h2 {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
   font-weight: 800;
+}
+
+.trakt-id {
+  font-size: 1.15rem;
 }
 
 .copy-row {
