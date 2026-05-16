@@ -51,6 +51,18 @@
         <div class="results-toolbar">
           <h2>Results</h2>
           <div class="toolbar-actions">
+            <label class="sort-control">
+              <span>Sort</span>
+              <select id="sort-select">
+                <option value="relevance">Relevance</option>
+                <option value="title">Title</option>
+                <option value="owner">Owner</option>
+                <option value="items-desc">Items high-low</option>
+                <option value="comments-desc">Comments high-low</option>
+                <option value="likes-desc">Likes high-low</option>
+                <option value="id-desc">Trakt ID high-low</option>
+              </select>
+            </label>
             <div id="pager" class="pager" hidden>
               <button id="prev-page" type="button" class="ghost-button">Previous</button>
               <span id="page-label"></span>
@@ -79,7 +91,7 @@
       <article class="result-card">
         <div class="result-main">
           <div>
-            <p class="result-owner"></p>
+            <p class="result-owner"><a target="_blank" rel="noreferrer"></a></p>
             <h3 class="result-title"></h3>
           </div>
           <a class="open-link" target="_blank" rel="noreferrer">Open on Trakt</a>
@@ -99,6 +111,10 @@
           <div>
             <dt>Items</dt>
             <dd class="items"></dd>
+          </div>
+          <div>
+            <dt>Likes</dt>
+            <dd class="likes"></dd>
           </div>
           <div>
             <dt>Comments</dt>

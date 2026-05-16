@@ -10,6 +10,7 @@ const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
 const pageLabel = document.querySelector("#page-label");
 const themeToggle = document.querySelector("#theme-toggle");
+const sortSelect = document.querySelector("#sort-select");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 30;
@@ -19,6 +20,7 @@ const state = {
   query: "",
   page: 1,
   pagination: null,
+  results: [],
 };
 
 const placeholders = {
@@ -70,6 +72,10 @@ nextPageButton.addEventListener("click", () => {
   if (state.page < pageCount) runSearch(state.page + 1);
 });
 
+sortSelect.addEventListener("change", () => {
+  renderCurrentResults();
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -105,9 +111,9 @@ async function runSearch(page) {
     }
 
     const results = payload.results || [];
+    state.results = results;
     state.pagination = payload.pagination || null;
-    renderResults(results);
-    renderJumps(results);
+    renderCurrentResults();
     renderPagination(state.pagination);
 
     const total = state.pagination?.item_count;
@@ -116,11 +122,18 @@ async function runSearch(page) {
   } catch (error) {
     renderResults([]);
     renderJumps([]);
+    state.results = [];
     renderPagination(null);
     setStatus(error.message, true);
   } finally {
     setLoading(false);
   }
+}
+
+function renderCurrentResults() {
+  const results = getSortedResults(state.results);
+  renderResults(results);
+  renderJumps(results);
 }
 
 function getMode() {
@@ -156,12 +169,16 @@ function renderResults(results) {
     const url = result.url || "";
 
     card.id = `result-${index + 1}`;
-    node.querySelector(".result-owner").textContent = `#${index + 1} @${owner}`;
+    const ownerLink = node.querySelector(".result-owner a");
+    ownerLink.textContent = `#${index + 1} @${owner}`;
+    ownerLink.href = getUserProfileUrl(result);
+    ownerLink.hidden = !result.user?.username;
     node.querySelector(".result-title").textContent = title;
     node.querySelector(".description").textContent = cleanDescription(result.description);
     node.querySelector(".trakt-id").textContent = result.ids?.trakt || "n/a";
     node.querySelector(".slug").textContent = result.ids?.slug || "n/a";
     node.querySelector(".items").textContent = formatNumber(result.item_count);
+    node.querySelector(".likes").textContent = formatNumber(result.like_count);
     node.querySelector(".comments").textContent = formatNumber(result.comment_count);
 
     const openLink = node.querySelector(".open-link");
@@ -196,6 +213,33 @@ function renderJumps(results) {
     link.title = result.name || `Result ${index + 1}`;
     jumpNav.append(link);
   });
+}
+
+function getSortedResults(results) {
+  const sort = sortSelect.value;
+  const sorted = [...results];
+  if (sort === "title") {
+    sorted.sort((a, b) => compareText(a.name, b.name));
+  } else if (sort === "owner") {
+    sorted.sort((a, b) => compareText(a.user?.username, b.user?.username) || compareText(a.name, b.name));
+  } else if (sort === "items-desc") {
+    sorted.sort((a, b) => compareNumber(b.item_count, a.item_count));
+  } else if (sort === "comments-desc") {
+    sorted.sort((a, b) => compareNumber(b.comment_count, a.comment_count));
+  } else if (sort === "likes-desc") {
+    sorted.sort((a, b) => compareNumber(b.like_count, a.like_count));
+  } else if (sort === "id-desc") {
+    sorted.sort((a, b) => compareNumber(b.ids?.trakt, a.ids?.trakt));
+  }
+  return sorted;
+}
+
+function compareText(a, b) {
+  return String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base" });
+}
+
+function compareNumber(a, b) {
+  return Number(a || 0) - Number(b || 0);
 }
 
 function renderPagination(pagination) {
@@ -339,6 +383,10 @@ function getCopyValue(kind, result) {
   if (kind === "slug") return result.ids?.slug || "";
   if (kind === "url") return result.url || "";
   return "";
+}
+
+function getUserProfileUrl(result) {
+  return result.user?.username ? `https://trakt.tv/users/${encodeURIComponent(result.user.username)}` : "";
 }
 
 function flashButton(button) {

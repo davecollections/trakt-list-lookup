@@ -47,7 +47,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -82,7 +83,8 @@ input {
 .item-panel-header,
 .top-actions,
 .site-footer,
-.site-footer div {
+.site-footer div,
+.sort-control {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -120,7 +122,8 @@ h2 {
 .trakt-link,
 .open-link,
 .result-jumps a,
-.site-footer a {
+.site-footer a,
+.result-owner a {
   color: var(--accent);
   font-weight: 800;
   text-decoration: none;
@@ -233,6 +236,23 @@ h2 {
   justify-content: flex-end;
 }
 
+.sort-control {
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.sort-control select {
+  min-height: 36px;
+  padding: 0 34px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
 .pager {
   color: var(--muted);
   font-size: 0.9rem;
@@ -323,13 +343,13 @@ h2 {
 
 .meta-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: 1.25fr repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .meta-grid div {
   min-width: 0;
-  padding: 10px;
+  padding: 8px 10px;
   background: var(--soft);
   border-radius: 8px;
 }
@@ -344,19 +364,20 @@ h2 {
 }
 
 .meta-grid dt {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .meta-grid dd {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   overflow-wrap: anywhere;
   font-weight: 800;
+  line-height: 1.15;
 }
 
 .trakt-id {
-  font-size: 1.15rem;
+  font-size: 1rem;
 }
 
 .copy-row {
@@ -504,6 +525,7 @@ h2 {
 
   .toolbar-actions,
   .pager,
+  .sort-control,
   .top-actions,
   .site-footer div {
     width: 100%;
