@@ -337,12 +337,20 @@ function normalizeListItem(item) {
 function getPosterUrl(media) {
   const poster = media?.images?.poster;
   if (!poster) return "";
-  if (typeof poster === "string") return poster;
-  if (Array.isArray(poster)) return poster.find(Boolean) || "";
+  if (typeof poster === "string") return normalizeImageUrl(poster);
+  if (Array.isArray(poster)) return normalizeImageUrl(poster.find(Boolean) || "");
   if (typeof poster === "object") {
-    return poster.medium || poster.full || poster.thumb || poster.original || Object.values(poster).find(Boolean) || "";
+    return normalizeImageUrl(poster.medium || poster.full || poster.thumb || poster.original || Object.values(poster).find(Boolean) || "");
   }
   return "";
+}
+
+function normalizeImageUrl(value) {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  if (url.startsWith("https://") || url.startsWith("http://")) return url;
+  if (url.startsWith("//")) return `https:${url}`;
+  return `https://${url}`;
 }
 
 function getTraktErrorMessage(status, body = "") {
