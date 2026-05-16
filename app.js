@@ -9,6 +9,7 @@ const pager = document.querySelector("#pager");
 const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
 const pageLabel = document.querySelector("#page-label");
+const themeToggle = document.querySelector("#theme-toggle");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 30;
@@ -25,6 +26,15 @@ const placeholders = {
   user: "Enter a Trakt username to list their public lists",
   url: "Paste a Trakt list URL",
 };
+
+const savedTheme = localStorage.getItem("theme");
+const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+setTheme(savedTheme || preferredTheme);
+
+themeToggle.addEventListener("click", () => {
+  const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  setTheme(nextTheme);
+});
 
 document.querySelectorAll("input[name='mode']").forEach((radio) => {
   radio.addEventListener("change", () => {
@@ -260,7 +270,7 @@ function renderItems(container, items) {
     const title = document.createElement("strong");
     title.textContent = item.title || "Untitled";
     const meta = document.createElement("span");
-    meta.textContent = [item.type, item.year].filter(Boolean).join(" · ");
+    meta.textContent = [item.type, item.year].filter(Boolean).join(" - ");
     main.append(title, meta);
 
     const ids = document.createElement("code");
@@ -315,4 +325,12 @@ function flashButton(button) {
   window.setTimeout(() => {
     button.textContent = original;
   }, 900);
+}
+
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("theme", theme);
+  const isDark = theme === "dark";
+  themeToggle.textContent = isDark ? "Light" : "Dark";
+  themeToggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
 }

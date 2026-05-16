@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,7 +14,10 @@
             <p class="eyebrow">Trakt list search</p>
             <h1 id="page-title">Find public Trakt list IDs and links</h1>
           </div>
-          <a class="trakt-link" href="https://trakt.tv/search/lists" target="_blank" rel="noreferrer">trakt.tv</a>
+          <div class="top-actions">
+            <button id="theme-toggle" type="button" class="ghost-button" aria-label="Switch to dark mode">Dark</button>
+            <a class="trakt-link" href="https://trakt.tv/search/lists" target="_blank" rel="noreferrer">trakt.tv</a>
+          </div>
         </div>
 
         <form id="search-form" class="search-form">
@@ -61,6 +64,15 @@
           <p>Results will appear here.</p>
         </div>
       </section>
+
+      <footer class="site-footer">
+        <p>This is an unofficial lookup tool powered by the Trakt API. It is not affiliated with or endorsed by Trakt.</p>
+        <div>
+          <a href="https://trakt.tv" target="_blank" rel="noreferrer">Trakt</a>
+          <a href="https://trakt.docs.apiary.io/" target="_blank" rel="noreferrer">API docs</a>
+          <a href="https://github.com/davecollections/trakt-list-lookup" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </footer>
     </main>
 
     <template id="result-template">
