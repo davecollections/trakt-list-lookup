@@ -1,5 +1,6 @@
 const TRAKT_API_BASE = "https://api.trakt.tv";
 const TRAKT_WEB_BASE = "https://trakt.tv";
+const SUPPORTED_TRAKT_HOSTS = new Set(["trakt.tv", "app.trakt.tv"]);
 const RESULT_LIMIT = 20;
 const ITEM_LIMIT = 30;
 const MAX_PAGE = 25;
@@ -202,7 +203,7 @@ function parseTraktListUrl(value) {
   }
 
   const host = url.hostname.replace(/^www\./, "");
-  if (host !== "trakt.tv") return null;
+  if (!SUPPORTED_TRAKT_HOSTS.has(host)) return null;
 
   const parts = url.pathname.split("/").filter(Boolean);
   if (parts[0] === "users" && parts[2] === "lists" && parts[1] && parts[3]) {
