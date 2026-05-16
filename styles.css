@@ -402,44 +402,58 @@ h2 {
 
 .item-list {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.item-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px;
+.poster-card {
+  min-width: 0;
+  overflow: hidden;
   border-radius: 8px;
   background: var(--item-bg);
   border: 1px solid var(--border);
 }
 
-.item-row div {
+.poster-wrap {
   display: grid;
-  min-width: 0;
-  gap: 3px;
+  aspect-ratio: 2 / 3;
+  place-items: center;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
 }
 
-.item-row strong,
-.item-row span {
+.poster-wrap img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.poster-body {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+}
+
+.poster-body strong,
+.poster-body span,
+.poster-body code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.item-row span {
+.poster-body span {
   color: var(--muted);
   font-size: 0.85rem;
 }
 
-.item-row code {
-  max-width: 360px;
-  overflow: hidden;
+.poster-body code {
   color: var(--code);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.72rem;
 }
 
 .item-empty {
@@ -480,9 +494,12 @@ h2 {
   }
 
   .query-row,
-  .meta-grid,
-  .item-row {
+  .meta-grid {
     grid-template-columns: 1fr;
+  }
+
+  .item-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .toolbar-actions,
@@ -491,10 +508,6 @@ h2 {
   .site-footer div {
     width: 100%;
     justify-content: flex-start;
-  }
-
-  .item-row code {
-    max-width: 100%;
   }
 
   .mode-tabs {

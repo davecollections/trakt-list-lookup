@@ -155,7 +155,7 @@ async function getListItems(username, slug, page, limit, clientId) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
-    extended: "full",
+    extended: "full,images",
   });
   return traktFetch(`/users/${safeUsername}/lists/${safeSlug}/items?${params.toString()}`, clientId);
 }
@@ -325,12 +325,24 @@ function normalizeListItem(item) {
     type: item.type,
     title,
     year: media.year || item.show?.year || "",
+    poster: getPosterUrl(media) || getPosterUrl(item.show),
     ids: {
       trakt: media.ids?.trakt,
       tmdb: media.ids?.tmdb,
       imdb: media.ids?.imdb,
     },
   };
+}
+
+function getPosterUrl(media) {
+  const poster = media?.images?.poster;
+  if (!poster) return "";
+  if (typeof poster === "string") return poster;
+  if (Array.isArray(poster)) return poster.find(Boolean) || "";
+  if (typeof poster === "object") {
+    return poster.medium || poster.full || poster.thumb || poster.original || Object.values(poster).find(Boolean) || "";
+  }
+  return "";
 }
 
 function getTraktErrorMessage(status, body = "") {

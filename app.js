@@ -270,21 +270,36 @@ function renderItems(container, items) {
   }
 
   items.forEach((item) => {
-    const row = document.createElement("div");
-    row.className = "item-row";
+    const card = document.createElement("article");
+    card.className = "poster-card";
 
-    const main = document.createElement("div");
+    const posterWrap = document.createElement("div");
+    posterWrap.className = "poster-wrap";
+    if (item.poster) {
+      const image = document.createElement("img");
+      image.src = item.poster;
+      image.alt = "";
+      image.loading = "lazy";
+      posterWrap.append(image);
+    } else {
+      const placeholder = document.createElement("span");
+      placeholder.textContent = "No Poster";
+      posterWrap.append(placeholder);
+    }
+
+    const body = document.createElement("div");
+    body.className = "poster-body";
     const title = document.createElement("strong");
     title.textContent = item.title || "Untitled";
     const meta = document.createElement("span");
     meta.textContent = [item.type, item.year].filter(Boolean).join(" - ");
-    main.append(title, meta);
 
     const ids = document.createElement("code");
     ids.textContent = buildItemIdText(item);
 
-    row.append(main, ids);
-    container.append(row);
+    body.append(title, meta, ids);
+    card.append(posterWrap, body);
+    container.append(card);
   });
 }
 
