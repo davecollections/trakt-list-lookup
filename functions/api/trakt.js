@@ -11,18 +11,20 @@ export async function onRequestGet({ request, env }) {
     return json({ error: "Missing search query." }, 400);
   }
 
-  if (!env.TRAKT_CLIENT_ID) {
+  const clientId = getClientId(env);
+
+  if (!clientId) {
     return json({ error: "TRAKT_CLIENT_ID is not configured in Cloudflare." }, 500);
   }
 
   try {
     let results;
     if (mode === "search") {
-      results = await searchLists(query, env.TRAKT_CLIENT_ID);
+      results = await searchLists(query, clientId);
     } else if (mode === "user") {
-      results = await getUserLists(query, env.TRAKT_CLIENT_ID);
+      results = await getUserLists(query, clientId);
     } else if (mode === "url") {
-      results = await resolveListUrl(query, env.TRAKT_CLIENT_ID);
+      results = await resolveListUrl(query, clientId);
     } else {
       return json({ error: "Unsupported search mode." }, 400);
     }
@@ -74,16 +76,27 @@ async function traktFetch(path, clientId) {
   const response = await fetch(`${TRAKT_API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      "User-Agent": "trakt-list-lookup/0.1 (+https://trakt-list-lookup.pages.dev)",
       "trakt-api-version": "2",
       "trakt-api-key": clientId,
     },
   });
 
   if (!response.ok) {
-    throw httpError(getTraktErrorMessage(response.status), response.status);
+    const body = await response.text();
+    console.error("Trakt API error", {
+      status: response.status,
+      path,
+      body: body.slice(0, 500),
+    });
+    throw httpError(getTraktErrorMessage(response.status, body), response.status);
   }
 
   return response.json();
+}
+
+function getClientId(env) {
+  return String(env.TRAKT_CLIENT_ID || "").trim();
 }
 
 function parseTraktListUrl(value) {
@@ -147,12 +160,13 @@ function normalizeList(list) {
   };
 }
 
-function getTraktErrorMessage(status) {
+function getTraktErrorMessage(status, body = "") {
+  const detail = body ? ` Trakt response: ${body.slice(0, 240)}` : "";
   if (status === 401) return "Trakt requires OAuth for that request.";
-  if (status === 403) return "Trakt rejected the API key or the app is not approved.";
+  if (status === 403) return `Trakt rejected the API key or the app is not approved.${detail}`;
   if (status === 404) return "No matching Trakt list was found.";
   if (status === 429) return "Trakt rate limit exceeded. Try again shortly.";
-  return `Trakt returned HTTP ${status}.`;
+  return `Trakt returned HTTP ${status}.${detail}`;
 }
 
 function httpError(message, status) {
