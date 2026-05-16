@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trakt List Lookup</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="search-panel" aria-labelledby="page-title">
+        <div class="title-row">
+          <div>
+            <p class="eyebrow">Trakt list search</p>
+            <h1 id="page-title">Find public Trakt list IDs and links</h1>
+          </div>
+          <a class="trakt-link" href="https://trakt.tv/search/lists" target="_blank" rel="noreferrer">trakt.tv</a>
+        </div>
+
+        <form id="search-form" class="search-form">
+          <div class="mode-tabs" role="tablist" aria-label="Search mode">
+            <label>
+              <input type="radio" name="mode" value="search" checked>
+              <span>Keyword</span>
+            </label>
+            <label>
+              <input type="radio" name="mode" value="user">
+              <span>User</span>
+            </label>
+            <label>
+              <input type="radio" name="mode" value="url">
+              <span>URL</span>
+            </label>
+          </div>
+
+          <div class="query-row">
+            <input id="query" name="query" type="search" autocomplete="off" spellcheck="false" placeholder="Search public lists, paste a username, or paste a Trakt list URL">
+            <button type="submit">
+              <span aria-hidden="true">⌕</span>
+              Search
+            </button>
+          </div>
+        </form>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="results-wrap" aria-label="Search results">
+        <div class="results-toolbar">
+          <h2>Results</h2>
+          <button id="clear-button" type="button" class="ghost-button">Clear</button>
+        </div>
+        <div id="results" class="results empty-state">
+          <p>Results will appear here.</p>
+        </div>
+      </section>
+    </main>
+
+    <template id="result-template">
+      <article class="result-card">
+        <div class="result-main">
+          <div>
+            <p class="result-owner"></p>
+            <h3 class="result-title"></h3>
+          </div>
+          <a class="open-link" target="_blank" rel="noreferrer">Open</a>
+        </div>
+
+        <p class="description"></p>
+
+        <dl class="meta-grid">
+          <div>
+            <dt>Trakt ID</dt>
+            <dd class="trakt-id"></dd>
+          </div>
+          <div>
+            <dt>Slug</dt>
+            <dd class="slug"></dd>
+          </div>
+          <div>
+            <dt>Items</dt>
+            <dd class="items"></dd>
+          </div>
+          <div>
+            <dt>Likes</dt>
+            <dd class="likes"></dd>
+          </div>
+        </dl>
+
+        <div class="copy-row">
+          <button type="button" data-copy="id">Copy ID</button>
+          <button type="button" data-copy="url">Copy URL</button>
+          <button type="button" data-copy="slug">Copy Slug</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

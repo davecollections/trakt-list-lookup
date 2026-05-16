@@ -1,0 +1,10 @@
+{
+  "name": "trakt-list-lookup",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check app.js && node --check functions/api/trakt.js",
+    "dev": "wrangler pages dev ."
+  }
+}
