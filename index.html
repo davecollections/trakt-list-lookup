@@ -47,8 +47,16 @@
       <section class="results-wrap" aria-label="Search results">
         <div class="results-toolbar">
           <h2>Results</h2>
-          <button id="clear-button" type="button" class="ghost-button">Clear</button>
+          <div class="toolbar-actions">
+            <div id="pager" class="pager" hidden>
+              <button id="prev-page" type="button" class="ghost-button">Previous</button>
+              <span id="page-label"></span>
+              <button id="next-page" type="button" class="ghost-button">Next</button>
+            </div>
+            <button id="clear-button" type="button" class="ghost-button">Clear</button>
+          </div>
         </div>
+        <nav id="result-jumps" class="result-jumps" aria-label="Jump to result" hidden></nav>
         <div id="results" class="results empty-state">
           <p>Results will appear here.</p>
         </div>
@@ -62,7 +70,7 @@
             <p class="result-owner"></p>
             <h3 class="result-title"></h3>
           </div>
-          <a class="open-link" target="_blank" rel="noreferrer">Open</a>
+          <a class="open-link" target="_blank" rel="noreferrer">Open on Trakt</a>
         </div>
 
         <p class="description"></p>
@@ -90,6 +98,15 @@
           <button type="button" data-copy="id">Copy ID</button>
           <button type="button" data-copy="url">Copy URL</button>
           <button type="button" data-copy="slug">Copy Slug</button>
+          <button type="button" class="view-items-button">View Items</button>
+        </div>
+
+        <div class="item-panel" hidden>
+          <div class="item-panel-header">
+            <h4>List Preview</h4>
+            <span class="item-status"></span>
+          </div>
+          <div class="item-list"></div>
         </div>
       </article>
     </template>

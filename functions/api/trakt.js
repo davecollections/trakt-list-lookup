@@ -1,16 +1,13 @@
 const TRAKT_API_BASE = "https://api.trakt.tv";
 const TRAKT_WEB_BASE = "https://trakt.tv";
 const RESULT_LIMIT = 20;
+const ITEM_LIMIT = 30;
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode") || "search";
   const query = (url.searchParams.get("q") || "").trim();
-
-  if (!query) {
-    return json({ error: "Missing search query." }, 400);
-  }
-
+  const page = getPositiveInteger(url.searchParams.get("page"), 1);
   const clientId = getClientId(env);
 
   if (!clientId) {
@@ -18,37 +15,68 @@ export async function onRequestGet({ request, env }) {
   }
 
   try {
-    let results;
+    if (mode === "items") {
+      const username = (url.searchParams.get("user") || "").trim();
+      const slug = (url.searchParams.get("slug") || "").trim();
+      const limit = getPositiveInteger(url.searchParams.get("limit"), ITEM_LIMIT);
+      if (!username || !slug) {
+        return json({ error: "Missing Trakt username or list slug." }, 400);
+      }
+
+      const payload = await getListItems(username, slug, page, Math.min(limit, 50), clientId);
+      return json({
+        items: payload.data.map(normalizeListItem).filter(Boolean),
+        pagination: payload.pagination,
+      });
+    }
+
+    if (!query) {
+      return json({ error: "Missing search query." }, 400);
+    }
+
+    let payload;
     if (mode === "search") {
-      results = await searchLists(query, clientId);
+      payload = await searchLists(query, page, clientId);
     } else if (mode === "user") {
-      results = await getUserLists(query, clientId);
+      payload = await getUserLists(query, page, clientId);
     } else if (mode === "url") {
-      results = await resolveListUrl(query, clientId);
+      payload = await resolveListUrl(query, clientId);
     } else {
       return json({ error: "Unsupported search mode." }, 400);
     }
 
-    return json({ results: results.map(normalizeList).filter(Boolean) });
+    return json({
+      results: payload.data.map(normalizeList).filter(Boolean),
+      pagination: payload.pagination,
+    });
   } catch (error) {
     const status = error.status || 502;
     return json({ error: error.message || "Trakt request failed." }, status);
   }
 }
 
-async function searchLists(query, clientId) {
+async function searchLists(query, page, clientId) {
   const params = new URLSearchParams({
     query,
+    page: String(page),
     limit: String(RESULT_LIMIT),
     extended: "full",
   });
-  const data = await traktFetch(`/search/list?${params.toString()}`, clientId);
-  return data.map((item) => item.list).filter(Boolean);
+  const payload = await traktFetch(`/search/list?${params.toString()}`, clientId);
+  return {
+    data: payload.data.map((item) => item.list).filter(Boolean),
+    pagination: payload.pagination,
+  };
 }
 
-async function getUserLists(username, clientId) {
+async function getUserLists(username, page, clientId) {
   const safeUsername = encodeURIComponent(username.replace(/^@/, ""));
-  return traktFetch(`/users/${safeUsername}/lists?extended=full`, clientId);
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(RESULT_LIMIT),
+    extended: "full",
+  });
+  return traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
 }
 
 async function resolveListUrl(value, clientId) {
@@ -60,16 +88,33 @@ async function resolveListUrl(value, clientId) {
   if (parsed.kind === "user-list") {
     const username = encodeURIComponent(parsed.username);
     const slug = encodeURIComponent(parsed.slug);
-    const list = await traktFetch(`/users/${username}/lists/${slug}?extended=full`, clientId);
-    return [list];
+    const payload = await traktFetch(`/users/${username}/lists/${slug}?extended=full`, clientId);
+    return {
+      data: [payload.data],
+      pagination: singleResultPagination(),
+    };
   }
 
   if (parsed.kind === "list-id") {
-    const list = await traktFetch(`/lists/${encodeURIComponent(parsed.id)}?extended=full`, clientId);
-    return [list];
+    const payload = await traktFetch(`/lists/${encodeURIComponent(parsed.id)}?extended=full`, clientId);
+    return {
+      data: [payload.data],
+      pagination: singleResultPagination(),
+    };
   }
 
   throw httpError("Unsupported Trakt list URL.", 400);
+}
+
+async function getListItems(username, slug, page, limit, clientId) {
+  const safeUsername = encodeURIComponent(username);
+  const safeSlug = encodeURIComponent(slug);
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+    extended: "full",
+  });
+  return traktFetch(`/users/${safeUsername}/lists/${safeSlug}/items?${params.toString()}`, clientId);
 }
 
 async function traktFetch(path, clientId) {
@@ -92,11 +137,42 @@ async function traktFetch(path, clientId) {
     throw httpError(getTraktErrorMessage(response.status, body), response.status);
   }
 
-  return response.json();
+  return {
+    data: await response.json(),
+    pagination: getPagination(response),
+  };
 }
 
 function getClientId(env) {
   return String(env.TRAKT_CLIENT_ID || "").trim();
+}
+
+function getPositiveInteger(value, fallback) {
+  const number = Number.parseInt(value, 10);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function getPagination(response) {
+  const page = getPositiveInteger(response.headers.get("x-pagination-page"), 1);
+  const limit = getPositiveInteger(response.headers.get("x-pagination-limit"), RESULT_LIMIT);
+  const pageCount = getPositiveInteger(response.headers.get("x-pagination-page-count"), 1);
+  const itemCount = getPositiveInteger(response.headers.get("x-pagination-item-count"), 0);
+
+  return {
+    page,
+    limit,
+    page_count: pageCount,
+    item_count: itemCount,
+  };
+}
+
+function singleResultPagination() {
+  return {
+    page: 1,
+    limit: 1,
+    page_count: 1,
+    item_count: 1,
+  };
 }
 
 function parseTraktListUrl(value) {
@@ -157,6 +233,27 @@ function normalizeList(list) {
       name: user.name || "",
     },
     url,
+  };
+}
+
+function normalizeListItem(item) {
+  if (!item || !item.type) return null;
+
+  const media = item[item.type] || {};
+  const title = item.type === "episode" && item.show?.title
+    ? `${item.show.title}: ${media.title || "Untitled episode"}`
+    : media.title || media.name || "Untitled";
+
+  return {
+    rank: item.rank,
+    type: item.type,
+    title,
+    year: media.year || item.show?.year || "",
+    ids: {
+      trakt: media.ids?.trakt,
+      tmdb: media.ids?.tmdb,
+      imdb: media.ids?.imdb,
+    },
   };
 }
 
