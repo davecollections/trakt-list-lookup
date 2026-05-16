@@ -10,6 +10,7 @@ const nextPageButton = document.querySelector("#next-page");
 const pageLabel = document.querySelector("#page-label");
 const themeToggle = document.querySelector("#theme-toggle");
 const sortSelect = document.querySelector("#sort-select");
+const pageSizeSelect = document.querySelector("#page-size-select");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 15;
@@ -20,6 +21,7 @@ const state = {
   page: 1,
   pagination: null,
   results: [],
+  limit: 20,
 };
 
 const placeholders = {
@@ -74,6 +76,11 @@ sortSelect.addEventListener("change", () => {
   renderCurrentResults();
 });
 
+pageSizeSelect.addEventListener("change", () => {
+  state.limit = Number(pageSizeSelect.value);
+  if (state.query) runSearch(1);
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -87,6 +94,7 @@ form.addEventListener("submit", async (event) => {
 
   state.mode = mode;
   state.query = query;
+  state.limit = Number(pageSizeSelect.value);
   await runSearch(1);
 });
 
@@ -100,6 +108,7 @@ async function runSearch(page) {
       mode: state.mode,
       q: state.query,
       page: String(state.page),
+      limit: String(state.limit),
     });
     const response = await fetch(`/api/trakt?${params.toString()}`);
     const payload = await response.json();

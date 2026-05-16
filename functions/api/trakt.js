@@ -2,6 +2,7 @@ const TRAKT_API_BASE = "https://api.trakt.tv";
 const TRAKT_WEB_BASE = "https://trakt.tv";
 const SUPPORTED_TRAKT_HOSTS = new Set(["trakt.tv", "app.trakt.tv"]);
 const RESULT_LIMIT = 20;
+const MAX_RESULT_LIMIT = 50;
 const ITEM_LIMIT = 15;
 const MAX_PAGE = 25;
 const MAX_ITEM_LIMIT = 15;
@@ -14,6 +15,7 @@ export async function onRequestGet({ request, env }) {
   const mode = url.searchParams.get("mode") || "search";
   const query = (url.searchParams.get("q") || "").trim();
   const page = clampPositiveInteger(url.searchParams.get("page"), 1, MAX_PAGE);
+  const resultLimit = clampPositiveInteger(url.searchParams.get("limit"), RESULT_LIMIT, MAX_RESULT_LIMIT);
   const clientId = getClientId(env);
 
   if (!clientId) {
@@ -48,9 +50,9 @@ export async function onRequestGet({ request, env }) {
 
     let payload;
     if (mode === "search") {
-      payload = await searchLists(query, page, clientId);
+      payload = await searchLists(query, page, resultLimit, clientId);
     } else if (mode === "user") {
-      payload = await getUserLists(query, page, clientId);
+      payload = await getUserLists(query, page, resultLimit, clientId);
     } else if (mode === "url") {
       payload = await resolveListUrl(query, clientId);
     } else {
@@ -67,11 +69,11 @@ export async function onRequestGet({ request, env }) {
   }
 }
 
-async function searchLists(query, page, clientId) {
+async function searchLists(query, page, limit, clientId) {
   const params = new URLSearchParams({
     query,
     page: String(page),
-    limit: String(RESULT_LIMIT),
+    limit: String(limit),
     extended: "full",
   });
   const payload = await traktFetch(`/search/list?${params.toString()}`, clientId);
@@ -81,7 +83,7 @@ async function searchLists(query, page, clientId) {
   };
 }
 
-async function getUserLists(username, page, clientId) {
+async function getUserLists(username, page, limit, clientId) {
   const parsed = parseUserListQuery(username);
   if (!isSafePathSegment(parsed.username)) {
     throw httpError("Invalid Trakt username.", 400);
@@ -94,7 +96,7 @@ async function getUserLists(username, page, clientId) {
   const safeUsername = encodeURIComponent(parsed.username);
   const params = new URLSearchParams({
     page: String(page),
-    limit: String(RESULT_LIMIT),
+    limit: String(limit),
     extended: "full",
   });
   return traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
@@ -231,8 +233,10 @@ function isSafePathSegment(value) {
 function getPagination(response) {
   const page = getPositiveInteger(response.headers.get("x-pagination-page"), 1);
   const limit = getPositiveInteger(response.headers.get("x-pagination-limit"), RESULT_LIMIT);
-  const pageCount = getPositiveInteger(response.headers.get("x-pagination-page-count"), 1);
   const itemCount = getPositiveInteger(response.headers.get("x-pagination-item-count"), 0);
+  const headerPageCount = getPositiveInteger(response.headers.get("x-pagination-page-count"), 1);
+  const calculatedPageCount = itemCount && limit ? Math.ceil(itemCount / limit) : 1;
+  const pageCount = Math.max(headerPageCount, calculatedPageCount);
 
   return {
     page,
