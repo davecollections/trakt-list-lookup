@@ -2,9 +2,9 @@ const TRAKT_API_BASE = "https://api.trakt.tv";
 const TRAKT_WEB_BASE = "https://trakt.tv";
 const SUPPORTED_TRAKT_HOSTS = new Set(["trakt.tv", "app.trakt.tv"]);
 const RESULT_LIMIT = 20;
-const ITEM_LIMIT = 30;
+const ITEM_LIMIT = 15;
 const MAX_PAGE = 25;
-const MAX_ITEM_LIMIT = 50;
+const MAX_ITEM_LIMIT = 15;
 const MAX_QUERY_LENGTH = 220;
 const SUCCESS_CACHE_SECONDS = 300;
 const USER_FILTER_LIMIT = 100;
@@ -32,7 +32,7 @@ export async function onRequestGet({ request, env }) {
         return json({ error: "Invalid Trakt username or list slug." }, 400);
       }
 
-      const payload = await getListItems(username, slug, page, Math.min(limit, 50), clientId);
+      const payload = await getListItems(username, slug, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
       return json({
         items: payload.data.map(normalizeListItem).filter(Boolean),
         pagination: payload.pagination,
@@ -300,6 +300,7 @@ function normalizeList(list) {
     item_count: list.item_count,
     like_count: list.like_count,
     comment_count: list.comment_count,
+    updated_at: list.updated_at || list.updated || "",
     ids: {
       trakt: ids.trakt,
       slug: ids.slug,

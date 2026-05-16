@@ -71,7 +71,6 @@
             <button id="clear-button" type="button" class="ghost-button">Clear</button>
           </div>
         </div>
-        <nav id="result-jumps" class="result-jumps" aria-label="Jump to result" hidden></nav>
         <div id="results" class="results empty-state">
           <p>Results will appear here.</p>
         </div>
@@ -105,10 +104,6 @@
             <dd class="trakt-id"></dd>
           </div>
           <div>
-            <dt>Slug</dt>
-            <dd class="slug"></dd>
-          </div>
-          <div>
             <dt>Items</dt>
             <dd class="items"></dd>
           </div>
@@ -118,7 +113,11 @@
           </div>
           <div>
             <dt>Comments</dt>
-            <dd class="comments"></dd>
+            <dd class="comments"><a target="_blank" rel="noreferrer"></a></dd>
+          </div>
+          <div>
+            <dt>Updated</dt>
+            <dd class="updated"></dd>
           </div>
         </dl>
 
@@ -131,7 +130,7 @@
 
         <div class="item-panel" hidden>
           <div class="item-panel-header">
-            <h4>List Preview</h4>
+            <h4>List Preview <span>first 15 only</span></h4>
             <span class="item-status"></span>
           </div>
           <div class="item-list"></div>

@@ -4,7 +4,6 @@ const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
 const clearButton = document.querySelector("#clear-button");
 const template = document.querySelector("#result-template");
-const jumpNav = document.querySelector("#result-jumps");
 const pager = document.querySelector("#pager");
 const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
@@ -13,7 +12,7 @@ const themeToggle = document.querySelector("#theme-toggle");
 const sortSelect = document.querySelector("#sort-select");
 
 const DESCRIPTION_LIMIT = 360;
-const ITEMS_PREVIEW_LIMIT = 30;
+const ITEMS_PREVIEW_LIMIT = 15;
 
 const state = {
   mode: "search",
@@ -59,7 +58,6 @@ clearButton.addEventListener("click", () => {
   setStatus("");
   renderResults([]);
   renderPagination(null);
-  renderJumps([]);
   queryInput.focus();
 });
 
@@ -121,7 +119,6 @@ async function runSearch(page) {
     setStatus(results.length ? `Found ${countText}.` : "No matching public lists found.");
   } catch (error) {
     renderResults([]);
-    renderJumps([]);
     state.results = [];
     renderPagination(null);
     setStatus(error.message, true);
@@ -133,7 +130,6 @@ async function runSearch(page) {
 function renderCurrentResults() {
   const results = getSortedResults(state.results);
   renderResults(results);
-  renderJumps(results);
 }
 
 function getMode() {
@@ -176,10 +172,13 @@ function renderResults(results) {
     node.querySelector(".result-title").textContent = title;
     node.querySelector(".description").textContent = cleanDescription(result.description);
     node.querySelector(".trakt-id").textContent = result.ids?.trakt || "n/a";
-    node.querySelector(".slug").textContent = result.ids?.slug || "n/a";
     node.querySelector(".items").textContent = formatNumber(result.item_count);
     node.querySelector(".likes").textContent = formatNumber(result.like_count);
-    node.querySelector(".comments").textContent = formatNumber(result.comment_count);
+    node.querySelector(".updated").textContent = formatDate(result.updated_at);
+    const commentsLink = node.querySelector(".comments a");
+    commentsLink.textContent = formatNumber(result.comment_count);
+    commentsLink.href = getCommentsUrl(result);
+    commentsLink.hidden = !result.url;
 
     const openLink = node.querySelector(".open-link");
     openLink.href = url;
@@ -199,19 +198,6 @@ function renderResults(results) {
     viewItemsButton.addEventListener("click", () => loadItems(card, result, viewItemsButton));
 
     resultsEl.append(node);
-  });
-}
-
-function renderJumps(results) {
-  jumpNav.textContent = "";
-  jumpNav.hidden = results.length === 0;
-
-  results.forEach((result, index) => {
-    const link = document.createElement("a");
-    link.href = `#result-${index + 1}`;
-    link.textContent = String(index + 1);
-    link.title = result.name || `Result ${index + 1}`;
-    jumpNav.append(link);
   });
 }
 
@@ -291,7 +277,7 @@ async function loadItems(card, result, button) {
     const items = payload.items || [];
     renderItems(itemList, items);
     const total = payload.pagination?.item_count || items.length || 0;
-    status.textContent = total ? `Showing ${Math.min(ITEMS_PREVIEW_LIMIT, items.length)} of ${formatNumber(total)}` : "No items found.";
+    status.textContent = total ? `Previewing ${Math.min(ITEMS_PREVIEW_LIMIT, items.length)} of ${formatNumber(total)}` : "No items found.";
     panel.dataset.loaded = "true";
     button.textContent = "Hide Items";
   } catch (error) {
@@ -316,6 +302,7 @@ function renderItems(container, items) {
   items.forEach((item) => {
     const card = document.createElement("article");
     card.className = "poster-card";
+    card.title = item.title || "";
 
     const posterWrap = document.createElement("div");
     posterWrap.className = "poster-wrap";
@@ -333,15 +320,13 @@ function renderItems(container, items) {
 
     const body = document.createElement("div");
     body.className = "poster-body";
-    const title = document.createElement("strong");
-    title.textContent = item.title || "Untitled";
     const meta = document.createElement("span");
-    meta.textContent = [item.type, item.year].filter(Boolean).join(" - ");
+    meta.textContent = item.year || "Year n/a";
 
     const ids = document.createElement("code");
     ids.textContent = buildItemIdText(item);
 
-    body.append(title, meta, ids);
+    body.append(meta, ids);
     card.append(posterWrap, body);
     container.append(card);
   });
@@ -378,6 +363,13 @@ function formatNumber(value) {
   return Number(value).toLocaleString();
 }
 
+function formatDate(value) {
+  if (!value) return "n/a";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "n/a";
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
 function getCopyValue(kind, result) {
   if (kind === "id") return result.ids?.trakt ? String(result.ids.trakt) : "";
   if (kind === "slug") return result.ids?.slug || "";
@@ -386,7 +378,12 @@ function getCopyValue(kind, result) {
 }
 
 function getUserProfileUrl(result) {
-  return result.user?.username ? `https://trakt.tv/users/${encodeURIComponent(result.user.username)}` : "";
+  return result.user?.username ? `https://app.trakt.tv/users/${encodeURIComponent(result.user.username)}` : "";
+}
+
+function getCommentsUrl(result) {
+  if (!result.user?.username || !result.ids?.slug) return "";
+  return `https://app.trakt.tv/users/${encodeURIComponent(result.user.username)}/lists/${encodeURIComponent(result.ids.slug)}/comments`;
 }
 
 function flashButton(button) {
