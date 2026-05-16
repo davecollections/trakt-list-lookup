@@ -2,12 +2,16 @@ const TRAKT_API_BASE = "https://api.trakt.tv";
 const TRAKT_WEB_BASE = "https://trakt.tv";
 const RESULT_LIMIT = 20;
 const ITEM_LIMIT = 30;
+const MAX_PAGE = 25;
+const MAX_ITEM_LIMIT = 50;
+const MAX_QUERY_LENGTH = 220;
+const SUCCESS_CACHE_SECONDS = 300;
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode") || "search";
   const query = (url.searchParams.get("q") || "").trim();
-  const page = getPositiveInteger(url.searchParams.get("page"), 1);
+  const page = clampPositiveInteger(url.searchParams.get("page"), 1, MAX_PAGE);
   const clientId = getClientId(env);
 
   if (!clientId) {
@@ -18,20 +22,26 @@ export async function onRequestGet({ request, env }) {
     if (mode === "items") {
       const username = (url.searchParams.get("user") || "").trim();
       const slug = (url.searchParams.get("slug") || "").trim();
-      const limit = getPositiveInteger(url.searchParams.get("limit"), ITEM_LIMIT);
+      const limit = clampPositiveInteger(url.searchParams.get("limit"), ITEM_LIMIT, MAX_ITEM_LIMIT);
       if (!username || !slug) {
         return json({ error: "Missing Trakt username or list slug." }, 400);
+      }
+      if (!isSafePathSegment(username) || !isSafePathSegment(slug)) {
+        return json({ error: "Invalid Trakt username or list slug." }, 400);
       }
 
       const payload = await getListItems(username, slug, page, Math.min(limit, 50), clientId);
       return json({
         items: payload.data.map(normalizeListItem).filter(Boolean),
         pagination: payload.pagination,
-      });
+      }, 200, true);
     }
 
     if (!query) {
       return json({ error: "Missing search query." }, 400);
+    }
+    if (query.length > MAX_QUERY_LENGTH) {
+      return json({ error: `Search query is too long. Keep it under ${MAX_QUERY_LENGTH} characters.` }, 400);
     }
 
     let payload;
@@ -48,10 +58,10 @@ export async function onRequestGet({ request, env }) {
     return json({
       results: payload.data.map(normalizeList).filter(Boolean),
       pagination: payload.pagination,
-    });
+    }, 200, true);
   } catch (error) {
     const status = error.status || 502;
-    return json({ error: error.message || "Trakt request failed." }, status);
+    return json({ error: getPublicErrorMessage(error, status) }, status);
   }
 }
 
@@ -150,6 +160,14 @@ function getClientId(env) {
 function getPositiveInteger(value, fallback) {
   const number = Number.parseInt(value, 10);
   return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function clampPositiveInteger(value, fallback, max) {
+  return Math.min(getPositiveInteger(value, fallback), max);
+}
+
+function isSafePathSegment(value) {
+  return /^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/.test(value);
 }
 
 function getPagination(response) {
@@ -266,18 +284,25 @@ function getTraktErrorMessage(status, body = "") {
   return `Trakt returned HTTP ${status}.${detail}`;
 }
 
+function getPublicErrorMessage(error, status) {
+  if (status >= 500) return "Trakt request failed. Try again shortly.";
+  return error.message || "Trakt request failed.";
+}
+
 function httpError(message, status) {
   const error = new Error(message);
   error.status = status;
   return error;
 }
 
-function json(payload, status = 200) {
+function json(payload, status = 200, cacheable = false) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
+      "Cache-Control": cacheable
+        ? `public, max-age=${SUCCESS_CACHE_SECONDS}, s-maxage=${SUCCESS_CACHE_SECONDS}`
+        : "no-store",
     },
   });
 }

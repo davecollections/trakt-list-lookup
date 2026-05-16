@@ -16,9 +16,14 @@ The browser never receives the Trakt key. All Trakt calls go through `/api/trakt
 
 - Keyword search: `GET /search/list?query=...`
 - User public lists: `GET /users/:username/lists`
+- List item previews: `GET /users/:username/lists/:slug/items`
 - URL validation:
   - `https://trakt.tv/users/:username/lists/:slug`
   - `https://trakt.tv/lists/:id`
+
+## Preview status
+
+`robots.txt` currently discourages indexing while the project is being tested.
 
 ## Local notes
 
