@@ -36,6 +36,13 @@ themeToggle.addEventListener("click", () => {
   setTheme(nextTheme);
 });
 
+queryInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+
 document.querySelectorAll("input[name='mode']").forEach((radio) => {
   radio.addEventListener("change", () => {
     queryInput.placeholder = placeholders[getMode()];
