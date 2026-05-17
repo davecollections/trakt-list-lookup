@@ -428,10 +428,10 @@ h2 {
 
 .copy-row button {
   min-height: 34px;
-  padding: 0 9px;
+  padding: 0 12px;
   background: var(--text);
   color: var(--bg);
-  font-size: 0.82rem;
+  font-size: 0.86rem;
 }
 
 .view-items-button {

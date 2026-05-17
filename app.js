@@ -463,7 +463,6 @@ function formatDate(value) {
 
 function getCopyValue(kind, result) {
   if (kind === "id") return result.ids?.trakt ? String(result.ids.trakt) : "";
-  if (kind === "slug") return result.ids?.slug || "";
   if (kind === "url") return result.url || "";
   return "";
 }
