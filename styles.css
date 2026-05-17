@@ -8,7 +8,8 @@
   --accent: #e53345;
   --accent-dark: #bb2635;
   --soft: #f0f3f7;
-  --shadow: 0 18px 45px rgba(31, 41, 55, 0.12);
+  --shadow: 0 14px 32px rgba(31, 41, 55, 0.08);
+  --card-shadow: 0 8px 22px rgba(31, 41, 55, 0.08);
   --item-bg: #ffffff;
   --primary-tile: #17191f;
   --primary-tile-muted: rgba(255, 255, 255, 0.68);
@@ -26,6 +27,7 @@
   --accent-dark: #ff6d7b;
   --soft: #242934;
   --shadow: 0 18px 45px rgba(0, 0, 0, 0.34);
+  --card-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   --item-bg: #20242d;
   --primary-tile: #f3f5f7;
   --primary-tile-muted: rgba(17, 19, 24, 0.68);
@@ -275,8 +277,8 @@ h2 {
 .results {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  padding: 18px;
+  gap: 16px;
+  padding: 22px;
 }
 
 .empty-state {
@@ -288,10 +290,13 @@ h2 {
 .result-card {
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid var(--border);
+  gap: 16px;
+  min-height: 100%;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--border) 86%, var(--text));
   border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--card-shadow);
 }
 
 .result-owner,
@@ -301,18 +306,20 @@ h2 {
 }
 
 .result-owner {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-size: 0.86rem;
   font-weight: 800;
 }
 
 .result-title {
-  font-size: 1.2rem;
+  min-height: 2.6em;
+  font-size: 1.18rem;
   line-height: 1.25;
 }
 
 .description {
   max-width: 100%;
+  min-height: 4.35em;
   line-height: 1.45;
   display: -webkit-box;
   overflow: hidden;
@@ -322,15 +329,16 @@ h2 {
 
 .meta-grid {
   display: grid;
-  grid-template-columns: 1.15fr 0.75fr 0.75fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .meta-grid div {
   min-width: 0;
-  padding: 7px 9px;
+  padding: 8px;
   background: var(--soft);
-  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 6px;
 }
 
 .meta-grid div:first-child {
@@ -343,16 +351,16 @@ h2 {
 }
 
 .meta-grid dt {
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .meta-grid dd {
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   overflow-wrap: anywhere;
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.12;
 }
 
 .trakt-id {
@@ -362,15 +370,18 @@ h2 {
 .copy-row {
   justify-content: flex-start;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
 .copy-row button {
-  padding: 0 12px;
+  min-height: 36px;
+  padding: 0 11px;
   background: var(--text);
   color: var(--bg);
 }
 
 .view-items-button {
+  margin-top: 2px;
   background: var(--accent) !important;
 }
 
@@ -427,17 +438,17 @@ body.modal-open {
 
 .item-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
   margin-top: 12px;
 }
 
 .preview-item {
   display: grid;
-  grid-template-columns: auto 62px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: auto 64px minmax(0, 1fr);
+  gap: 12px;
   min-width: 0;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--item-bg);
@@ -446,8 +457,8 @@ body.modal-open {
 .preview-rank {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
   background: var(--soft);
   color: var(--muted);
@@ -457,7 +468,7 @@ body.modal-open {
 
 .preview-poster {
   display: grid;
-  width: 62px;
+  width: 64px;
   aspect-ratio: 2 / 3;
   place-items: center;
   overflow: hidden;
@@ -478,19 +489,22 @@ body.modal-open {
 
 .preview-body {
   display: grid;
-  gap: 3px;
+  align-content: start;
+  gap: 2px;
   min-width: 0;
 }
 
 .preview-body strong,
-.preview-body span,
-.preview-body code {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.preview-body span {
+  overflow-wrap: anywhere;
+}
+
+.preview-body > span {
+  margin-top: 0;
 }
 
 .preview-body strong {
+  line-height: 1.22;
   font-size: 0.9rem;
 }
 
@@ -500,9 +514,18 @@ body.modal-open {
   font-weight: 800;
 }
 
-.preview-body code {
+.preview-ids {
+  display: grid;
+  gap: 1px;
+  margin-top: 4px;
   color: var(--code);
   font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.preview-ids span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .item-empty {

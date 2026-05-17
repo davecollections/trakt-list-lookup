@@ -365,7 +365,12 @@ function renderItems(container, items) {
     meta.textContent = item.year ? String(item.year) : "Year n/a";
 
     const ids = document.createElement("code");
-    ids.textContent = buildItemIdText(item);
+    ids.className = "preview-ids";
+    getItemIdParts(item).forEach((part) => {
+      const line = document.createElement("span");
+      line.textContent = part;
+      ids.append(line);
+    });
 
     body.append(title, meta, ids);
     card.append(rank, posterWrap, body);
@@ -373,12 +378,12 @@ function renderItems(container, items) {
   });
 }
 
-function buildItemIdText(item) {
+function getItemIdParts(item) {
   const parts = [];
   if (item.ids?.trakt) parts.push(`trakt:${item.ids.trakt}`);
   if (item.ids?.tmdb) parts.push(`tmdb:${item.ids.tmdb}`);
   if (item.ids?.imdb) parts.push(`imdb:${item.ids.imdb}`);
-  return parts.join("  ") || "ids:n/a";
+  return parts.length ? parts : ["ids:n/a"];
 }
 
 function cleanDescription(value) {
