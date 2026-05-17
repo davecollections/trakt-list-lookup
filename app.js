@@ -24,6 +24,7 @@ const descriptionFull = document.querySelector("#description-full");
 const descriptionCloseButton = document.querySelector("#description-close");
 const selectionPanel = document.querySelector("#selection-panel");
 const selectionSummary = document.querySelector("#selection-summary");
+const selectedListChips = document.querySelector("#selected-list-chips");
 const openNuvioExportButton = document.querySelector("#open-nuvio-export");
 const clearSelectionButton = document.querySelector("#clear-selection");
 const nuvioModal = document.querySelector("#nuvio-modal");
@@ -422,9 +423,31 @@ function updateSelectionUi() {
   selectionSummary.textContent = count
     ? `${formatNumber(count)} list${count === 1 ? "" : "s"} selected.`
     : "No lists selected.";
+  renderSelectedListChips();
   openNuvioExportButton.disabled = count === 0;
   clearSelectionButton.disabled = count === 0;
   if (!nuvioModal.hidden) updateNuvioOutput();
+}
+
+function renderSelectedListChips() {
+  selectedListChips.textContent = "";
+
+  [...state.selectedLists.values()].slice(0, 6).forEach((result) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "selected-chip";
+    chip.textContent = result.name || "Untitled list";
+    chip.title = "Remove from selection";
+    chip.addEventListener("click", () => toggleSelectedList(result));
+    selectedListChips.append(chip);
+  });
+
+  if (state.selectedLists.size > 6) {
+    const more = document.createElement("span");
+    more.className = "selected-more";
+    more.textContent = `+${formatNumber(state.selectedLists.size - 6)} more`;
+    selectedListChips.append(more);
+  }
 }
 
 function clearSelection() {

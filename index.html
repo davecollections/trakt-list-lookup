@@ -60,6 +60,7 @@
         <div>
           <h2>Selected lists</h2>
           <p id="selection-summary">No lists selected.</p>
+          <div id="selected-list-chips" class="selected-list-chips"></div>
         </div>
         <div class="selection-actions">
           <button id="open-nuvio-export" type="button" disabled>Create Nuvio JSON</button>
@@ -196,6 +197,8 @@
           </div>
           <button id="nuvio-close" type="button" class="ghost-button">Close</button>
         </div>
+
+        <p class="nuvio-warning">Trakt list export is pending validation against a real Nuvio Trakt collection. Use this as a draft until the source schema is confirmed.</p>
 
         <div class="nuvio-grid">
           <label>

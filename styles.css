@@ -249,6 +249,39 @@ h2 {
   font-weight: 800;
 }
 
+.selected-list-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.selected-chip,
+.selected-more {
+  max-width: 220px;
+  min-height: 28px;
+  padding: 0 9px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-chip {
+  cursor: pointer;
+}
+
+.selected-more {
+  display: inline-grid;
+  align-items: center;
+  color: var(--muted);
+}
+
 .selection-actions,
 .modal-actions {
   display: flex;
@@ -594,6 +627,17 @@ body.modal-open {
 
 .nuvio-dialog {
   width: min(920px, 100%);
+}
+
+.nuvio-warning {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.35;
 }
 
 .nuvio-grid {
