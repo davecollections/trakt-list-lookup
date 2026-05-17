@@ -435,6 +435,7 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("theme", theme);
   const isDark = theme === "dark";
-  themeToggle.textContent = isDark ? "Light" : "Dark";
+  themeToggle.textContent = isDark ? "☀" : "☾";
+  themeToggle.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   themeToggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
 }

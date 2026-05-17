@@ -167,7 +167,7 @@ h2 {
 
 .query-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 10px;
   margin-top: 14px;
 }
@@ -188,7 +188,8 @@ h2 {
 
 .query-row button,
 .copy-row button,
-.ghost-button {
+.ghost-button,
+.theme-toggle {
   min-height: 40px;
   border: 0;
   border-radius: 8px;
@@ -205,6 +206,10 @@ h2 {
 
 .query-row button:hover {
   background: var(--accent-dark);
+}
+
+.query-row .ghost-button {
+  height: 50px;
 }
 
 .status {
@@ -267,7 +272,19 @@ h2 {
   color: var(--text);
 }
 
+.theme-toggle {
+  display: grid;
+  width: 42px;
+  padding: 0;
+  place-items: center;
+  background: var(--soft);
+  color: var(--text);
+  font-size: 1.18rem;
+  line-height: 1;
+}
+
 .ghost-button:disabled,
+.theme-toggle:disabled,
 .query-row button:disabled,
 .copy-row button:disabled {
   cursor: not-allowed;
