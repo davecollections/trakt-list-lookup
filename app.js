@@ -2,6 +2,7 @@ const form = document.querySelector("#search-form");
 const queryInput = document.querySelector("#query");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
+const resultsHeader = document.querySelector(".results-header");
 const clearButton = document.querySelector("#clear-button");
 const template = document.querySelector("#result-template");
 const pager = document.querySelector("#pager");
@@ -9,7 +10,7 @@ const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
 const pageLabel = document.querySelector("#page-label");
 const themeToggle = document.querySelector("#theme-toggle");
-const sortSelect = document.querySelector("#sort-select");
+const sortButtons = document.querySelectorAll("[data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
 const previewModal = document.querySelector("#preview-modal");
 const previewTitle = document.querySelector("#preview-title");
@@ -51,6 +52,7 @@ const state = {
   results: [],
   limit: 30,
   activePreviewButton: null,
+  sort: "relevance",
   selectedLists: new Map(),
   posterSamples: new Map(),
 };
@@ -144,8 +146,12 @@ nextPageButton.addEventListener("click", () => {
   if (state.page < pageCount) runSearch(state.page + 1);
 });
 
-sortSelect.addEventListener("change", () => {
-  renderCurrentResults();
+sortButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    state.sort = button.dataset.sort;
+    updateSortButtons();
+    renderCurrentResults();
+  });
 });
 
 pageSizeSelect.addEventListener("change", () => {
@@ -241,6 +247,7 @@ function setStatus(message, isError = false) {
 function renderResults(results) {
   resultsEl.textContent = "";
   resultsEl.classList.toggle("empty-state", results.length === 0);
+  resultsHeader.hidden = results.length === 0;
 
   if (!results.length) {
     const empty = document.createElement("p");
@@ -265,7 +272,7 @@ function renderResults(results) {
     readMoreButton.hidden = !hasDescription(result.description);
     readMoreButton.addEventListener("click", () => openDescription(result, fullDescription));
     node.querySelector(".trakt-id-button").textContent = result.ids?.trakt || "n/a";
-    node.querySelector(".items").textContent = `${formatNumber(result.item_count)} items`;
+    node.querySelector(".items").textContent = formatNumber(result.item_count);
     node.querySelector(".likes").textContent = formatNumber(result.like_count);
     node.querySelector(".updated").textContent = formatDate(result.updated_at);
 
@@ -282,9 +289,9 @@ function renderResults(results) {
       });
     });
 
-    const viewItemsButton = node.querySelector(".view-items-button");
-    viewItemsButton.disabled = !result.user?.username || !result.ids?.slug;
-    viewItemsButton.addEventListener("click", () => openPreview(result, viewItemsButton));
+    const posterButton = node.querySelector(".poster-samples");
+    posterButton.disabled = !result.user?.username || !result.ids?.slug;
+    posterButton.addEventListener("click", () => openPreview(result, posterButton));
 
     const selectListButton = node.querySelector(".select-list-button");
     updateSelectListButton(selectListButton, result);
@@ -372,7 +379,7 @@ function getPosterSampleKey(result) {
 }
 
 function getSortedResults(results) {
-  const sort = sortSelect.value;
+  const sort = state.sort;
   const sorted = [...results];
   if (sort === "title") {
     sorted.sort((a, b) => compareText(a.name, b.name));
@@ -382,10 +389,14 @@ function getSortedResults(results) {
     sorted.sort((a, b) => compareNumber(b.item_count, a.item_count));
   } else if (sort === "likes-desc") {
     sorted.sort((a, b) => compareNumber(b.like_count, a.like_count));
-  } else if (sort === "id-desc") {
-    sorted.sort((a, b) => compareNumber(b.ids?.trakt, a.ids?.trakt));
   }
   return sorted;
+}
+
+function updateSortButtons() {
+  sortButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.sort === state.sort);
+  });
 }
 
 function compareText(a, b) {
@@ -407,8 +418,10 @@ function renderPagination(pagination) {
 
 async function openPreview(result, button) {
   state.activePreviewButton = button;
-  button.disabled = true;
-  button.textContent = "Loading";
+  if (button) {
+    button.disabled = true;
+    button.classList.add("loading");
+  }
   previewTitle.textContent = result.name || "List Preview";
   previewOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
   previewStatus.textContent = "Loading preview...";
@@ -439,8 +452,10 @@ async function openPreview(result, button) {
   } catch (error) {
     previewStatus.textContent = error.message;
   } finally {
-    button.disabled = false;
-    button.textContent = "Preview";
+    if (button) {
+      button.disabled = false;
+      button.classList.remove("loading");
+    }
   }
 }
 
@@ -486,7 +501,7 @@ function toggleSelectedList(result) {
 
 function updateSelectListButton(button, result) {
   const selected = state.selectedLists.has(getListSelectionKey(result));
-  button.textContent = selected ? "Remove" : "Select";
+  button.textContent = selected ? "Remove" : "Add";
   button.classList.toggle("selected", selected);
 }
 

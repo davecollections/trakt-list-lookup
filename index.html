@@ -24,23 +24,23 @@
           <div class="mode-tabs" role="tablist" aria-label="Search mode">
             <label>
               <input type="radio" name="mode" value="search" checked>
-              <span>Keyword</span>
+              <span class="mode-label">Keyword</span>
             </label>
             <label>
               <input type="radio" name="mode" value="user">
-              <span>User Search</span>
+              <span class="mode-label">User Search</span>
             </label>
             <label>
               <input type="radio" name="mode" value="url">
-              <span>URL</span>
+              <span class="mode-label">URL</span>
             </label>
             <label>
               <input type="radio" name="mode" value="popular">
-              <span>Popular</span>
+              <span class="mode-label mode-popular">Popular</span>
             </label>
             <label>
               <input type="radio" name="mode" value="trending">
-              <span>Trending</span>
+              <span class="mode-label mode-trending">Trending</span>
             </label>
           </div>
 
@@ -70,19 +70,18 @@
 
       <section class="results-wrap" aria-label="Search results">
         <div class="results-toolbar">
-          <h2>Results</h2>
-          <div class="toolbar-actions">
-            <label class="sort-control">
+          <div class="results-title-group">
+            <h2>Results</h2>
+            <div class="sort-buttons" aria-label="Sort results">
               <span>Sort</span>
-              <select id="sort-select">
-                <option value="relevance">Relevance</option>
-                <option value="title">Title</option>
-                <option value="owner">Owner</option>
-                <option value="items-desc">Items high-low</option>
-                <option value="likes-desc">Likes high-low</option>
-                <option value="id-desc">Trakt ID high-low</option>
-              </select>
-            </label>
+              <button type="button" data-sort="relevance" class="active">Relevance</button>
+              <button type="button" data-sort="title">Title</button>
+              <button type="button" data-sort="owner">Owner</button>
+              <button type="button" data-sort="items-desc">Items</button>
+              <button type="button" data-sort="likes-desc">Likes</button>
+            </div>
+          </div>
+          <div class="toolbar-actions">
             <label class="sort-control">
               <span>Per page</span>
               <select id="page-size-select">
@@ -97,6 +96,16 @@
               <button id="next-page" type="button" class="ghost-button">Next</button>
             </div>
           </div>
+        </div>
+        <div class="results-header" aria-hidden="true" hidden>
+          <span>Preview</span>
+          <span>List</span>
+          <span>Trakt ID <small>click to copy</small></span>
+          <span>Items</span>
+          <span>Likes</span>
+          <span>Last Updated</span>
+          <span>Link</span>
+          <span>Add to JSON</span>
         </div>
         <div id="results" class="results empty-state">
           <p>Results will appear here.</p>
@@ -117,11 +126,11 @@
 
     <template id="result-template">
       <article class="result-card">
-        <div class="poster-samples" aria-hidden="true">
+        <button type="button" class="poster-samples" aria-label="Preview list items">
           <div class="sample-poster placeholder"></div>
           <div class="sample-poster placeholder"></div>
           <div class="sample-poster placeholder"></div>
-        </div>
+        </button>
 
         <div class="result-main">
           <div>
@@ -132,7 +141,6 @@
         </div>
 
         <div class="result-id">
-          <span>Trakt ID</span>
           <button type="button" class="trakt-id-button" data-copy="id"></button>
         </div>
 
@@ -145,14 +153,13 @@
           <span class="likes"></span>
         </div>
 
-        <p class="updated-line">Last updated <span class="updated"></span></p>
+        <p class="updated-line"><span class="updated"></span></p>
 
         <a class="open-link" target="_blank" rel="noreferrer" aria-label="Open on Trakt">
           <span class="trakt-symbol" aria-hidden="true">T</span>
         </a>
 
         <div class="result-actions">
-          <button type="button" class="view-items-button">Preview</button>
           <button type="button" class="select-list-button">Select</button>
         </div>
       </article>
