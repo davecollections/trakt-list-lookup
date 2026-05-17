@@ -329,10 +329,23 @@ h2 {
   font-weight: 800;
 }
 
+.result-main {
+  align-items: start;
+}
+
 .result-title {
   min-height: 2.6em;
   font-size: 1.18rem;
   line-height: 1.25;
+}
+
+.open-link {
+  display: grid;
+  flex: 0 0 auto;
+  min-width: 74px;
+  justify-items: end;
+  line-height: 1.12;
+  text-align: right;
 }
 
 .description-wrap {
