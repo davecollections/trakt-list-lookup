@@ -966,6 +966,10 @@ body.modal-open {
   font-weight: 800;
 }
 
+.existing-json-option:has(:disabled) {
+  opacity: 0.55;
+}
+
 .radio-label {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -1020,6 +1024,39 @@ body.modal-open {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 800;
+}
+
+.nuvio-source-fields {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
+.nuvio-list-mapping {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.nuvio-list-mapping[hidden] {
+  display: none;
+}
+
+.nuvio-map-row {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 72%, var(--soft));
+}
+
+.nuvio-map-row span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .export-preview-details textarea {
