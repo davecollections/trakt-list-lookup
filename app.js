@@ -40,6 +40,8 @@ const downloadNuvioJsonButton = document.querySelector("#download-nuvio-json");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 15;
+const POSTER_SAMPLE_LIMIT = 3;
+const POSTER_SAMPLE_CONCURRENCY = 4;
 
 const state = {
   mode: "search",
@@ -50,6 +52,7 @@ const state = {
   limit: 30,
   activePreviewButton: null,
   selectedLists: new Map(),
+  posterSamples: new Map(),
 };
 
 const placeholders = {
@@ -147,7 +150,7 @@ sortSelect.addEventListener("change", () => {
 
 pageSizeSelect.addEventListener("change", () => {
   state.limit = Number(pageSizeSelect.value);
-  if (state.query) runSearch(1);
+  if (state.query || isDiscoveryMode(state.mode)) runSearch(1);
 });
 
 form.addEventListener("submit", async (event) => {
@@ -254,16 +257,15 @@ function renderResults(results) {
     const url = result.url || "";
 
     card.id = `result-${index + 1}`;
-    node.querySelector(".result-owner").textContent = `#${index + 1} @${owner}`;
+    card.dataset.sampleKey = getPosterSampleKey(result);
+    node.querySelector(".result-owner").textContent = `@${owner}`;
     node.querySelector(".result-title").textContent = title;
     const fullDescription = cleanDescription(result.description);
-    const descriptionEl = node.querySelector(".description");
-    descriptionEl.textContent = fullDescription;
     const readMoreButton = node.querySelector(".read-more-button");
-    readMoreButton.hidden = true;
+    readMoreButton.hidden = !hasDescription(result.description);
     readMoreButton.addEventListener("click", () => openDescription(result, fullDescription));
-    node.querySelector(".trakt-id").textContent = result.ids?.trakt || "n/a";
-    node.querySelector(".items").textContent = formatNumber(result.item_count);
+    node.querySelector(".trakt-id-button").textContent = result.ids?.trakt || "n/a";
+    node.querySelector(".items").textContent = `${formatNumber(result.item_count)} items`;
     node.querySelector(".likes").textContent = formatNumber(result.like_count);
     node.querySelector(".updated").textContent = formatDate(result.updated_at);
 
@@ -291,7 +293,82 @@ function renderResults(results) {
     resultsEl.append(node);
   });
 
-  requestAnimationFrame(updateReadMoreButtons);
+  loadPosterSamplesForResults(results);
+}
+
+async function loadPosterSamplesForResults(results) {
+  const queue = results.filter((result) => {
+    const key = getPosterSampleKey(result);
+    return key && !state.posterSamples.has(key) && result.user?.username && result.ids?.slug;
+  });
+
+  if (!queue.length) {
+    results.forEach((result) => renderPosterSamples(result));
+    return;
+  }
+
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(POSTER_SAMPLE_CONCURRENCY, queue.length) }, async () => {
+    while (cursor < queue.length) {
+      const result = queue[cursor];
+      cursor += 1;
+      await loadPosterSamples(result);
+      renderPosterSamples(result);
+    }
+  });
+
+  await Promise.all(workers);
+  results.forEach((result) => renderPosterSamples(result));
+}
+
+async function loadPosterSamples(result) {
+  const key = getPosterSampleKey(result);
+  if (!key) return;
+
+  try {
+    const params = new URLSearchParams({
+      mode: "items",
+      user: result.user.username,
+      slug: result.ids.slug,
+      limit: String(POSTER_SAMPLE_LIMIT),
+    });
+    const response = await fetch(`/api/trakt?${params.toString()}`);
+    const payload = await response.json();
+    const posters = response.ok
+      ? (payload.items || []).map((item) => item.poster).filter(Boolean).slice(0, POSTER_SAMPLE_LIMIT)
+      : [];
+    state.posterSamples.set(key, posters);
+  } catch {
+    state.posterSamples.set(key, []);
+  }
+}
+
+function renderPosterSamples(result) {
+  const key = getPosterSampleKey(result);
+  if (!key) return;
+  const card = resultsEl.querySelector(`[data-sample-key="${CSS.escape(key)}"]`);
+  if (!card) return;
+
+  const sampleWrap = card.querySelector(".poster-samples");
+  const posters = state.posterSamples.get(key) || [];
+  sampleWrap.textContent = "";
+
+  for (let index = 0; index < POSTER_SAMPLE_LIMIT; index += 1) {
+    const poster = document.createElement("div");
+    poster.className = posters[index] ? "sample-poster" : "sample-poster placeholder";
+    if (posters[index]) {
+      const image = document.createElement("img");
+      image.src = posters[index];
+      image.alt = "";
+      image.loading = "lazy";
+      poster.append(image);
+    }
+    sampleWrap.append(poster);
+  }
+}
+
+function getPosterSampleKey(result) {
+  return getListSelectionKey(result);
 }
 
 function getSortedResults(results) {
@@ -363,7 +440,7 @@ async function openPreview(result, button) {
     previewStatus.textContent = error.message;
   } finally {
     button.disabled = false;
-    button.textContent = "View Items";
+    button.textContent = "Preview";
   }
 }
 
@@ -585,10 +662,6 @@ function renderItems(container, items) {
     card.className = "preview-item";
     card.title = item.title || "";
 
-    const rank = document.createElement("span");
-    rank.className = "preview-rank";
-    rank.textContent = item.rank ? `#${item.rank}` : "#";
-
     const posterWrap = document.createElement("div");
     posterWrap.className = "preview-poster";
     if (item.poster) {
@@ -601,33 +674,13 @@ function renderItems(container, items) {
       posterWrap.textContent = "No poster";
     }
 
-    const body = document.createElement("div");
-    body.className = "preview-body";
-    const title = document.createElement("strong");
-    title.textContent = item.title || "Untitled";
-    const meta = document.createElement("span");
-    meta.textContent = item.year ? String(item.year) : "Year n/a";
+    const traktId = document.createElement("code");
+    traktId.className = "preview-trakt-id";
+    traktId.textContent = item.ids?.trakt ? `trakt:${item.ids.trakt}` : "trakt:n/a";
 
-    const ids = document.createElement("code");
-    ids.className = "preview-ids";
-    getItemIdParts(item).forEach((part) => {
-      const line = document.createElement("span");
-      line.textContent = part;
-      ids.append(line);
-    });
-
-    body.append(title, meta, ids);
-    card.append(rank, posterWrap, body);
+    card.append(posterWrap, traktId);
     container.append(card);
   });
-}
-
-function getItemIdParts(item) {
-  const parts = [];
-  if (item.ids?.trakt) parts.push(`trakt:${item.ids.trakt}`);
-  if (item.ids?.tmdb) parts.push(`tmdb:${item.ids.tmdb}`);
-  if (item.ids?.imdb) parts.push(`imdb:${item.ids.imdb}`);
-  return parts.length ? parts : ["ids:n/a"];
 }
 
 function cleanDescription(value) {
@@ -647,13 +700,8 @@ function cleanDescription(value) {
   return text;
 }
 
-function updateReadMoreButtons() {
-  resultsEl.querySelectorAll(".result-card").forEach((card) => {
-    const description = card.querySelector(".description");
-    const button = card.querySelector(".read-more-button");
-    if (!description || !button) return;
-    button.hidden = description.scrollHeight <= description.clientHeight + 1;
-  });
+function hasDescription(value) {
+  return cleanDescription(value) !== "No description provided.";
 }
 
 function formatNumber(value) {

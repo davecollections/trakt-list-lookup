@@ -117,43 +117,43 @@
 
     <template id="result-template">
       <article class="result-card">
+        <div class="poster-samples" aria-hidden="true">
+          <div class="sample-poster placeholder"></div>
+          <div class="sample-poster placeholder"></div>
+          <div class="sample-poster placeholder"></div>
+        </div>
+
         <div class="result-main">
           <div>
             <p class="result-owner"></p>
             <h3 class="result-title"></h3>
           </div>
-          <a class="open-link" target="_blank" rel="noreferrer"><span>Open on</span><span>Trakt</span></a>
+          <button type="button" class="read-more-button">Read description</button>
         </div>
 
-        <div class="description-wrap">
-          <p class="description"></p>
-          <button type="button" class="read-more-button" hidden>Read more</button>
+        <div class="result-id">
+          <span>Trakt ID</span>
+          <button type="button" class="trakt-id-button" data-copy="id"></button>
         </div>
 
-        <div class="result-footer">
-          <p class="updated-line">Last updated <span class="updated"></span></p>
+        <div class="result-counts">
+          <span class="items"></span>
+        </div>
 
-          <dl class="meta-grid">
-            <div>
-              <dt>Trakt ID</dt>
-              <dd class="trakt-id"></dd>
-            </div>
-            <div>
-              <dt>Items</dt>
-              <dd class="items"></dd>
-            </div>
-            <div>
-              <dt>Likes</dt>
-              <dd class="likes"></dd>
-            </div>
-          </dl>
+        <div class="result-likes" aria-label="Likes">
+          <span class="likes-heart" aria-hidden="true"></span>
+          <span class="likes"></span>
+        </div>
 
-          <div class="copy-row">
-            <button type="button" data-copy="id">Copy ID</button>
-            <button type="button" data-copy="url">Copy URL</button>
-            <button type="button" class="select-list-button">Select</button>
-            <button type="button" class="view-items-button">View Items</button>
-          </div>
+        <p class="updated-line">Last updated <span class="updated"></span></p>
+
+        <a class="open-link" target="_blank" rel="noreferrer" aria-label="Open on Trakt">
+          <span class="trakt-symbol" aria-hidden="true">T</span>
+        </a>
+
+        <div class="result-actions">
+          <button type="button" class="view-items-button">Preview</button>
+          <button type="button" class="select-list-button">Select</button>
         </div>
       </article>
     </template>
