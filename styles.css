@@ -381,6 +381,11 @@ h2 {
 }
 
 .updated-line {
+  justify-self: start;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--soft) 52%, transparent);
   font-size: 0.76rem;
   font-weight: 800;
   text-transform: uppercase;
