@@ -46,7 +46,7 @@ export async function onRequestGet({ request, env }) {
       }, 200, true);
     }
 
-    if (!query) {
+    if (!query && !isGlobalListMode(mode)) {
       return json({ error: "Missing search query." }, 400);
     }
     if (query.length > MAX_QUERY_LENGTH) {
@@ -60,6 +60,8 @@ export async function onRequestGet({ request, env }) {
       payload = await getUserLists(query, page, resultLimit, clientId);
     } else if (mode === "url") {
       payload = await resolveListUrl(query, clientId);
+    } else if (mode === "popular" || mode === "trending") {
+      payload = await getGlobalLists(mode, page, resultLimit, clientId);
     } else {
       return json({ error: "Unsupported search mode." }, 400);
     }
@@ -86,6 +88,19 @@ async function searchLists(query, page, limit, clientId) {
   const payload = await traktFetch(`/search/list?${params.toString()}`, clientId);
   return {
     data: rankSearchResults(payload.data, query).map((item) => item.list).filter(Boolean),
+    pagination: payload.pagination,
+  };
+}
+
+async function getGlobalLists(kind, page, limit, clientId) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+    extended: "full",
+  });
+  const payload = await traktFetch(`/lists/${kind}?${params.toString()}`, clientId);
+  return {
+    data: payload.data.map(normalizeGlobalListEntry).filter(Boolean),
     pagination: payload.pagination,
   };
 }
@@ -207,8 +222,11 @@ async function enrichListsWithLikeCounts(lists, clientId) {
 }
 
 async function getListLikeCount(list, clientId) {
+  const existingCount = normalizeOptionalCount(list?.like_count);
+  if (existingCount !== null) return existingCount;
+
   const id = list?.ids?.trakt;
-  if (!id) return normalizeOptionalCount(list?.like_count);
+  if (!id) return null;
 
   try {
     const payload = await traktFetch(`/lists/${encodeURIComponent(id)}/likes?page=1&limit=1`, clientId);
@@ -298,6 +316,10 @@ function getTmdbBearerToken(env) {
 
 function hasTmdbAuth(env) {
   return Boolean(getTmdbApiKey(env) || getTmdbBearerToken(env));
+}
+
+function isGlobalListMode(mode) {
+  return mode === "popular" || mode === "trending";
 }
 
 function parseUserListQuery(value) {
@@ -461,6 +483,18 @@ function normalizeList(list) {
       name: user.name || "",
     },
     url,
+  };
+}
+
+function normalizeGlobalListEntry(entry) {
+  if (!entry) return null;
+  const list = entry.list || entry;
+  if (!list) return null;
+
+  return {
+    ...list,
+    like_count: normalizeOptionalCount(entry.like_count) ?? normalizeOptionalCount(list.like_count) ?? undefined,
+    comment_count: normalizeOptionalCount(entry.comment_count) ?? normalizeOptionalCount(list.comment_count) ?? undefined,
   };
 }
 

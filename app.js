@@ -35,11 +35,14 @@ const placeholders = {
   search: "Search public lists by title or description",
   user: "Enter a username, or username plus keywords",
   url: "Paste a Trakt list URL",
+  popular: "No search text needed",
+  trending: "No search text needed",
 };
 
 const savedTheme = localStorage.getItem("theme");
 const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 setTheme(savedTheme || preferredTheme);
+updateModeControls(getMode());
 
 themeToggle.addEventListener("click", () => {
   const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
@@ -55,8 +58,16 @@ queryInput.addEventListener("keydown", (event) => {
 
 document.querySelectorAll("input[name='mode']").forEach((radio) => {
   radio.addEventListener("change", () => {
-    queryInput.placeholder = placeholders[getMode()];
-    queryInput.focus();
+    const mode = getMode();
+    updateModeControls(mode);
+    if (isDiscoveryMode(mode)) {
+      state.mode = mode;
+      state.query = "";
+      queryInput.value = "";
+      runSearch(1);
+    } else {
+      queryInput.focus();
+    }
   });
 });
 
@@ -103,7 +114,7 @@ form.addEventListener("submit", async (event) => {
 
   const mode = getMode();
   const query = queryInput.value.trim();
-  if (!query) {
+  if (!query && !isDiscoveryMode(mode)) {
     setStatus("Enter a keyword, username, or Trakt list URL.", true);
     queryInput.focus();
     return;
@@ -162,9 +173,20 @@ function getMode() {
   return document.querySelector("input[name='mode']:checked").value;
 }
 
+function isDiscoveryMode(mode) {
+  return mode === "popular" || mode === "trending";
+}
+
+function updateModeControls(mode) {
+  const discoveryMode = isDiscoveryMode(mode);
+  queryInput.placeholder = placeholders[mode];
+  queryInput.disabled = discoveryMode;
+  form.querySelector("button[type='submit']").textContent = discoveryMode ? "Load" : "Search";
+}
+
 function setLoading(isLoading) {
   form.querySelector("button[type='submit']").disabled = isLoading;
-  queryInput.disabled = isLoading;
+  queryInput.disabled = isLoading || isDiscoveryMode(getMode());
 }
 
 function setStatus(message, isError = false) {
