@@ -3,6 +3,8 @@ const queryInput = document.querySelector("#query");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
 const resultsHeader = document.querySelector(".results-header");
+const quickUsers = document.querySelector("#quick-users");
+const quickUserButtons = document.querySelector("#quick-user-buttons");
 const clearButton = document.querySelector("#clear-button");
 const template = document.querySelector("#result-template");
 const pager = document.querySelector("#pager");
@@ -37,6 +39,9 @@ const nuvioCollectionNameInput = document.querySelector("#nuvio-collection-name"
 const nuvioSortAlphaInput = document.querySelector("#nuvio-sort-alpha");
 const nuvioExistingJsonInput = document.querySelector("#nuvio-existing-json");
 const nuvioExistingFileInput = document.querySelector("#nuvio-existing-file");
+const nuvioMergeOptions = document.querySelector("#nuvio-merge-options");
+const nuvioExistingSummary = document.querySelector("#nuvio-existing-summary");
+const nuvioTargetCollectionSelect = document.querySelector("#nuvio-target-collection");
 const nuvioOutput = document.querySelector("#nuvio-output");
 const copyNuvioJsonButton = document.querySelector("#copy-nuvio-json");
 const downloadNuvioJsonButton = document.querySelector("#download-nuvio-json");
@@ -106,6 +111,7 @@ clearButton.addEventListener("click", () => {
   state.pagination = null;
   setStatus("");
   renderResults([]);
+  renderQuickUsers([]);
   renderPagination(null);
   queryInput.focus();
 });
@@ -121,6 +127,13 @@ nuvioCollectionNameInput.addEventListener("input", updateNuvioOutput);
 nuvioSortAlphaInput.addEventListener("change", updateNuvioOutput);
 nuvioExistingJsonInput.addEventListener("input", updateNuvioOutput);
 nuvioExistingFileInput.addEventListener("change", loadNuvioExistingFile);
+nuvioTargetCollectionSelect.addEventListener("change", updateNuvioOutput);
+document.querySelectorAll("input[name='nuvio-merge-mode']").forEach((radio) => {
+  radio.addEventListener("change", () => {
+    updateNuvioMergeControls();
+    updateNuvioOutput();
+  });
+});
 
 previewModal.addEventListener("click", (event) => {
   if (event.target.matches("[data-close-modal]")) closePreview();
@@ -215,6 +228,7 @@ async function runSearch(page) {
     state.results = results;
     state.pagination = payload.pagination || null;
     renderCurrentResults();
+    renderQuickUsers(results);
     renderPagination(state.pagination);
 
     const total = state.pagination?.item_count;
@@ -223,6 +237,7 @@ async function runSearch(page) {
   } catch (error) {
     renderResults([]);
     state.results = [];
+    renderQuickUsers([]);
     renderPagination(null);
     setStatus(error.message, true);
   } finally {
@@ -319,6 +334,37 @@ function renderResults(results) {
   });
 
   loadPosterSamplesForResults(results);
+}
+
+function renderQuickUsers(results) {
+  quickUserButtons.textContent = "";
+  const users = getPopularUsersFromResults(results);
+  quickUsers.hidden = users.length === 0;
+
+  users.forEach((user) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = `@${user.username}`;
+    button.title = `${formatNumber(user.lists)} list${user.lists === 1 ? "" : "s"} in results`;
+    button.addEventListener("click", () => loadUserLists(user.username));
+    quickUserButtons.append(button);
+  });
+}
+
+function getPopularUsersFromResults(results) {
+  const users = new Map();
+  results.forEach((result) => {
+    const username = result.user?.username;
+    if (!username) return;
+    const existing = users.get(username) || { username, lists: 0, likes: 0 };
+    existing.lists += 1;
+    existing.likes += Number(result.like_count || 0);
+    users.set(username, existing);
+  });
+
+  return [...users.values()]
+    .sort((a, b) => compareNumber(b.likes, a.likes) || compareNumber(b.lists, a.lists) || compareText(a.username, b.username))
+    .slice(0, 6);
 }
 
 async function loadPosterSamplesForResults(results) {
@@ -619,6 +665,7 @@ async function loadNuvioExistingFile() {
 
 function updateNuvioOutput() {
   try {
+    updateNuvioMergeControls();
     nuvioOutput.value = JSON.stringify(createNuvioExportJson(), null, 2);
   } catch (error) {
     nuvioOutput.value = `Could not build JSON: ${error.message}`;
@@ -628,7 +675,11 @@ function updateNuvioOutput() {
 function createNuvioExportJson() {
   const newCollection = createNuvioCollection();
   const existing = parseExistingNuvioJson();
-  return existing ? [...existing, newCollection] : [newCollection];
+  if (!existing) return [newCollection];
+  if (getNuvioMergeMode() === "existing") {
+    return mergeFoldersIntoExistingCollection(existing, newCollection);
+  }
+  return [...existing, newCollection];
 }
 
 function parseExistingNuvioJson() {
@@ -637,6 +688,61 @@ function parseExistingNuvioJson() {
   const parsed = JSON.parse(text);
   if (!Array.isArray(parsed)) throw new Error("Existing Nuvio JSON must be an array.");
   return parsed;
+}
+
+function getExistingNuvioCollections() {
+  try {
+    const existing = parseExistingNuvioJson();
+    return existing || [];
+  } catch {
+    return [];
+  }
+}
+
+function getNuvioMergeMode() {
+  return document.querySelector("input[name='nuvio-merge-mode']:checked")?.value || "new";
+}
+
+function updateNuvioMergeControls() {
+  const collections = getExistingNuvioCollections();
+  nuvioMergeOptions.hidden = collections.length === 0;
+  nuvioExistingSummary.textContent = collections.length
+    ? `Detected ${formatNumber(collections.length)} collection${collections.length === 1 ? "" : "s"} in the existing JSON.`
+    : "";
+
+  const selectedId = nuvioTargetCollectionSelect.value;
+  nuvioTargetCollectionSelect.textContent = "";
+  collections.forEach((collection, index) => {
+    const option = document.createElement("option");
+    option.value = collection.id || String(index);
+    option.textContent = collection.title || `Collection ${index + 1}`;
+    nuvioTargetCollectionSelect.append(option);
+  });
+  if (selectedId && [...nuvioTargetCollectionSelect.options].some((option) => option.value === selectedId)) {
+    nuvioTargetCollectionSelect.value = selectedId;
+  }
+
+  const mergeIntoExisting = getNuvioMergeMode() === "existing" && collections.length > 0;
+  nuvioTargetCollectionSelect.disabled = !mergeIntoExisting;
+}
+
+function mergeFoldersIntoExistingCollection(existing, newCollection) {
+  const targetId = nuvioTargetCollectionSelect.value;
+  if (!targetId) throw new Error("Choose an existing collection to merge into.");
+  let matched = false;
+
+  const merged = existing.map((collection, index) => {
+    const collectionId = collection.id || String(index);
+    if (collectionId !== targetId) return collection;
+    matched = true;
+    return {
+      ...collection,
+      folders: [...(collection.folders || []), ...newCollection.folders],
+    };
+  });
+
+  if (!matched) throw new Error("Selected collection was not found in the existing JSON.");
+  return merged;
 }
 
 function createNuvioCollection() {
@@ -663,14 +769,14 @@ function createNuvioFolder(result) {
     id: createNuvioId("folder"),
     title: result.name || "Trakt List",
     sources: [createNuvioTraktSource(result)],
-    hideTitle: false,
-    tileShape: "POSTER",
+    hideTitle: true,
+    tileShape: "LANDSCAPE",
     coverEmoji: "",
     focusGifUrl: "",
     heroVideoUrl: "",
     titleLogoUrl: "",
     coverImageUrl: "",
-    catalogSources: [],
+    catalogSources: [createNuvioTraktCatalogSource(result)],
     focusGifEnabled: false,
     heroBackdropUrl: "",
   };
@@ -678,16 +784,19 @@ function createNuvioFolder(result) {
 
 function createNuvioTraktSource(result) {
   return {
-    title: result.name || "Trakt List",
-    sortBy: "rank.asc",
-    traktId: Number(result.ids?.trakt || 0) || null,
-    traktSlug: result.ids?.slug || "",
-    traktUrl: result.url || "",
-    traktUser: result.user?.username || "",
-    filters: {},
-    provider: "trakt",
-    mediaType: "MIXED",
-    traktSourceType: "LIST",
+    type: "all",
+    genre: "",
+    addonId: "aio-metadata",
+    provider: "addon",
+    catalogId: `trakt.list.${result.ids?.trakt || ""}`,
+  };
+}
+
+function createNuvioTraktCatalogSource(result) {
+  return {
+    type: "all",
+    addonId: "aio-metadata",
+    catalogId: `trakt.list.${result.ids?.trakt || ""}`,
   };
 }
 

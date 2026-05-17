@@ -54,6 +54,10 @@
         </form>
 
         <div id="status" class="status" role="status" aria-live="polite"></div>
+        <div id="quick-users" class="quick-users" hidden>
+          <span>Popular users in results</span>
+          <div id="quick-user-buttons"></div>
+        </div>
       </section>
 
       <section id="selection-panel" class="selection-panel" aria-label="Selected Trakt lists" hidden>
@@ -220,10 +224,25 @@
             Upload existing Nuvio JSON (optional)
             <input id="nuvio-existing-file" type="file" accept="application/json,.json">
           </label>
-          <label class="nuvio-wide">
-            Export preview
+          <div id="nuvio-merge-options" class="nuvio-wide nuvio-merge-options" hidden>
+            <p id="nuvio-existing-summary"></p>
+            <label class="radio-label">
+              <input type="radio" name="nuvio-merge-mode" value="new" checked>
+              Add selected lists as a new collection
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="nuvio-merge-mode" value="existing">
+              Add selected lists as folders in an existing collection
+            </label>
+            <label>
+              Existing collection
+              <select id="nuvio-target-collection" disabled></select>
+            </label>
+          </div>
+          <details class="nuvio-wide export-preview-details">
+            <summary>Export preview</summary>
             <textarea id="nuvio-output" rows="12" readonly></textarea>
-          </label>
+          </details>
         </div>
 
         <div class="modal-actions">

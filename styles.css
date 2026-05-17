@@ -257,6 +257,39 @@ h2 {
   color: var(--accent-dark);
 }
 
+.quick-users {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.quick-users[hidden] {
+  display: none;
+}
+
+.quick-users > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-users button {
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
 .results-wrap {
   margin-top: 18px;
   overflow: hidden;
@@ -851,8 +884,38 @@ body.modal-open {
   font-weight: 800;
 }
 
+.nuvio-merge-options {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--soft) 54%, transparent);
+}
+
+.nuvio-merge-options[hidden] {
+  display: none;
+}
+
+.nuvio-merge-options p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.radio-label {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.radio-label input {
+  width: auto;
+  min-height: 0;
+}
+
 .nuvio-grid input,
-.nuvio-grid textarea {
+.nuvio-grid textarea,
+.nuvio-grid select {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--border);
@@ -866,6 +929,11 @@ body.modal-open {
   padding: 0 10px;
 }
 
+.nuvio-grid select {
+  min-height: 38px;
+  padding: 0 10px;
+}
+
 .nuvio-grid textarea {
   padding: 10px;
   resize: vertical;
@@ -875,6 +943,25 @@ body.modal-open {
 
 .nuvio-wide {
   grid-column: 1 / -1;
+}
+
+.export-preview-details {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--soft) 38%, transparent);
+}
+
+.export-preview-details summary {
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.export-preview-details textarea {
+  border-width: 1px 0 0;
+  border-radius: 0 0 8px 8px;
 }
 
 .checkbox-label {
