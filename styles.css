@@ -84,8 +84,7 @@ input {
 .top-actions,
 .site-footer,
 .site-footer div,
-.sort-control,
-.sort-buttons {
+.sort-control {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -354,32 +353,6 @@ h2 {
   cursor: pointer;
 }
 
-.sort-buttons {
-  justify-content: flex-start;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.sort-buttons button {
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--panel);
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.sort-buttons button.active {
-  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--text);
-}
-
 .pager {
   color: var(--muted);
   font-size: 0.9rem;
@@ -493,6 +466,43 @@ h2 {
   text-transform: none;
 }
 
+.results-header button {
+  justify-self: start;
+  min-height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+}
+
+.results-header button::after {
+  content: "\2195";
+  display: inline-block;
+  margin-left: 5px;
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
+  font-size: 0.68rem;
+}
+
+.results-header button.active {
+  color: var(--text);
+}
+
+.results-header button.active[data-direction="asc"]::after {
+  content: "\2191";
+  color: var(--accent);
+}
+
+.results-header button.active[data-direction="desc"]::after {
+  content: "\2193";
+  color: var(--accent);
+}
+
 .empty-state {
   min-height: 180px;
   place-items: center;
@@ -582,10 +592,28 @@ h2 {
 }
 
 .result-owner {
+  justify-self: start;
   margin-top: 4px;
   margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
   font-size: 0.78rem;
   font-weight: 800;
+  text-align: left;
+}
+
+.result-main .result-owner:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.result-owner:disabled,
+.modal .result-owner {
+  cursor: default;
+  text-decoration: none;
 }
 
 .result-main {

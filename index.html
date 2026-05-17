@@ -72,14 +72,6 @@
         <div class="results-toolbar">
           <div class="results-title-group">
             <h2>Results</h2>
-            <div class="sort-buttons" aria-label="Sort results">
-              <span>Sort</span>
-              <button type="button" data-sort="relevance" class="active">Relevance</button>
-              <button type="button" data-sort="title">Title</button>
-              <button type="button" data-sort="owner">Owner</button>
-              <button type="button" data-sort="items-desc">Items</button>
-              <button type="button" data-sort="likes-desc">Likes</button>
-            </div>
           </div>
           <div class="toolbar-actions">
             <label class="sort-control">
@@ -97,13 +89,13 @@
             </div>
           </div>
         </div>
-        <div class="results-header" aria-hidden="true" hidden>
+        <div class="results-header" hidden>
           <span>Preview</span>
-          <span>List</span>
+          <button type="button" data-sort="title">List</button>
           <span>Trakt ID <small>click to copy</small></span>
-          <span>Items</span>
-          <span>Likes</span>
-          <span>Last Updated</span>
+          <button type="button" data-sort="items">Items</button>
+          <button type="button" data-sort="likes">Likes</button>
+          <button type="button" data-sort="updated">Last Updated</button>
           <span>Link</span>
           <span>Add to JSON</span>
         </div>
@@ -134,7 +126,7 @@
 
         <div class="result-main">
           <div>
-            <p class="result-owner"></p>
+            <button type="button" class="result-owner"></button>
             <h3 class="result-title"></h3>
           </div>
           <button type="button" class="read-more-button">Read description</button>

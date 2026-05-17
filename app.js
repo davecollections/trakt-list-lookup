@@ -10,7 +10,7 @@ const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
 const pageLabel = document.querySelector("#page-label");
 const themeToggle = document.querySelector("#theme-toggle");
-const sortButtons = document.querySelectorAll("[data-sort]");
+const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
 const previewModal = document.querySelector("#preview-modal");
 const previewTitle = document.querySelector("#preview-title");
@@ -53,6 +53,7 @@ const state = {
   limit: 30,
   activePreviewButton: null,
   sort: "relevance",
+  sortDirection: "desc",
   selectedLists: new Map(),
   posterSamples: new Map(),
 };
@@ -148,7 +149,7 @@ nextPageButton.addEventListener("click", () => {
 
 sortButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    state.sort = button.dataset.sort;
+    setSort(button.dataset.sort);
     updateSortButtons();
     renderCurrentResults();
   });
@@ -265,7 +266,10 @@ function renderResults(results) {
 
     card.id = `result-${index + 1}`;
     card.dataset.sampleKey = getPosterSampleKey(result);
-    node.querySelector(".result-owner").textContent = `@${owner}`;
+    const ownerButton = node.querySelector(".result-owner");
+    ownerButton.textContent = `@${owner}`;
+    ownerButton.disabled = !result.user?.username;
+    ownerButton.addEventListener("click", () => loadUserLists(result.user.username));
     node.querySelector(".result-title").textContent = title;
     const fullDescription = cleanDescription(result.description);
     const readMoreButton = node.querySelector(".read-more-button");
@@ -383,20 +387,49 @@ function getSortedResults(results) {
   const sorted = [...results];
   if (sort === "title") {
     sorted.sort((a, b) => compareText(a.name, b.name));
-  } else if (sort === "owner") {
-    sorted.sort((a, b) => compareText(a.user?.username, b.user?.username) || compareText(a.name, b.name));
-  } else if (sort === "items-desc") {
+  } else if (sort === "items") {
     sorted.sort((a, b) => compareNumber(b.item_count, a.item_count));
-  } else if (sort === "likes-desc") {
+  } else if (sort === "likes") {
     sorted.sort((a, b) => compareNumber(b.like_count, a.like_count));
+  } else if (sort === "updated") {
+    sorted.sort((a, b) => compareNumber(Date.parse(b.updated_at), Date.parse(a.updated_at)));
+  }
+
+  if (state.sortDirection === "asc" && sort !== "relevance") {
+    sorted.reverse();
   }
   return sorted;
 }
 
+function setSort(sort) {
+  if (state.sort === sort) {
+    state.sortDirection = state.sortDirection === "asc" ? "desc" : "asc";
+    return;
+  }
+
+  state.sort = sort;
+  state.sortDirection = sort === "title" ? "asc" : "desc";
+}
+
 function updateSortButtons() {
   sortButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.sort === state.sort);
+    const active = button.dataset.sort === state.sort;
+    button.classList.toggle("active", active);
+    button.dataset.direction = active ? state.sortDirection : "";
+    button.setAttribute("aria-sort", active ? (state.sortDirection === "asc" ? "ascending" : "descending") : "none");
   });
+}
+
+async function loadUserLists(username) {
+  if (!username) return;
+  const userRadio = document.querySelector("input[name='mode'][value='user']");
+  userRadio.checked = true;
+  updateModeControls("user");
+  queryInput.value = username;
+  state.mode = "user";
+  state.query = username;
+  state.page = 1;
+  await runSearch(1);
 }
 
 function compareText(a, b) {
