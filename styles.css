@@ -306,7 +306,7 @@ h2 {
 
 .result-card {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 16px;
   min-height: 100%;
   padding: 20px;
@@ -337,8 +337,8 @@ h2 {
 
 .description-wrap {
   display: grid;
+  align-content: start;
   gap: 4px;
-  min-height: 4.85em;
 }
 
 .description {
@@ -368,7 +368,6 @@ h2 {
 }
 
 .updated-line {
-  margin-top: -6px;
   font-size: 0.76rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -393,15 +392,6 @@ h2 {
   border-radius: 6px;
 }
 
-.meta-grid div:first-child {
-  background: var(--primary-tile);
-  color: var(--bg);
-}
-
-.meta-grid div:first-child dt {
-  color: var(--primary-tile-muted);
-}
-
 .meta-grid dt {
   font-size: 0.56rem;
   font-weight: 800;
@@ -417,7 +407,13 @@ h2 {
 }
 
 .trakt-id {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+}
+
+.result-footer {
+  display: grid;
+  align-self: end;
+  gap: 12px;
 }
 
 .copy-row {

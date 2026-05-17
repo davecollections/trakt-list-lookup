@@ -227,10 +227,10 @@ function renderResults(results) {
     node.querySelector(".result-owner").textContent = `#${index + 1} @${owner}`;
     node.querySelector(".result-title").textContent = title;
     const fullDescription = cleanDescription(result.description);
-    const cardDescription = getCardDescription(fullDescription);
-    node.querySelector(".description").textContent = cardDescription.text;
+    const descriptionEl = node.querySelector(".description");
+    descriptionEl.textContent = fullDescription;
     const readMoreButton = node.querySelector(".read-more-button");
-    readMoreButton.hidden = !cardDescription.truncated;
+    readMoreButton.hidden = true;
     readMoreButton.addEventListener("click", () => openDescription(result, fullDescription));
     node.querySelector(".trakt-id").textContent = result.ids?.trakt || "n/a";
     node.querySelector(".items").textContent = formatNumber(result.item_count);
@@ -256,6 +256,8 @@ function renderResults(results) {
 
     resultsEl.append(node);
   });
+
+  requestAnimationFrame(updateReadMoreButtons);
 }
 
 function getSortedResults(results) {
@@ -435,18 +437,13 @@ function cleanDescription(value) {
   return text;
 }
 
-function getCardDescription(text) {
-  if (text.length <= DESCRIPTION_LIMIT) {
-    return {
-      text,
-      truncated: false,
-    };
-  }
-
-  return {
-    text: `${text.slice(0, DESCRIPTION_LIMIT).trim()}...`,
-    truncated: true,
-  };
+function updateReadMoreButtons() {
+  resultsEl.querySelectorAll(".result-card").forEach((card) => {
+    const description = card.querySelector(".description");
+    const button = card.querySelector(".read-more-button");
+    if (!description || !button) return;
+    button.hidden = description.scrollHeight <= description.clientHeight + 1;
+  });
 }
 
 function formatNumber(value) {
