@@ -30,8 +30,13 @@ const descriptionCloseButton = document.querySelector("#description-close");
 const selectionPanel = document.querySelector("#selection-panel");
 const selectionSummary = document.querySelector("#selection-summary");
 const selectedListChips = document.querySelector("#selected-list-chips");
+const manageSelectionButton = document.querySelector("#manage-selection");
 const openNuvioExportButton = document.querySelector("#open-nuvio-export");
 const clearSelectionButton = document.querySelector("#clear-selection");
+const selectionModal = document.querySelector("#selection-modal");
+const selectionCloseButton = document.querySelector("#selection-close");
+const selectionModalCount = document.querySelector("#selection-modal-count");
+const selectedTableBody = document.querySelector("#selected-table-body");
 const nuvioModal = document.querySelector("#nuvio-modal");
 const nuvioCloseButton = document.querySelector("#nuvio-close");
 const nuvioCount = document.querySelector("#nuvio-count");
@@ -118,6 +123,8 @@ clearButton.addEventListener("click", () => {
 
 modalCloseButton.addEventListener("click", closePreview);
 descriptionCloseButton.addEventListener("click", closeDescription);
+selectionCloseButton.addEventListener("click", closeSelectionManager);
+manageSelectionButton.addEventListener("click", openSelectionManager);
 nuvioCloseButton.addEventListener("click", closeNuvioExport);
 openNuvioExportButton.addEventListener("click", openNuvioExport);
 clearSelectionButton.addEventListener("click", clearSelection);
@@ -143,6 +150,10 @@ descriptionModal.addEventListener("click", (event) => {
   if (event.target.matches("[data-close-description]")) closeDescription();
 });
 
+selectionModal.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-selection]")) closeSelectionManager();
+});
+
 nuvioModal.addEventListener("click", (event) => {
   if (event.target.matches("[data-close-nuvio]")) closeNuvioExport();
 });
@@ -150,6 +161,7 @@ nuvioModal.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !previewModal.hidden) closePreview();
   if (event.key === "Escape" && !descriptionModal.hidden) closeDescription();
+  if (event.key === "Escape" && !selectionModal.hidden) closeSelectionManager();
   if (event.key === "Escape" && !nuvioModal.hidden) closeNuvioExport();
 });
 
@@ -611,8 +623,11 @@ function updateSelectionUi() {
     ? `${formatNumber(count)} list${count === 1 ? "" : "s"} selected.`
     : "No lists selected.";
   renderSelectedListChips();
+  renderSelectedTable();
+  manageSelectionButton.disabled = count === 0;
   openNuvioExportButton.disabled = count === 0;
   clearSelectionButton.disabled = count === 0;
+  if (!selectionModal.hidden && count === 0) closeSelectionManager();
   if (!nuvioModal.hidden) updateNuvioOutput();
 }
 
@@ -641,6 +656,66 @@ function clearSelection() {
   state.selectedLists.clear();
   updateSelectionUi();
   renderCurrentResults();
+}
+
+function openSelectionManager() {
+  if (!state.selectedLists.size) return;
+  renderSelectedTable();
+  selectionModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeSelectionManager() {
+  selectionModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function renderSelectedTable() {
+  if (!selectedTableBody) return;
+  const lists = [...state.selectedLists.values()].sort((a, b) => compareText(a.name, b.name));
+  selectionModalCount.textContent = `${formatNumber(lists.length)} selected`;
+  selectedTableBody.textContent = "";
+
+  lists.forEach((result) => {
+    const row = document.createElement("tr");
+
+    const listCell = document.createElement("td");
+    const title = document.createElement("strong");
+    title.textContent = result.name || "Untitled list";
+    listCell.append(title);
+
+    const userCell = document.createElement("td");
+    userCell.textContent = result.user?.username ? `@${result.user.username}` : "n/a";
+
+    const idCell = document.createElement("td");
+    const idButton = document.createElement("button");
+    idButton.type = "button";
+    idButton.className = "table-copy-button";
+    idButton.textContent = result.ids?.trakt || "n/a";
+    idButton.disabled = !result.ids?.trakt;
+    idButton.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(String(result.ids.trakt));
+      flashButton(idButton);
+    });
+    idCell.append(idButton);
+
+    const itemsCell = document.createElement("td");
+    itemsCell.textContent = formatNumber(result.item_count);
+
+    const likesCell = document.createElement("td");
+    likesCell.textContent = formatNumber(result.like_count);
+
+    const actionCell = document.createElement("td");
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "remove-selected-button";
+    removeButton.textContent = "Remove";
+    removeButton.addEventListener("click", () => toggleSelectedList(result));
+    actionCell.append(removeButton);
+
+    row.append(listCell, userCell, idCell, itemsCell, likesCell, actionCell);
+    selectedTableBody.append(row);
+  });
 }
 
 function openNuvioExport() {

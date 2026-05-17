@@ -855,8 +855,71 @@ body.modal-open {
   width: min(760px, 100%);
 }
 
+.selection-dialog {
+  width: min(860px, 100%);
+}
+
 .nuvio-dialog {
   width: min(920px, 100%);
+}
+
+.selected-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.selected-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 680px;
+  font-size: 0.82rem;
+}
+
+.selected-table th,
+.selected-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.selected-table th {
+  background: color-mix(in srgb, var(--soft) 58%, var(--panel));
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.selected-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.selected-table td:last-child,
+.selected-table th:last-child {
+  text-align: right;
+}
+
+.table-copy-button,
+.remove-selected-button {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.table-copy-button {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.remove-selected-button {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
 }
 
 .nuvio-warning {

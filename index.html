@@ -67,6 +67,7 @@
           <div id="selected-list-chips" class="selected-list-chips"></div>
         </div>
         <div class="selection-actions">
+          <button id="manage-selection" type="button" class="ghost-button" disabled>Manage selection</button>
           <button id="open-nuvio-export" type="button" disabled>Create Nuvio JSON</button>
           <button id="clear-selection" type="button" class="ghost-button" disabled>Clear selection</button>
         </div>
@@ -191,6 +192,34 @@
           <button id="description-close" type="button" class="ghost-button">Close</button>
         </div>
         <p id="description-full" class="description-full"></p>
+      </section>
+    </div>
+
+    <div id="selection-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-selection></div>
+      <section class="modal-dialog selection-dialog" role="dialog" aria-modal="true" aria-labelledby="selection-title">
+        <div class="modal-header">
+          <div>
+            <p id="selection-modal-count" class="result-owner"></p>
+            <h2 id="selection-title">Selected Lists</h2>
+          </div>
+          <button id="selection-close" type="button" class="ghost-button">Close</button>
+        </div>
+        <div class="selected-table-wrap">
+          <table class="selected-table">
+            <thead>
+              <tr>
+                <th>List</th>
+                <th>User</th>
+                <th>Trakt ID</th>
+                <th>Items</th>
+                <th>Likes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="selected-table-body"></tbody>
+          </table>
+        </div>
       </section>
     </div>
 
