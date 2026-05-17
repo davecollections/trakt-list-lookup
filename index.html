@@ -58,16 +58,14 @@
                 <option value="title">Title</option>
                 <option value="owner">Owner</option>
                 <option value="items-desc">Items high-low</option>
-                <option value="comments-desc">Comments high-low</option>
-                <option value="likes-desc">Likes high-low</option>
                 <option value="id-desc">Trakt ID high-low</option>
               </select>
             </label>
             <label class="sort-control">
               <span>Per page</span>
               <select id="page-size-select">
-                <option value="10">10</option>
-                <option value="20" selected>20</option>
+                <option value="20">20</option>
+                <option value="30" selected>30</option>
                 <option value="50">50</option>
               </select>
             </label>
@@ -98,7 +96,7 @@
       <article class="result-card">
         <div class="result-main">
           <div>
-            <p class="result-owner"><a target="_blank" rel="noreferrer"></a></p>
+            <p class="result-owner"></p>
             <h3 class="result-title"></h3>
           </div>
           <a class="open-link" target="_blank" rel="noreferrer">Open on Trakt</a>
@@ -116,14 +114,6 @@
             <dd class="items"></dd>
           </div>
           <div>
-            <dt>Likes</dt>
-            <dd class="likes"></dd>
-          </div>
-          <div>
-            <dt>Comments</dt>
-            <dd class="comments"><a target="_blank" rel="noreferrer"></a></dd>
-          </div>
-          <div>
             <dt>Updated</dt>
             <dd class="updated"></dd>
           </div>
@@ -135,16 +125,23 @@
           <button type="button" data-copy="slug">Copy Slug</button>
           <button type="button" class="view-items-button">View Items</button>
         </div>
-
-        <div class="item-panel" hidden>
-          <div class="item-panel-header">
-            <h4>List Preview <span>first 15 only</span></h4>
-            <span class="item-status"></span>
-          </div>
-          <div class="item-list"></div>
-        </div>
       </article>
     </template>
+
+    <div id="preview-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+        <div class="modal-header">
+          <div>
+            <p id="preview-owner" class="result-owner"></p>
+            <h2 id="preview-title">List Preview</h2>
+          </div>
+          <button id="modal-close" type="button" class="ghost-button">Close</button>
+        </div>
+        <p id="preview-status" class="item-status"></p>
+        <div id="modal-item-list" class="item-list"></div>
+      </section>
+    </div>
 
     <script src="./app.js" type="module"></script>
   </body>

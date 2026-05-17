@@ -11,6 +11,12 @@ const pageLabel = document.querySelector("#page-label");
 const themeToggle = document.querySelector("#theme-toggle");
 const sortSelect = document.querySelector("#sort-select");
 const pageSizeSelect = document.querySelector("#page-size-select");
+const previewModal = document.querySelector("#preview-modal");
+const previewTitle = document.querySelector("#preview-title");
+const previewOwner = document.querySelector("#preview-owner");
+const previewStatus = document.querySelector("#preview-status");
+const modalItemList = document.querySelector("#modal-item-list");
+const modalCloseButton = document.querySelector("#modal-close");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 15;
@@ -21,7 +27,8 @@ const state = {
   page: 1,
   pagination: null,
   results: [],
-  limit: 20,
+  limit: 30,
+  activePreviewButton: null,
 };
 
 const placeholders = {
@@ -61,6 +68,16 @@ clearButton.addEventListener("click", () => {
   renderResults([]);
   renderPagination(null);
   queryInput.focus();
+});
+
+modalCloseButton.addEventListener("click", closePreview);
+
+previewModal.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-modal]")) closePreview();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !previewModal.hidden) closePreview();
 });
 
 prevPageButton.addEventListener("click", () => {
@@ -174,20 +191,12 @@ function renderResults(results) {
     const url = result.url || "";
 
     card.id = `result-${index + 1}`;
-    const ownerLink = node.querySelector(".result-owner a");
-    ownerLink.textContent = `#${index + 1} @${owner}`;
-    ownerLink.href = getUserProfileUrl(result);
-    ownerLink.hidden = !result.user?.username;
+    node.querySelector(".result-owner").textContent = `#${index + 1} @${owner}`;
     node.querySelector(".result-title").textContent = title;
     node.querySelector(".description").textContent = cleanDescription(result.description);
     node.querySelector(".trakt-id").textContent = result.ids?.trakt || "n/a";
     node.querySelector(".items").textContent = formatNumber(result.item_count);
-    node.querySelector(".likes").textContent = formatNumber(result.like_count);
     node.querySelector(".updated").textContent = formatDate(result.updated_at);
-    const commentsLink = node.querySelector(".comments a");
-    commentsLink.textContent = formatNumber(result.comment_count);
-    commentsLink.href = getCommentsUrl(result);
-    commentsLink.hidden = !result.url;
 
     const openLink = node.querySelector(".open-link");
     openLink.href = url;
@@ -204,7 +213,7 @@ function renderResults(results) {
 
     const viewItemsButton = node.querySelector(".view-items-button");
     viewItemsButton.disabled = !result.user?.username || !result.ids?.slug;
-    viewItemsButton.addEventListener("click", () => loadItems(card, result, viewItemsButton));
+    viewItemsButton.addEventListener("click", () => openPreview(result, viewItemsButton));
 
     resultsEl.append(node);
   });
@@ -219,10 +228,6 @@ function getSortedResults(results) {
     sorted.sort((a, b) => compareText(a.user?.username, b.user?.username) || compareText(a.name, b.name));
   } else if (sort === "items-desc") {
     sorted.sort((a, b) => compareNumber(b.item_count, a.item_count));
-  } else if (sort === "comments-desc") {
-    sorted.sort((a, b) => compareNumber(b.comment_count, a.comment_count));
-  } else if (sort === "likes-desc") {
-    sorted.sort((a, b) => compareNumber(b.like_count, a.like_count));
   } else if (sort === "id-desc") {
     sorted.sort((a, b) => compareNumber(b.ids?.trakt, a.ids?.trakt));
   }
@@ -246,28 +251,16 @@ function renderPagination(pagination) {
   nextPageButton.disabled = page >= pageCount;
 }
 
-async function loadItems(card, result, button) {
-  const panel = card.querySelector(".item-panel");
-  const itemList = card.querySelector(".item-list");
-  const status = card.querySelector(".item-status");
-
-  if (!panel.hidden && panel.dataset.loaded === "true") {
-    panel.hidden = true;
-    button.textContent = "View Items";
-    return;
-  }
-
-  if (panel.hidden && panel.dataset.loaded === "true") {
-    panel.hidden = false;
-    button.textContent = "Hide Items";
-    return;
-  }
-
-  panel.hidden = false;
+async function openPreview(result, button) {
+  state.activePreviewButton = button;
   button.disabled = true;
   button.textContent = "Loading";
-  status.textContent = "Loading items...";
-  itemList.textContent = "";
+  previewTitle.textContent = result.name || "List Preview";
+  previewOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
+  previewStatus.textContent = "Loading preview...";
+  modalItemList.textContent = "";
+  previewModal.hidden = false;
+  document.body.classList.add("modal-open");
 
   try {
     const params = new URLSearchParams({
@@ -284,17 +277,27 @@ async function loadItems(card, result, button) {
     }
 
     const items = payload.items || [];
-    renderItems(itemList, items);
+    renderItems(modalItemList, items);
     const total = payload.pagination?.item_count || items.length || 0;
-    status.textContent = total ? `Previewing ${Math.min(ITEMS_PREVIEW_LIMIT, items.length)} of ${formatNumber(total)}` : "No items found.";
-    panel.dataset.loaded = "true";
-    button.textContent = "Hide Items";
+    previewStatus.textContent = total
+      ? `Preview only: showing first ${formatNumber(Math.min(ITEMS_PREVIEW_LIMIT, items.length))} of ${formatNumber(total)}.`
+      : "No items found.";
   } catch (error) {
-    status.textContent = error.message;
-    button.textContent = "View Items";
+    previewStatus.textContent = error.message;
   } finally {
     button.disabled = false;
+    button.textContent = "View Items";
   }
+}
+
+function closePreview() {
+  previewModal.hidden = true;
+  document.body.classList.remove("modal-open");
+  previewTitle.textContent = "List Preview";
+  previewOwner.textContent = "";
+  previewStatus.textContent = "";
+  modalItemList.textContent = "";
+  state.activePreviewButton = null;
 }
 
 function renderItems(container, items) {
@@ -310,33 +313,25 @@ function renderItems(container, items) {
 
   items.forEach((item) => {
     const card = document.createElement("article");
-    card.className = "poster-card";
+    card.className = "preview-item";
     card.title = item.title || "";
 
-    const posterWrap = document.createElement("div");
-    posterWrap.className = "poster-wrap";
-    if (item.poster) {
-      const image = document.createElement("img");
-      image.src = item.poster;
-      image.alt = "";
-      image.loading = "lazy";
-      posterWrap.append(image);
-    } else {
-      const placeholder = document.createElement("span");
-      placeholder.textContent = "No Poster";
-      posterWrap.append(placeholder);
-    }
+    const rank = document.createElement("span");
+    rank.className = "preview-rank";
+    rank.textContent = item.rank ? `#${item.rank}` : "#";
 
     const body = document.createElement("div");
-    body.className = "poster-body";
+    body.className = "preview-body";
+    const title = document.createElement("strong");
+    title.textContent = item.title || "Untitled";
     const meta = document.createElement("span");
-    meta.textContent = item.year || "Year n/a";
+    meta.textContent = item.year ? String(item.year) : "Year n/a";
 
     const ids = document.createElement("code");
     ids.textContent = buildItemIdText(item);
 
-    body.append(meta, ids);
-    card.append(posterWrap, body);
+    body.append(title, meta, ids);
+    card.append(rank, body);
     container.append(card);
   });
 }
@@ -384,15 +379,6 @@ function getCopyValue(kind, result) {
   if (kind === "slug") return result.ids?.slug || "";
   if (kind === "url") return result.url || "";
   return "";
-}
-
-function getUserProfileUrl(result) {
-  return result.user?.username ? `https://app.trakt.tv/users/${encodeURIComponent(result.user.username)}` : "";
-}
-
-function getCommentsUrl(result) {
-  if (!result.user?.username || !result.ids?.slug) return "";
-  return `https://app.trakt.tv/users/${encodeURIComponent(result.user.username)}/lists/${encodeURIComponent(result.ids.slug)}/comments`;
 }
 
 function flashButton(button) {

@@ -1,7 +1,7 @@
 const TRAKT_API_BASE = "https://api.trakt.tv";
 const TRAKT_WEB_BASE = "https://trakt.tv";
 const SUPPORTED_TRAKT_HOSTS = new Set(["trakt.tv", "app.trakt.tv"]);
-const RESULT_LIMIT = 20;
+const RESULT_LIMIT = 30;
 const MAX_RESULT_LIMIT = 50;
 const ITEM_LIMIT = 15;
 const MAX_PAGE = 25;
@@ -78,7 +78,7 @@ async function searchLists(query, page, limit, clientId) {
   });
   const payload = await traktFetch(`/search/list?${params.toString()}`, clientId);
   return {
-    data: payload.data.map((item) => item.list).filter(Boolean),
+    data: rankSearchResults(payload.data, query).map((item) => item.list).filter(Boolean),
     pagination: payload.pagination,
   };
 }
@@ -157,7 +157,7 @@ async function getListItems(username, slug, page, limit, clientId) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
-    extended: "full,images",
+    extended: "full",
   });
   return traktFetch(`/users/${safeUsername}/lists/${safeSlug}/items?${params.toString()}`, clientId);
 }
@@ -215,6 +215,39 @@ function listMatchesTerms(list, terms) {
     list.description,
   ].filter(Boolean).join(" "));
   return terms.every((term) => haystack.includes(term));
+}
+
+function rankSearchResults(items, query) {
+  const terms = normalizeSearchText(query).split(" ").filter(Boolean);
+  if (!terms.length) return items;
+
+  return [...items].sort((a, b) => {
+    const scoreA = scoreListSearchMatch(a.list, terms, a.score);
+    const scoreB = scoreListSearchMatch(b.list, terms, b.score);
+    return scoreB - scoreA;
+  });
+}
+
+function scoreListSearchMatch(list, terms, traktScore = 0) {
+  if (!list) return 0;
+
+  const nameTokens = normalizeSearchText(list.name).split(" ").filter(Boolean);
+  const slugTokens = normalizeSearchText(list.ids?.slug).split(" ").filter(Boolean);
+  const description = normalizeSearchText(list.description);
+  const name = nameTokens.join(" ");
+  const slug = slugTokens.join(" ");
+  let score = Number(traktScore || 0);
+
+  for (const term of terms) {
+    if (name === term || slug === term) score += 120;
+    if (nameTokens.includes(term)) score += 90;
+    if (slugTokens.includes(term)) score += 75;
+    if (name.startsWith(term) || slug.startsWith(term)) score += 45;
+    if (name.includes(term) || slug.includes(term)) score += 20;
+    if (description.includes(term)) score += 8;
+  }
+
+  return score;
 }
 
 function getPositiveInteger(value, fallback) {
@@ -330,32 +363,12 @@ function normalizeListItem(item) {
     type: item.type,
     title,
     year: media.year || item.show?.year || "",
-    poster: getPosterUrl(media) || getPosterUrl(item.show),
     ids: {
       trakt: media.ids?.trakt,
       tmdb: media.ids?.tmdb,
       imdb: media.ids?.imdb,
     },
   };
-}
-
-function getPosterUrl(media) {
-  const poster = media?.images?.poster;
-  if (!poster) return "";
-  if (typeof poster === "string") return normalizeImageUrl(poster);
-  if (Array.isArray(poster)) return normalizeImageUrl(poster.find(Boolean) || "");
-  if (typeof poster === "object") {
-    return normalizeImageUrl(poster.medium || poster.full || poster.thumb || poster.original || Object.values(poster).find(Boolean) || "");
-  }
-  return "";
-}
-
-function normalizeImageUrl(value) {
-  const url = String(value || "").trim();
-  if (!url) return "";
-  if (url.startsWith("https://") || url.startsWith("http://")) return url;
-  if (url.startsWith("//")) return `https:${url}`;
-  return `https://${url}`;
 }
 
 function getTraktErrorMessage(status, body = "") {
