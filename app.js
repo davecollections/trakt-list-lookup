@@ -17,6 +17,11 @@ const previewOwner = document.querySelector("#preview-owner");
 const previewStatus = document.querySelector("#preview-status");
 const modalItemList = document.querySelector("#modal-item-list");
 const modalCloseButton = document.querySelector("#modal-close");
+const descriptionModal = document.querySelector("#description-modal");
+const descriptionTitle = document.querySelector("#description-title");
+const descriptionOwner = document.querySelector("#description-owner");
+const descriptionFull = document.querySelector("#description-full");
+const descriptionCloseButton = document.querySelector("#description-close");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 15;
@@ -82,13 +87,19 @@ clearButton.addEventListener("click", () => {
 });
 
 modalCloseButton.addEventListener("click", closePreview);
+descriptionCloseButton.addEventListener("click", closeDescription);
 
 previewModal.addEventListener("click", (event) => {
   if (event.target.matches("[data-close-modal]")) closePreview();
 });
 
+descriptionModal.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-description]")) closeDescription();
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !previewModal.hidden) closePreview();
+  if (event.key === "Escape" && !descriptionModal.hidden) closeDescription();
 });
 
 prevPageButton.addEventListener("click", () => {
@@ -215,7 +226,12 @@ function renderResults(results) {
     card.id = `result-${index + 1}`;
     node.querySelector(".result-owner").textContent = `#${index + 1} @${owner}`;
     node.querySelector(".result-title").textContent = title;
-    node.querySelector(".description").textContent = cleanDescription(result.description);
+    const fullDescription = cleanDescription(result.description);
+    const cardDescription = getCardDescription(fullDescription);
+    node.querySelector(".description").textContent = cardDescription.text;
+    const readMoreButton = node.querySelector(".read-more-button");
+    readMoreButton.hidden = !cardDescription.truncated;
+    readMoreButton.addEventListener("click", () => openDescription(result, fullDescription));
     node.querySelector(".trakt-id").textContent = result.ids?.trakt || "n/a";
     node.querySelector(".items").textContent = formatNumber(result.item_count);
     node.querySelector(".likes").textContent = formatNumber(result.like_count);
@@ -325,6 +341,22 @@ function closePreview() {
   state.activePreviewButton = null;
 }
 
+function openDescription(result, text) {
+  descriptionTitle.textContent = result.name || "Description";
+  descriptionOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
+  descriptionFull.textContent = text;
+  descriptionModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeDescription() {
+  descriptionModal.hidden = true;
+  document.body.classList.remove("modal-open");
+  descriptionTitle.textContent = "Description";
+  descriptionOwner.textContent = "";
+  descriptionFull.textContent = "";
+}
+
 function renderItems(container, items) {
   container.textContent = "";
 
@@ -400,8 +432,21 @@ function cleanDescription(value) {
     .trim();
 
   if (!text) return "No description provided.";
-  if (text.length <= DESCRIPTION_LIMIT) return text;
-  return `${text.slice(0, DESCRIPTION_LIMIT).trim()}...`;
+  return text;
+}
+
+function getCardDescription(text) {
+  if (text.length <= DESCRIPTION_LIMIT) {
+    return {
+      text,
+      truncated: false,
+    };
+  }
+
+  return {
+    text: `${text.slice(0, DESCRIPTION_LIMIT).trim()}...`,
+    truncated: true,
+  };
 }
 
 function formatNumber(value) {

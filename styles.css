@@ -335,14 +335,36 @@ h2 {
   line-height: 1.25;
 }
 
+.description-wrap {
+  display: grid;
+  gap: 4px;
+  min-height: 4.85em;
+}
+
 .description {
   max-width: 100%;
-  min-height: 4.05em;
+  min-height: 0;
   line-height: 1.45;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
+}
+
+.read-more-button {
+  justify-self: start;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.read-more-button[hidden] {
+  display: none;
 }
 
 .updated-line {
@@ -459,6 +481,16 @@ body.modal-open {
   margin-top: 3px;
   font-size: 1.35rem;
   line-height: 1.2;
+}
+
+.description-dialog {
+  width: min(760px, 100%);
+}
+
+.description-full {
+  color: var(--text);
+  line-height: 1.55;
+  white-space: pre-wrap;
 }
 
 .item-status {
