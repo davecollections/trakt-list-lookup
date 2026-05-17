@@ -22,6 +22,20 @@ const descriptionTitle = document.querySelector("#description-title");
 const descriptionOwner = document.querySelector("#description-owner");
 const descriptionFull = document.querySelector("#description-full");
 const descriptionCloseButton = document.querySelector("#description-close");
+const selectionPanel = document.querySelector("#selection-panel");
+const selectionSummary = document.querySelector("#selection-summary");
+const openNuvioExportButton = document.querySelector("#open-nuvio-export");
+const clearSelectionButton = document.querySelector("#clear-selection");
+const nuvioModal = document.querySelector("#nuvio-modal");
+const nuvioCloseButton = document.querySelector("#nuvio-close");
+const nuvioCount = document.querySelector("#nuvio-count");
+const nuvioCollectionNameInput = document.querySelector("#nuvio-collection-name");
+const nuvioSortAlphaInput = document.querySelector("#nuvio-sort-alpha");
+const nuvioExistingJsonInput = document.querySelector("#nuvio-existing-json");
+const nuvioExistingFileInput = document.querySelector("#nuvio-existing-file");
+const nuvioOutput = document.querySelector("#nuvio-output");
+const copyNuvioJsonButton = document.querySelector("#copy-nuvio-json");
+const downloadNuvioJsonButton = document.querySelector("#download-nuvio-json");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 15;
@@ -34,6 +48,7 @@ const state = {
   results: [],
   limit: 30,
   activePreviewButton: null,
+  selectedLists: new Map(),
 };
 
 const placeholders = {
@@ -88,6 +103,15 @@ clearButton.addEventListener("click", () => {
 
 modalCloseButton.addEventListener("click", closePreview);
 descriptionCloseButton.addEventListener("click", closeDescription);
+nuvioCloseButton.addEventListener("click", closeNuvioExport);
+openNuvioExportButton.addEventListener("click", openNuvioExport);
+clearSelectionButton.addEventListener("click", clearSelection);
+copyNuvioJsonButton.addEventListener("click", copyNuvioJson);
+downloadNuvioJsonButton.addEventListener("click", downloadNuvioJson);
+nuvioCollectionNameInput.addEventListener("input", updateNuvioOutput);
+nuvioSortAlphaInput.addEventListener("change", updateNuvioOutput);
+nuvioExistingJsonInput.addEventListener("input", updateNuvioOutput);
+nuvioExistingFileInput.addEventListener("change", loadNuvioExistingFile);
 
 previewModal.addEventListener("click", (event) => {
   if (event.target.matches("[data-close-modal]")) closePreview();
@@ -97,9 +121,14 @@ descriptionModal.addEventListener("click", (event) => {
   if (event.target.matches("[data-close-description]")) closeDescription();
 });
 
+nuvioModal.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-nuvio]")) closeNuvioExport();
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !previewModal.hidden) closePreview();
   if (event.key === "Escape" && !descriptionModal.hidden) closeDescription();
+  if (event.key === "Escape" && !nuvioModal.hidden) closeNuvioExport();
 });
 
 prevPageButton.addEventListener("click", () => {
@@ -254,6 +283,10 @@ function renderResults(results) {
     viewItemsButton.disabled = !result.user?.username || !result.ids?.slug;
     viewItemsButton.addEventListener("click", () => openPreview(result, viewItemsButton));
 
+    const selectListButton = node.querySelector(".select-list-button");
+    updateSelectListButton(selectListButton, result);
+    selectListButton.addEventListener("click", () => toggleSelectedList(result));
+
     resultsEl.append(node);
   });
 
@@ -359,6 +392,160 @@ function closeDescription() {
   descriptionFull.textContent = "";
 }
 
+function toggleSelectedList(result) {
+  const key = getListSelectionKey(result);
+  if (!key) return;
+
+  if (state.selectedLists.has(key)) {
+    state.selectedLists.delete(key);
+  } else {
+    state.selectedLists.set(key, result);
+  }
+
+  updateSelectionUi();
+  renderCurrentResults();
+}
+
+function updateSelectListButton(button, result) {
+  const selected = state.selectedLists.has(getListSelectionKey(result));
+  button.textContent = selected ? "Remove" : "Select";
+  button.classList.toggle("selected", selected);
+}
+
+function getListSelectionKey(result) {
+  return result.ids?.trakt ? String(result.ids.trakt) : result.url || "";
+}
+
+function updateSelectionUi() {
+  const count = state.selectedLists.size;
+  selectionPanel.hidden = count === 0;
+  selectionSummary.textContent = count
+    ? `${formatNumber(count)} list${count === 1 ? "" : "s"} selected.`
+    : "No lists selected.";
+  openNuvioExportButton.disabled = count === 0;
+  clearSelectionButton.disabled = count === 0;
+  if (!nuvioModal.hidden) updateNuvioOutput();
+}
+
+function clearSelection() {
+  state.selectedLists.clear();
+  updateSelectionUi();
+  renderCurrentResults();
+}
+
+function openNuvioExport() {
+  if (!state.selectedLists.size) return;
+  nuvioCount.textContent = `${formatNumber(state.selectedLists.size)} selected`;
+  updateNuvioOutput();
+  nuvioModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeNuvioExport() {
+  nuvioModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+async function loadNuvioExistingFile() {
+  const file = nuvioExistingFileInput.files?.[0];
+  if (!file) return;
+  nuvioExistingJsonInput.value = await file.text();
+  updateNuvioOutput();
+}
+
+function updateNuvioOutput() {
+  try {
+    nuvioOutput.value = JSON.stringify(createNuvioExportJson(), null, 2);
+  } catch (error) {
+    nuvioOutput.value = `Could not build JSON: ${error.message}`;
+  }
+}
+
+function createNuvioExportJson() {
+  const newCollection = createNuvioCollection();
+  const existing = parseExistingNuvioJson();
+  return existing ? [...existing, newCollection] : [newCollection];
+}
+
+function parseExistingNuvioJson() {
+  const text = nuvioExistingJsonInput.value.trim();
+  if (!text) return null;
+  const parsed = JSON.parse(text);
+  if (!Array.isArray(parsed)) throw new Error("Existing Nuvio JSON must be an array.");
+  return parsed;
+}
+
+function createNuvioCollection() {
+  const title = nuvioCollectionNameInput.value.trim() || "Trakt Lists";
+  let lists = [...state.selectedLists.values()];
+  if (nuvioSortAlphaInput.checked) {
+    lists = lists.sort((a, b) => compareText(a.name, b.name));
+  }
+
+  return {
+    id: createNuvioId("collection"),
+    title,
+    folders: lists.map(createNuvioFolder),
+    pinToTop: false,
+    viewMode: "TABBED_GRID",
+    showAllTab: false,
+    backdropImageUrl: "",
+    focusGlowEnabled: true,
+  };
+}
+
+function createNuvioFolder(result) {
+  return {
+    id: createNuvioId("folder"),
+    title: result.name || "Trakt List",
+    sources: [createNuvioTraktSource(result)],
+    hideTitle: false,
+    tileShape: "POSTER",
+    coverEmoji: "",
+    focusGifUrl: "",
+    heroVideoUrl: "",
+    titleLogoUrl: "",
+    coverImageUrl: "",
+    catalogSources: [],
+    focusGifEnabled: false,
+    heroBackdropUrl: "",
+  };
+}
+
+function createNuvioTraktSource(result) {
+  return {
+    title: result.name || "Trakt List",
+    sortBy: "rank.asc",
+    traktId: Number(result.ids?.trakt || 0) || null,
+    traktSlug: result.ids?.slug || "",
+    traktUrl: result.url || "",
+    traktUser: result.user?.username || "",
+    filters: {},
+    provider: "trakt",
+    mediaType: "MIXED",
+    traktSourceType: "LIST",
+  };
+}
+
+function createNuvioId(prefix) {
+  if (crypto.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function copyNuvioJson() {
+  await navigator.clipboard.writeText(nuvioOutput.value);
+  flashButton(copyNuvioJsonButton);
+}
+
+function downloadNuvioJson() {
+  const blob = new Blob([`${nuvioOutput.value}\n`], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${slugifyFilename(nuvioCollectionNameInput.value || "trakt-lists")}.nuvio.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 function renderItems(container, items) {
   container.textContent = "";
 
@@ -458,6 +645,13 @@ function formatDate(value) {
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+function slugifyFilename(value) {
+  return String(value || "trakt-lists")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "trakt-lists";
+}
+
 function getCopyValue(kind, result) {
   if (kind === "id") return result.ids?.trakt ? String(result.ids.trakt) : "";
   if (kind === "url") return result.url || "";
@@ -476,7 +670,7 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("theme", theme);
   const isDark = theme === "dark";
-  themeToggle.textContent = isDark ? "☀" : "☾";
+  themeToggle.dataset.icon = isDark ? "sun" : "moon";
   themeToggle.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   themeToggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
 }

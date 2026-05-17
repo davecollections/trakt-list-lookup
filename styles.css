@@ -63,7 +63,8 @@ input {
 }
 
 .search-panel,
-.results-wrap {
+.results-wrap,
+.selection-panel {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -228,6 +229,46 @@ h2 {
   overflow: hidden;
 }
 
+.selection-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 16px 18px;
+}
+
+.selection-panel[hidden] {
+  display: none;
+}
+
+.selection-panel p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.selection-actions,
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.selection-actions button,
+.modal-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+}
+
 .results-toolbar {
   min-height: 58px;
   padding: 0 20px;
@@ -274,13 +315,58 @@ h2 {
 
 .theme-toggle {
   display: grid;
+  position: relative;
   width: 42px;
   padding: 0;
   place-items: center;
   background: var(--soft);
   color: var(--text);
-  font-size: 1.18rem;
   line-height: 1;
+}
+
+.theme-toggle::before,
+.theme-toggle::after {
+  content: "";
+  position: absolute;
+  display: block;
+}
+
+.theme-toggle[data-icon="sun"]::before {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.theme-toggle[data-icon="sun"]::after {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow:
+    0 -13px 0 currentColor,
+    9px -9px 0 currentColor,
+    13px 0 0 currentColor,
+    9px 9px 0 currentColor,
+    0 13px 0 currentColor,
+    -9px 9px 0 currentColor,
+    -13px 0 0 currentColor,
+    -9px -9px 0 currentColor;
+}
+
+.theme-toggle[data-icon="moon"]::before {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.theme-toggle[data-icon="moon"]::after {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--soft);
+  transform: translate(6px, -3px);
 }
 
 .ghost-button:disabled,
@@ -452,6 +538,11 @@ h2 {
   background: var(--accent) !important;
 }
 
+.select-list-button.selected {
+  background: var(--soft);
+  color: var(--text);
+}
+
 body.modal-open {
   overflow: hidden;
 }
@@ -499,6 +590,65 @@ body.modal-open {
 
 .description-dialog {
   width: min(760px, 100%);
+}
+
+.nuvio-dialog {
+  width: min(920px, 100%);
+}
+
+.nuvio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
+  gap: 14px;
+}
+
+.nuvio-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.nuvio-grid input,
+.nuvio-grid textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.nuvio-grid input {
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+.nuvio-grid textarea {
+  padding: 10px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.8rem;
+}
+
+.nuvio-wide {
+  grid-column: 1 / -1;
+}
+
+.checkbox-label {
+  align-content: end;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.checkbox-label input {
+  width: auto;
+  min-height: 0;
+}
+
+.modal-actions {
+  margin-top: 14px;
 }
 
 .description-full {
@@ -676,9 +826,16 @@ body.modal-open {
   .pager,
   .sort-control,
   .top-actions,
-  .site-footer div {
+  .site-footer div,
+  .selection-panel,
+  .selection-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .selection-panel {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .mode-tabs {
@@ -686,6 +843,10 @@ body.modal-open {
   }
 
   .site-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .nuvio-grid {
     grid-template-columns: 1fr;
   }
 }

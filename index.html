@@ -56,6 +56,17 @@
         <div id="status" class="status" role="status" aria-live="polite"></div>
       </section>
 
+      <section id="selection-panel" class="selection-panel" aria-label="Selected Trakt lists" hidden>
+        <div>
+          <h2>Selected lists</h2>
+          <p id="selection-summary">No lists selected.</p>
+        </div>
+        <div class="selection-actions">
+          <button id="open-nuvio-export" type="button" disabled>Create Nuvio JSON</button>
+          <button id="clear-selection" type="button" class="ghost-button" disabled>Clear selection</button>
+        </div>
+      </section>
+
       <section class="results-wrap" aria-label="Search results">
         <div class="results-toolbar">
           <h2>Results</h2>
@@ -139,6 +150,7 @@
           <div class="copy-row">
             <button type="button" data-copy="id">Copy ID</button>
             <button type="button" data-copy="url">Copy URL</button>
+            <button type="button" class="select-list-button">Select</button>
             <button type="button" class="view-items-button">View Items</button>
           </div>
         </div>
@@ -171,6 +183,47 @@
           <button id="description-close" type="button" class="ghost-button">Close</button>
         </div>
         <p id="description-full" class="description-full"></p>
+      </section>
+    </div>
+
+    <div id="nuvio-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-nuvio></div>
+      <section class="modal-dialog nuvio-dialog" role="dialog" aria-modal="true" aria-labelledby="nuvio-title">
+        <div class="modal-header">
+          <div>
+            <p id="nuvio-count" class="result-owner"></p>
+            <h2 id="nuvio-title">Create Nuvio JSON</h2>
+          </div>
+          <button id="nuvio-close" type="button" class="ghost-button">Close</button>
+        </div>
+
+        <div class="nuvio-grid">
+          <label>
+            Collection name
+            <input id="nuvio-collection-name" type="text" value="Trakt Lists">
+          </label>
+          <label class="checkbox-label">
+            <input id="nuvio-sort-alpha" type="checkbox" checked>
+            Sort selected lists alphabetically
+          </label>
+          <label class="nuvio-wide">
+            Existing Nuvio JSON (optional)
+            <textarea id="nuvio-existing-json" rows="5" placeholder="Paste an existing Nuvio JSON array here to append this new collection."></textarea>
+          </label>
+          <label class="nuvio-wide">
+            Upload existing Nuvio JSON (optional)
+            <input id="nuvio-existing-file" type="file" accept="application/json,.json">
+          </label>
+          <label class="nuvio-wide">
+            Export preview
+            <textarea id="nuvio-output" rows="12" readonly></textarea>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button id="copy-nuvio-json" type="button">Copy JSON</button>
+          <button id="download-nuvio-json" type="button" class="ghost-button">Download JSON</button>
+        </div>
       </section>
     </div>
 
