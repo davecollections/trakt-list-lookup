@@ -776,7 +776,7 @@ function createNuvioFolder(result) {
     heroVideoUrl: "",
     titleLogoUrl: "",
     coverImageUrl: "",
-    catalogSources: [createNuvioTraktCatalogSource(result)],
+    catalogSources: [],
     focusGifEnabled: false,
     heroBackdropUrl: "",
   };
@@ -784,19 +784,12 @@ function createNuvioFolder(result) {
 
 function createNuvioTraktSource(result) {
   return {
-    type: "all",
-    genre: "",
-    addonId: "aio-metadata",
-    provider: "addon",
-    catalogId: `trakt.list.${result.ids?.trakt || ""}`,
-  };
-}
-
-function createNuvioTraktCatalogSource(result) {
-  return {
-    type: "all",
-    addonId: "aio-metadata",
-    catalogId: `trakt.list.${result.ids?.trakt || ""}`,
+    title: result.name || "Trakt List",
+    sortBy: "rank",
+    sortHow: "asc",
+    provider: "trakt",
+    mediaType: "MOVIE",
+    traktListId: Number(result.ids?.trakt || 0) || null,
   };
 }
 
