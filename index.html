@@ -12,7 +12,7 @@
         <div class="title-row">
           <div>
             <p class="eyebrow">Trakt list search</p>
-            <h1 id="page-title">Find public Trakt list IDs and links</h1>
+            <h1 id="page-title">Find Trakt list IDs and links</h1>
           </div>
           <div class="top-actions">
             <button id="theme-toggle" type="button" class="theme-toggle" aria-label="Switch to dark mode"></button>
@@ -34,11 +34,11 @@
               <input type="radio" name="mode" value="url">
               <span class="mode-label">URL</span>
             </label>
-            <label>
+            <label class="discovery-tab">
               <input type="radio" name="mode" value="popular">
               <span class="mode-label mode-popular">Popular</span>
             </label>
-            <label>
+            <label class="discovery-tab">
               <input type="radio" name="mode" value="trending">
               <span class="mode-label mode-trending">Trending</span>
             </label>
@@ -83,9 +83,11 @@
               </select>
             </label>
             <div id="pager" class="pager" hidden>
-              <button id="prev-page" type="button" class="ghost-button">Previous</button>
+              <button id="first-page" type="button" class="ghost-button">First</button>
+              <button id="prev-page" type="button" class="ghost-button" aria-label="Previous page">&lt;</button>
               <span id="page-label"></span>
-              <button id="next-page" type="button" class="ghost-button">Next</button>
+              <button id="next-page" type="button" class="ghost-button" aria-label="Next page">&gt;</button>
+              <button id="last-page" type="button" class="ghost-button">Last</button>
             </div>
           </div>
         </div>
@@ -105,14 +107,16 @@
       </section>
 
       <footer class="site-footer">
-        <p>This is an unofficial lookup tool powered by the Trakt API. It is not affiliated with or endorsed by Trakt.</p>
-        <p>Poster previews use TMDB metadata where available. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
-        <div>
+        <div class="footer-copy">
+          <p>Unofficial lookup tool powered by the Trakt API. Not affiliated with or endorsed by Trakt.</p>
+          <p>Poster previews use TMDB metadata where available. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        </div>
+        <nav aria-label="Footer links">
           <a href="https://trakt.tv" target="_blank" rel="noreferrer">Trakt</a>
           <a href="https://trakt.docs.apiary.io/" target="_blank" rel="noreferrer">API docs</a>
           <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">TMDB</a>
           <a href="https://github.com/davecollections/trakt-list-lookup" target="_blank" rel="noreferrer">GitHub</a>
-        </div>
+        </nav>
       </footer>
     </main>
 
@@ -129,7 +133,7 @@
             <button type="button" class="result-owner"></button>
             <h3 class="result-title"></h3>
           </div>
-          <button type="button" class="read-more-button">Read description</button>
+          <button type="button" class="read-more-button">See Description</button>
         </div>
 
         <div class="result-id">
@@ -148,7 +152,7 @@
         <p class="updated-line"><span class="updated"></span></p>
 
         <a class="open-link" target="_blank" rel="noreferrer" aria-label="Open on Trakt">
-          <img class="trakt-symbol-img" src="https://trakt.tv/favicon.ico" alt="" loading="lazy">
+          <img class="trakt-symbol-img" src="./assets/trakt.ico" alt="" loading="lazy">
         </a>
 
         <div class="result-actions">

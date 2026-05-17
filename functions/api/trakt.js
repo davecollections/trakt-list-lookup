@@ -13,6 +13,9 @@ const SUCCESS_CACHE_SECONDS = 300;
 const USER_FILTER_LIMIT = 100;
 const LIKE_COUNT_CONCURRENCY = 5;
 const TMDB_POSTER_CONCURRENCY = 5;
+const SORT_FETCH_LIMIT = 50;
+const SORT_MAX_ITEMS = 250;
+const SORTABLE_FIELDS = new Set(["title", "items", "likes", "updated"]);
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -20,6 +23,8 @@ export async function onRequestGet({ request, env }) {
   const query = (url.searchParams.get("q") || "").trim();
   const page = clampPositiveInteger(url.searchParams.get("page"), 1, MAX_PAGE);
   const resultLimit = clampPositiveInteger(url.searchParams.get("limit"), RESULT_LIMIT, MAX_RESULT_LIMIT);
+  const sort = normalizeSort(url.searchParams.get("sort"));
+  const order = normalizeSortOrder(url.searchParams.get("order"));
   const clientId = getClientId(env);
 
   if (!clientId) {
@@ -54,7 +59,9 @@ export async function onRequestGet({ request, env }) {
     }
 
     let payload;
-    if (mode === "search") {
+    if (sort && mode !== "url") {
+      payload = await getSortedLists(mode, query, page, resultLimit, sort, order, clientId);
+    } else if (mode === "search") {
       payload = await searchLists(query, page, resultLimit, clientId);
     } else if (mode === "user") {
       payload = await getUserLists(query, page, resultLimit, clientId);
@@ -76,6 +83,54 @@ export async function onRequestGet({ request, env }) {
     const status = error.status || 502;
     return json({ error: getPublicErrorMessage(error, status) }, status);
   }
+}
+
+async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
+  const fetchLimit = SORT_FETCH_LIMIT;
+  const firstPage = await getListPayload(mode, query, 1, fetchLimit, clientId);
+  const pageCount = Math.min(firstPage.pagination?.page_count || 1, Math.ceil(SORT_MAX_ITEMS / fetchLimit), MAX_PAGE);
+  const pages = [firstPage];
+
+  for (let nextPage = 2; nextPage <= pageCount; nextPage += 1) {
+    pages.push(await getListPayload(mode, query, nextPage, fetchLimit, clientId));
+  }
+
+  let lists = pages.flatMap((payload) => payload.data).slice(0, SORT_MAX_ITEMS);
+  lists = await enrichListsWithLikeCounts(lists, clientId);
+  lists = sortLists(lists, sort, order);
+
+  const start = (page - 1) * limit;
+  const data = lists.slice(start, start + limit);
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      page_count: Math.max(1, Math.ceil(lists.length / limit)),
+      item_count: lists.length,
+    },
+  };
+}
+
+async function getListPayload(mode, query, page, limit, clientId) {
+  if (mode === "search") return searchLists(query, page, limit, clientId);
+  if (mode === "user") return getUserLists(query, page, limit, clientId);
+  if (mode === "popular" || mode === "trending") return getGlobalLists(mode, page, limit, clientId);
+  throw httpError("Unsupported sorted search mode.", 400);
+}
+
+function sortLists(lists, sort, order) {
+  const sorted = [...lists].sort((a, b) => {
+    if (sort === "title") return compareText(a.name, b.name);
+    if (sort === "items") return compareNumber(b.item_count, a.item_count);
+    if (sort === "likes") return compareNumber(b.like_count, a.like_count);
+    if (sort === "updated") return compareNumber(Date.parse(b.updated_at || b.updated), Date.parse(a.updated_at || a.updated));
+    return 0;
+  });
+
+  if (order === "asc" && sort !== "title") sorted.reverse();
+  if (order === "desc" && sort === "title") sorted.reverse();
+  return sorted;
 }
 
 async function searchLists(query, page, limit, clientId) {
@@ -378,6 +433,24 @@ function scoreListSearchMatch(list, terms, traktScore = 0) {
   }
 
   return score;
+}
+
+function compareText(a, b) {
+  return String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base" });
+}
+
+function compareNumber(a, b) {
+  const numberA = Number.isFinite(Number(a)) ? Number(a) : 0;
+  const numberB = Number.isFinite(Number(b)) ? Number(b) : 0;
+  return numberA - numberB;
+}
+
+function normalizeSort(value) {
+  return SORTABLE_FIELDS.has(value) ? value : "";
+}
+
+function normalizeSortOrder(value) {
+  return value === "asc" ? "asc" : "desc";
 }
 
 function getPositiveInteger(value, fallback) {

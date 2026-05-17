@@ -83,7 +83,7 @@ input {
 .modal-header,
 .top-actions,
 .site-footer,
-.site-footer div,
+.site-footer nav,
 .sort-control {
   display: flex;
   align-items: center;
@@ -109,9 +109,9 @@ dl {
 }
 
 h1 {
-  max-width: 760px;
-  font-size: clamp(2rem, 5vw, 4.6rem);
-  line-height: 0.95;
+  max-width: 620px;
+  font-size: clamp(1.9rem, 4vw, 3.4rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -162,6 +162,11 @@ h2 {
   text-align: center;
 }
 
+.discovery-tab .mode-label {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+}
+
 .mode-popular::before {
   content: "\2605";
   color: var(--accent);
@@ -182,6 +187,16 @@ h2 {
   background: color-mix(in srgb, var(--accent) 10%, var(--panel));
   color: var(--text);
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12);
+}
+
+.discovery-tab input:checked + .mode-label {
+  background: var(--accent);
+  color: white;
+}
+
+.discovery-tab input:checked + .mode-label::before {
+  color: white;
+  border-color: white;
 }
 
 .query-row {
@@ -359,6 +374,11 @@ h2 {
   font-weight: 800;
 }
 
+.pager .ghost-button {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
 .pager[hidden] {
   display: none;
 }
@@ -441,10 +461,10 @@ h2 {
 
 .results-header {
   display: grid;
-  grid-template-columns: 140px minmax(180px, 1.7fr) minmax(100px, 0.7fr) minmax(80px, 0.55fr) minmax(70px, 0.45fr) minmax(120px, 0.8fr) 46px minmax(150px, auto);
+  grid-template-columns: 118px minmax(180px, 1.7fr) minmax(96px, 0.7fr) minmax(70px, 0.5fr) minmax(70px, 0.45fr) minmax(106px, 0.72fr) 44px minmax(116px, auto);
   align-items: center;
-  gap: 16px;
-  padding: 10px 18px;
+  gap: 12px;
+  padding: 9px 14px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--soft) 54%, var(--panel));
   color: var(--muted);
@@ -464,6 +484,11 @@ h2 {
   font-size: 0.58rem;
   font-weight: 800;
   text-transform: none;
+}
+
+.results-header > :last-child {
+  justify-self: end;
+  text-align: right;
 }
 
 .results-header button {
@@ -511,11 +536,11 @@ h2 {
 
 .result-card {
   display: grid;
-  grid-template-columns: 140px minmax(180px, 1.7fr) minmax(100px, 0.7fr) minmax(80px, 0.55fr) minmax(70px, 0.45fr) minmax(120px, 0.8fr) 46px minmax(150px, auto);
+  grid-template-columns: 118px minmax(180px, 1.7fr) minmax(96px, 0.7fr) minmax(70px, 0.5fr) minmax(70px, 0.45fr) minmax(106px, 0.72fr) 44px minmax(116px, auto);
   align-items: center;
-  gap: 16px;
-  min-height: 116px;
-  padding: 14px 18px;
+  gap: 12px;
+  min-height: 92px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
 }
@@ -530,9 +555,9 @@ h2 {
 
 .poster-samples {
   display: grid;
-  grid-template-columns: repeat(3, 44px);
+  grid-template-columns: repeat(3, 34px);
   align-items: center;
-  min-height: 72px;
+  min-height: 58px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -551,7 +576,7 @@ h2 {
 .sample-poster {
   position: relative;
   display: grid;
-  width: 52px;
+  width: 42px;
   aspect-ratio: 2 / 3;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
@@ -619,7 +644,7 @@ h2 {
 .result-main {
   display: grid;
   align-content: center;
-  gap: 9px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -657,7 +682,7 @@ h2 {
 
 .trakt-id-button {
   justify-self: start;
-  min-height: 30px;
+  min-height: 28px;
   max-width: 100%;
   padding: 0 9px;
   overflow-wrap: anywhere;
@@ -666,7 +691,7 @@ h2 {
   background: var(--soft);
   color: var(--text);
   cursor: pointer;
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 900;
   line-height: 1.05;
   text-align: left;
@@ -674,7 +699,7 @@ h2 {
 
 .result-counts,
 .result-likes {
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   font-weight: 800;
 }
 
@@ -708,14 +733,14 @@ h2 {
 
 .read-more-button {
   justify-self: start;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--accent);
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
@@ -731,8 +756,9 @@ h2 {
 }
 
 .result-actions button {
-  min-height: 34px;
-  padding: 0 11px;
+  min-height: 32px;
+  min-width: 92px;
+  padding: 0 12px;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -932,16 +958,26 @@ body.modal-open {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
+  gap: 18px;
   margin-top: 18px;
-  padding: 0 4px 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 74%, var(--soft));
   color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.4;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
-.site-footer div {
+.footer-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.site-footer nav {
   flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 @media (max-width: 720px) {
@@ -1012,7 +1048,7 @@ body.modal-open {
   .pager,
   .sort-control,
   .top-actions,
-  .site-footer div,
+  .site-footer nav,
   .selection-panel,
   .selection-actions {
     width: 100%;
@@ -1040,7 +1076,7 @@ body.modal-open {
 @media (min-width: 721px) and (max-width: 1060px) {
   .result-card,
   .results-header {
-    grid-template-columns: 126px minmax(180px, 1.6fr) minmax(92px, 0.7fr) minmax(72px, 0.5fr) minmax(64px, 0.45fr) minmax(110px, 0.75fr);
+    grid-template-columns: 112px minmax(180px, 1.6fr) minmax(88px, 0.7fr) minmax(66px, 0.5fr) minmax(62px, 0.45fr) minmax(100px, 0.75fr);
   }
 
   .open-link,

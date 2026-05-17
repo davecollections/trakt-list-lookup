@@ -6,8 +6,10 @@ const resultsHeader = document.querySelector(".results-header");
 const clearButton = document.querySelector("#clear-button");
 const template = document.querySelector("#result-template");
 const pager = document.querySelector("#pager");
+const firstPageButton = document.querySelector("#first-page");
 const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
+const lastPageButton = document.querySelector("#last-page");
 const pageLabel = document.querySelector("#page-label");
 const themeToggle = document.querySelector("#theme-toggle");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
@@ -138,6 +140,10 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !nuvioModal.hidden) closeNuvioExport();
 });
 
+firstPageButton.addEventListener("click", () => {
+  if (state.page > 1) runSearch(1);
+});
+
 prevPageButton.addEventListener("click", () => {
   if (state.page > 1) runSearch(state.page - 1);
 });
@@ -147,11 +153,16 @@ nextPageButton.addEventListener("click", () => {
   if (state.page < pageCount) runSearch(state.page + 1);
 });
 
+lastPageButton.addEventListener("click", () => {
+  const pageCount = state.pagination?.page_count || 1;
+  if (state.page < pageCount) runSearch(pageCount);
+});
+
 sortButtons.forEach((button) => {
   button.addEventListener("click", () => {
     setSort(button.dataset.sort);
     updateSortButtons();
-    renderCurrentResults();
+    runSearch(1);
   });
 });
 
@@ -189,6 +200,10 @@ async function runSearch(page) {
       page: String(state.page),
       limit: String(state.limit),
     });
+    if (state.sort !== "relevance") {
+      params.set("sort", state.sort);
+      params.set("order", state.sortDirection);
+    }
     const response = await fetch(`/api/trakt?${params.toString()}`);
     const payload = await response.json();
 
@@ -216,8 +231,7 @@ async function runSearch(page) {
 }
 
 function renderCurrentResults() {
-  const results = getSortedResults(state.results);
-  renderResults(results);
+  renderResults(state.results);
 }
 
 function getMode() {
@@ -445,8 +459,10 @@ function renderPagination(pagination) {
   const pageCount = pagination?.page_count || 1;
   pager.hidden = pageCount <= 1;
   pageLabel.textContent = `Page ${formatNumber(page)} of ${formatNumber(pageCount)}`;
+  firstPageButton.disabled = page <= 1;
   prevPageButton.disabled = page <= 1;
   nextPageButton.disabled = page >= pageCount;
+  lastPageButton.disabled = page >= pageCount;
 }
 
 async function openPreview(result, button) {
