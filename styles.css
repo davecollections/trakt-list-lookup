@@ -318,6 +318,7 @@ h2 {
 
 .result-owner,
 .description,
+.updated-line,
 .meta-grid dt {
   color: var(--muted);
 }
@@ -336,7 +337,7 @@ h2 {
 
 .description {
   max-width: 100%;
-  min-height: 4.35em;
+  min-height: 4.05em;
   line-height: 1.45;
   display: -webkit-box;
   overflow: hidden;
@@ -344,15 +345,27 @@ h2 {
   -webkit-line-clamp: 4;
 }
 
+.updated-line {
+  margin-top: -6px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.updated-line span {
+  color: var(--text);
+  text-transform: none;
+}
+
 .meta-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: 1.1fr 0.85fr 0.9fr;
   gap: 6px;
 }
 
 .meta-grid div {
   min-width: 0;
-  padding: 8px;
+  padding: 7px;
   background: var(--soft);
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 6px;
@@ -368,7 +381,7 @@ h2 {
 }
 
 .meta-grid dt {
-  font-size: 0.62rem;
+  font-size: 0.56rem;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -377,28 +390,29 @@ h2 {
   margin: 2px 0 0;
   overflow-wrap: anywhere;
   font-weight: 800;
-  line-height: 1.12;
+  font-size: 0.88rem;
+  line-height: 1.08;
 }
 
 .trakt-id {
-  font-size: 0.95rem;
+  font-size: 0.82rem;
 }
 
 .copy-row {
   justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
 }
 
 .copy-row button {
-  min-height: 36px;
-  padding: 0 11px;
+  min-height: 34px;
+  padding: 0 9px;
   background: var(--text);
   color: var(--bg);
+  font-size: 0.82rem;
 }
 
 .view-items-button {
-  margin-top: 2px;
   background: var(--accent) !important;
 }
 
@@ -594,6 +608,10 @@ body.modal-open {
 
   .meta-grid {
     grid-template-columns: 1fr;
+  }
+
+  .copy-row {
+    flex-wrap: wrap;
   }
 
   .item-list {
