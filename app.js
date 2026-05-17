@@ -196,6 +196,7 @@ function renderResults(results) {
     node.querySelector(".description").textContent = cleanDescription(result.description);
     node.querySelector(".trakt-id").textContent = result.ids?.trakt || "n/a";
     node.querySelector(".items").textContent = formatNumber(result.item_count);
+    node.querySelector(".likes").textContent = formatNumber(result.like_count);
     node.querySelector(".updated").textContent = formatDate(result.updated_at);
 
     const openLink = node.querySelector(".open-link");
@@ -228,6 +229,8 @@ function getSortedResults(results) {
     sorted.sort((a, b) => compareText(a.user?.username, b.user?.username) || compareText(a.name, b.name));
   } else if (sort === "items-desc") {
     sorted.sort((a, b) => compareNumber(b.item_count, a.item_count));
+  } else if (sort === "likes-desc") {
+    sorted.sort((a, b) => compareNumber(b.like_count, a.like_count));
   } else if (sort === "id-desc") {
     sorted.sort((a, b) => compareNumber(b.ids?.trakt, a.ids?.trakt));
   }
@@ -320,6 +323,18 @@ function renderItems(container, items) {
     rank.className = "preview-rank";
     rank.textContent = item.rank ? `#${item.rank}` : "#";
 
+    const posterWrap = document.createElement("div");
+    posterWrap.className = "preview-poster";
+    if (item.poster) {
+      const image = document.createElement("img");
+      image.src = item.poster;
+      image.alt = "";
+      image.loading = "lazy";
+      posterWrap.append(image);
+    } else {
+      posterWrap.textContent = "No poster";
+    }
+
     const body = document.createElement("div");
     body.className = "preview-body";
     const title = document.createElement("strong");
@@ -331,7 +346,7 @@ function renderItems(container, items) {
     ids.textContent = buildItemIdText(item);
 
     body.append(title, meta, ids);
-    card.append(rank, body);
+    card.append(rank, posterWrap, body);
     container.append(card);
   });
 }

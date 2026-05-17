@@ -58,6 +58,7 @@
                 <option value="title">Title</option>
                 <option value="owner">Owner</option>
                 <option value="items-desc">Items high-low</option>
+                <option value="likes-desc">Likes high-low</option>
                 <option value="id-desc">Trakt ID high-low</option>
               </select>
             </label>
@@ -84,9 +85,11 @@
 
       <footer class="site-footer">
         <p>This is an unofficial lookup tool powered by the Trakt API. It is not affiliated with or endorsed by Trakt.</p>
+        <p>Poster previews use TMDB metadata where available. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
         <div>
           <a href="https://trakt.tv" target="_blank" rel="noreferrer">Trakt</a>
           <a href="https://trakt.docs.apiary.io/" target="_blank" rel="noreferrer">API docs</a>
+          <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">TMDB</a>
           <a href="https://github.com/davecollections/trakt-list-lookup" target="_blank" rel="noreferrer">GitHub</a>
         </div>
       </footer>
@@ -112,6 +115,10 @@
           <div>
             <dt>Items</dt>
             <dd class="items"></dd>
+          </div>
+          <div>
+            <dt>Likes</dt>
+            <dd class="likes"></dd>
           </div>
           <div>
             <dt>Updated</dt>

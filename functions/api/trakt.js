@@ -1,6 +1,8 @@
 const TRAKT_API_BASE = "https://api.trakt.tv";
 const TRAKT_WEB_BASE = "https://trakt.tv";
 const SUPPORTED_TRAKT_HOSTS = new Set(["trakt.tv", "app.trakt.tv"]);
+const TMDB_API_BASE = "https://api.themoviedb.org";
+const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w342";
 const RESULT_LIMIT = 30;
 const MAX_RESULT_LIMIT = 50;
 const ITEM_LIMIT = 15;
@@ -9,6 +11,8 @@ const MAX_ITEM_LIMIT = 15;
 const MAX_QUERY_LENGTH = 220;
 const SUCCESS_CACHE_SECONDS = 300;
 const USER_FILTER_LIMIT = 100;
+const LIKE_COUNT_CONCURRENCY = 5;
+const TMDB_POSTER_CONCURRENCY = 5;
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -35,8 +39,9 @@ export async function onRequestGet({ request, env }) {
       }
 
       const payload = await getListItems(username, slug, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
+      const items = await enrichItemsWithTmdbPosters(payload.data.map(normalizeListItem).filter(Boolean), env);
       return json({
-        items: payload.data.map(normalizeListItem).filter(Boolean),
+        items,
         pagination: payload.pagination,
       }, 200, true);
     }
@@ -59,8 +64,10 @@ export async function onRequestGet({ request, env }) {
       return json({ error: "Unsupported search mode." }, 400);
     }
 
+    const lists = await enrichListsWithLikeCounts(payload.data, clientId);
+
     return json({
-      results: payload.data.map(normalizeList).filter(Boolean),
+      results: lists.map(normalizeList).filter(Boolean),
       pagination: payload.pagination,
     }, 200, true);
   } catch (error) {
@@ -188,8 +195,109 @@ async function traktFetch(path, clientId) {
   };
 }
 
+async function enrichListsWithLikeCounts(lists, clientId) {
+  return mapWithConcurrency(lists, LIKE_COUNT_CONCURRENCY, async (list) => {
+    const likeCount = await getListLikeCount(list, clientId);
+    if (likeCount === null) return list;
+    return {
+      ...list,
+      like_count: likeCount,
+    };
+  });
+}
+
+async function getListLikeCount(list, clientId) {
+  const id = list?.ids?.trakt;
+  if (!id) return normalizeOptionalCount(list?.like_count);
+
+  try {
+    const payload = await traktFetch(`/lists/${encodeURIComponent(id)}/likes?page=1&limit=1`, clientId);
+    return normalizeOptionalCount(payload.pagination?.item_count);
+  } catch (error) {
+    console.warn("Could not fetch Trakt list likes", {
+      id,
+      status: error.status,
+      message: error.message,
+    });
+    return normalizeOptionalCount(list?.like_count);
+  }
+}
+
+async function enrichItemsWithTmdbPosters(items, env) {
+  if (!hasTmdbAuth(env)) return items;
+
+  return mapWithConcurrency(items, TMDB_POSTER_CONCURRENCY, async (item) => {
+    const posterPath = await getTmdbPosterPath(item, env);
+    if (!posterPath) return item;
+    return {
+      ...item,
+      poster: `${TMDB_IMAGE_BASE}${posterPath}`,
+    };
+  });
+}
+
+async function getTmdbPosterPath(item, env) {
+  const lookup = getTmdbPosterLookup(item);
+  if (!lookup) return "";
+
+  try {
+    const payload = await tmdbFetch(`/3/${lookup.type}/${encodeURIComponent(lookup.id)}`, env);
+    return payload?.poster_path || "";
+  } catch (error) {
+    console.warn("Could not fetch TMDB poster", {
+      type: lookup.type,
+      id: lookup.id,
+      message: error.message,
+    });
+    return "";
+  }
+}
+
+function getTmdbPosterLookup(item) {
+  if (!item?.ids) return null;
+  if (item.type === "movie" && item.ids.tmdb) return { type: "movie", id: item.ids.tmdb };
+  if ((item.type === "show" || item.type === "season" || item.type === "episode") && item.ids.show_tmdb) {
+    return { type: "tv", id: item.ids.show_tmdb };
+  }
+  if (item.type === "show" && item.ids.tmdb) return { type: "tv", id: item.ids.tmdb };
+  return null;
+}
+
+async function tmdbFetch(path, env) {
+  const url = new URL(path, TMDB_API_BASE);
+  const headers = {
+    "Content-Type": "application/json",
+    "User-Agent": "trakt-list-lookup/0.1 (+https://trakt-list-lookup.pages.dev)",
+  };
+
+  const bearerToken = getTmdbBearerToken(env);
+  if (bearerToken) {
+    headers.Authorization = `Bearer ${bearerToken}`;
+  } else {
+    url.searchParams.set("api_key", getTmdbApiKey(env));
+  }
+
+  const response = await fetch(url.toString(), { headers });
+  if (!response.ok) {
+    throw httpError(`TMDB returned HTTP ${response.status}.`, response.status);
+  }
+  return response.json();
+}
+
 function getClientId(env) {
   return String(env.TRAKT_CLIENT_ID || "").trim();
+}
+
+function getTmdbApiKey(env) {
+  return String(env.TMDB_API_KEY || env.TMDB_CLIENT_ID || "").trim();
+}
+
+function getTmdbBearerToken(env) {
+  return String(env.TMDB_ACCESS_TOKEN || env.TMDB_READ_ACCESS_TOKEN || "").trim();
+}
+
+function hasTmdbAuth(env) {
+  return Boolean(getTmdbApiKey(env) || getTmdbBearerToken(env));
 }
 
 function parseUserListQuery(value) {
@@ -253,6 +361,12 @@ function scoreListSearchMatch(list, terms, traktScore = 0) {
 function getPositiveInteger(value, fallback) {
   const number = Number.parseInt(value, 10);
   return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function normalizeOptionalCount(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const number = Number.parseInt(value, 10);
+  return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
 function clampPositiveInteger(value, fallback, max) {
@@ -366,9 +480,27 @@ function normalizeListItem(item) {
     ids: {
       trakt: media.ids?.trakt,
       tmdb: media.ids?.tmdb,
+      show_tmdb: item.show?.ids?.tmdb,
       imdb: media.ids?.imdb,
     },
   };
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, worker);
+  await Promise.all(workers);
+  return results;
 }
 
 function getTraktErrorMessage(status, body = "") {
