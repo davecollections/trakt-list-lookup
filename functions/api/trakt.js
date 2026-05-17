@@ -16,6 +16,7 @@ const TMDB_POSTER_CONCURRENCY = 5;
 const SORT_FETCH_LIMIT = 50;
 const SORT_MAX_ITEMS = 250;
 const SORTABLE_FIELDS = new Set(["title", "items", "likes", "updated"]);
+const CURATED_USER_FALLBACKS = ["snoak"];
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -141,10 +142,68 @@ async function searchLists(query, page, limit, clientId) {
     extended: "full",
   });
   const payload = await traktFetch(`/search/list?${params.toString()}`, clientId);
+  const searchResults = rankSearchResults(payload.data, query).map((item) => item.list).filter(Boolean);
+  const fallbackResults = page === 1
+    ? await getCuratedUserSearchMatches(query, searchResults, clientId)
+    : [];
+  const data = dedupeLists([...fallbackResults, ...searchResults]);
   return {
-    data: rankSearchResults(payload.data, query).map((item) => item.list).filter(Boolean),
-    pagination: payload.pagination,
+    data,
+    pagination: {
+      ...payload.pagination,
+      item_count: Math.max(payload.pagination?.item_count || 0, data.length),
+      page_count: Math.max(payload.pagination?.page_count || 1, Math.ceil(data.length / limit)),
+    },
   };
+}
+
+async function getCuratedUserSearchMatches(query, existingResults, clientId) {
+  const terms = normalizeSearchText(query).split(" ").filter(Boolean);
+  if (!terms.length) return [];
+
+  const existingKeys = new Set(existingResults.map(getListKey).filter(Boolean));
+  const matches = [];
+
+  for (const username of CURATED_USER_FALLBACKS) {
+    try {
+      const payload = await getFilteredUserLists(username, query, clientId);
+      payload.data.forEach((list) => {
+        const key = getListKey(list);
+        if (!key || existingKeys.has(key)) return;
+        existingKeys.add(key);
+        matches.push(list);
+      });
+    } catch (error) {
+      console.warn("Curated user fallback failed", {
+        username,
+        message: error.message,
+      });
+    }
+  }
+
+  return rankFallbackLists(matches, terms);
+}
+
+function rankFallbackLists(lists, terms) {
+  return [...lists].sort((a, b) => {
+    const scoreA = scoreListSearchMatch(a, terms, 0);
+    const scoreB = scoreListSearchMatch(b, terms, 0);
+    return scoreB - scoreA;
+  });
+}
+
+function dedupeLists(lists) {
+  const seen = new Set();
+  return lists.filter((list) => {
+    const key = getListKey(list);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getListKey(list) {
+  return list?.ids?.trakt ? `id:${list.ids.trakt}` : list?.user?.username && list?.ids?.slug ? `${list.user.username}/${list.ids.slug}` : "";
 }
 
 async function getGlobalLists(kind, page, limit, clientId) {
