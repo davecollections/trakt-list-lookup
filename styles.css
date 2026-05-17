@@ -612,16 +612,11 @@ h2 {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-.trakt-symbol {
-  display: grid;
+.trakt-symbol-img {
+  display: block;
   width: 24px;
   height: 24px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--accent);
-  color: white;
-  font-size: 0.82rem;
-  font-weight: 900;
+  object-fit: contain;
 }
 
 .result-id,
