@@ -872,6 +872,10 @@ body.modal-open {
   box-shadow: var(--shadow);
 }
 
+.preview-dialog {
+  width: min(620px, 100%);
+}
+
 .modal-header {
   margin-bottom: 12px;
 }
@@ -967,8 +971,9 @@ body.modal-open {
 
 .item-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 140px));
   gap: 14px;
+  justify-content: start;
   margin-top: 12px;
 }
 
@@ -1218,7 +1223,22 @@ body.modal-open {
   }
 
   .item-list {
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .preview-dialog {
+    padding: 16px;
+  }
+
+  .preview-dialog .modal-header {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  .preview-dialog .modal-header .ghost-button {
+    min-height: 32px;
+    padding: 0 11px;
   }
 
   .toolbar-actions,
