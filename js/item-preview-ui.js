@@ -132,9 +132,9 @@ function renderItems(container, items) {
       posterWrap.textContent = "No poster";
     }
 
-    const sourceLinks = renderSourceLinks(item);
+    posterWrap.append(renderSourceLinks(item));
 
-    card.append(posterWrap, sourceLinks);
+    card.append(posterWrap);
     container.append(card);
   });
 }
@@ -191,10 +191,7 @@ function createSourceLink({ className, href, iconSrc = "", label, value }) {
     icon.loading = "lazy";
     link.append(icon);
   } else {
-    const badge = document.createElement("span");
-    badge.className = "preview-source-badge";
-    badge.textContent = label;
-    link.append(badge);
+    link.append(createTmdbIcon());
   }
 
   const id = document.createElement("span");
@@ -203,6 +200,14 @@ function createSourceLink({ className, href, iconSrc = "", label, value }) {
   link.append(id);
 
   return link;
+}
+
+function createTmdbIcon() {
+  const icon = document.createElement("span");
+  icon.className = "preview-source-badge";
+  icon.textContent = "TMDB";
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
 }
 
 function getTraktItemUrl(item) {
