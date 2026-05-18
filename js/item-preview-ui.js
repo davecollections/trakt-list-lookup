@@ -132,11 +132,93 @@ function renderItems(container, items) {
       posterWrap.textContent = "No poster";
     }
 
-    const traktId = document.createElement("code");
-    traktId.className = "preview-trakt-id";
-    traktId.textContent = item.ids?.trakt ? `trakt:${item.ids.trakt}` : "trakt:n/a";
+    const sourceLinks = renderSourceLinks(item);
 
-    card.append(posterWrap, traktId);
+    card.append(posterWrap, sourceLinks);
     container.append(card);
   });
+}
+
+function renderSourceLinks(item) {
+  const links = document.createElement("div");
+  links.className = "preview-source-links";
+
+  const traktUrl = getTraktItemUrl(item);
+  if (traktUrl) {
+    links.append(createSourceLink({
+      className: "trakt-source",
+      href: traktUrl,
+      iconSrc: "./assets/trakt.ico",
+      label: "Trakt",
+      value: item.ids.trakt,
+    }));
+  }
+
+  const tmdbUrl = getTmdbItemUrl(item);
+  const tmdbId = getTmdbId(item);
+  if (tmdbUrl && tmdbId) {
+    links.append(createSourceLink({
+      className: "tmdb-source",
+      href: tmdbUrl,
+      label: "TMDB",
+      value: tmdbId,
+    }));
+  }
+
+  if (!links.children.length) {
+    const empty = document.createElement("span");
+    empty.className = "preview-source-empty";
+    empty.textContent = "No source IDs";
+    links.append(empty);
+  }
+
+  return links;
+}
+
+function createSourceLink({ className, href, iconSrc = "", label, value }) {
+  const link = document.createElement("a");
+  link.className = `preview-source-link ${className}`;
+  link.href = href;
+  link.target = "_blank";
+  link.rel = "noreferrer";
+  link.title = `${label} ID ${value}`;
+  link.setAttribute("aria-label", `Open ${label} ID ${value}`);
+
+  if (iconSrc) {
+    const icon = document.createElement("img");
+    icon.src = iconSrc;
+    icon.alt = "";
+    icon.loading = "lazy";
+    link.append(icon);
+  } else {
+    const badge = document.createElement("span");
+    badge.className = "preview-source-badge";
+    badge.textContent = label;
+    link.append(badge);
+  }
+
+  const id = document.createElement("span");
+  id.className = "preview-source-id";
+  id.textContent = value;
+  link.append(id);
+
+  return link;
+}
+
+function getTraktItemUrl(item) {
+  return item.ids?.trakt ? `https://trakt.tv/search/trakt/${encodeURIComponent(item.ids.trakt)}` : "";
+}
+
+function getTmdbItemUrl(item) {
+  const id = getTmdbId(item);
+  if (!id) return "";
+  if (item.type === "movie") return `https://www.themoviedb.org/movie/${encodeURIComponent(id)}`;
+  if (item.type === "show" || item.type === "season" || item.type === "episode") {
+    return `https://www.themoviedb.org/tv/${encodeURIComponent(id)}`;
+  }
+  return `https://www.themoviedb.org/search?query=${encodeURIComponent(id)}`;
+}
+
+function getTmdbId(item) {
+  return item.ids?.show_tmdb || item.ids?.tmdb || "";
 }
