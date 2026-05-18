@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildNuvioExport, getSafeHttpsUrl } from "../nuvio-export.js";
+import { buildNuvioExport, getSafeHttpsUrl } from "../js/nuvio-export.js";
 
 const lists = [
   list("Comedy Nights", 101),

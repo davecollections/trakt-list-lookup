@@ -1,4 +1,6 @@
-import { buildNuvioExport, getSafeHttpsUrl, getListSelectionKey as getNuvioListSelectionKey } from "./nuvio-export.js";
+import { cleanDescription, compareNumber, compareText, formatDate, formatNumber, hasDescription, slugifyFilename } from "./js/formatting.js";
+import { fetchTraktListItems, fetchTraktLists } from "./js/api-client.js";
+import { buildNuvioExport, getSafeHttpsUrl, getListSelectionKey as getNuvioListSelectionKey } from "./js/nuvio-export.js";
 
 const form = document.querySelector("#search-form");
 const queryInput = document.querySelector("#query");
@@ -243,22 +245,14 @@ async function runSearch(page) {
   setStatus("Searching Trakt...");
 
   try {
-    const params = new URLSearchParams({
+    const payload = await fetchTraktLists({
       mode: state.mode,
-      q: state.query,
-      page: String(state.page),
-      limit: String(state.limit),
+      query: state.query,
+      page: state.page,
+      limit: state.limit,
+      sort: state.sort,
+      sortDirection: state.sortDirection,
     });
-    if (state.sort !== "relevance") {
-      params.set("sort", state.sort);
-      params.set("order", state.sortDirection);
-    }
-    const response = await fetch(`/api/trakt?${params.toString()}`);
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error || "Trakt request failed.");
-    }
 
     const results = payload.results || [];
     state.results = results;
@@ -433,17 +427,12 @@ async function loadPosterSamples(result) {
   if (!key) return;
 
   try {
-    const params = new URLSearchParams({
-      mode: "items",
+    const payload = await fetchTraktListItems({
       user: result.user.username,
       slug: result.ids.slug,
-      limit: String(POSTER_SAMPLE_LIMIT),
+      limit: POSTER_SAMPLE_LIMIT,
     });
-    const response = await fetch(`/api/trakt?${params.toString()}`);
-    const payload = await response.json();
-    const posters = response.ok
-      ? (payload.items || []).map((item) => item.poster).filter(Boolean).slice(0, POSTER_SAMPLE_LIMIT)
-      : [];
+    const posters = (payload.items || []).map((item) => item.poster).filter(Boolean).slice(0, POSTER_SAMPLE_LIMIT);
     state.posterSamples.set(key, posters);
   } catch {
     state.posterSamples.set(key, []);
@@ -528,14 +517,6 @@ async function loadUserLists(username) {
   await runSearch(1);
 }
 
-function compareText(a, b) {
-  return String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base" });
-}
-
-function compareNumber(a, b) {
-  return Number(a || 0) - Number(b || 0);
-}
-
 function renderPagination(pagination) {
   const page = pagination?.page || state.page;
   const pageCount = pagination?.page_count || 1;
@@ -561,18 +542,11 @@ async function openPreview(result, button) {
   document.body.classList.add("modal-open");
 
   try {
-    const params = new URLSearchParams({
-      mode: "items",
+    const payload = await fetchTraktListItems({
       user: result.user.username,
       slug: result.ids.slug,
-      limit: String(ITEMS_PREVIEW_LIMIT),
+      limit: ITEMS_PREVIEW_LIMIT,
     });
-    const response = await fetch(`/api/trakt?${params.toString()}`);
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error || "Item lookup failed.");
-    }
 
     const items = payload.items || [];
     renderItems(modalItemList, items);
@@ -1162,46 +1136,6 @@ function renderItems(container, items) {
     card.append(posterWrap, traktId);
     container.append(card);
   });
-}
-
-function cleanDescription(value) {
-  if (!value) return "No description provided.";
-  const text = String(value)
-    .replace(/<br\s*\/?>/gi, " ")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\*\*|__|[_`~]/g, "")
-    .replace(/\[[^\]]+\]\([^)]+\)/g, "")
-    .replace(/https?:\/\/\S+/gi, "")
-    .replace(/:[a-z0-9_+-]+:/gi, "")
-    .replace(/[-_]{5,}/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!text) return "No description provided.";
-  return text;
-}
-
-function hasDescription(value) {
-  return cleanDescription(value) !== "No description provided.";
-}
-
-function formatNumber(value) {
-  if (value === undefined || value === null || value === "") return "n/a";
-  return Number(value).toLocaleString();
-}
-
-function formatDate(value) {
-  if (!value) return "n/a";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "n/a";
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function slugifyFilename(value) {
-  return String(value || "trakt-lists")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "trakt-lists";
 }
 
 function getCopyValue(kind, result) {
