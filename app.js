@@ -1,5 +1,6 @@
 import { compareText, formatNumber } from "./js/formatting.js";
-import { fetchTraktListItems, fetchTraktLists } from "./js/api-client.js";
+import { fetchTraktLists } from "./js/api-client.js";
+import { createItemPreviewUi } from "./js/item-preview-ui.js";
 import { getListSelectionKey as getNuvioListSelectionKey } from "./js/nuvio-export.js";
 import { createNuvioExportUi } from "./js/nuvio-export-ui.js";
 import { createResultsView } from "./js/results-view.js";
@@ -16,17 +17,6 @@ const lastPageButton = document.querySelector("#last-page");
 const themeToggle = document.querySelector("#theme-toggle");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
-const previewModal = document.querySelector("#preview-modal");
-const previewTitle = document.querySelector("#preview-title");
-const previewOwner = document.querySelector("#preview-owner");
-const previewStatus = document.querySelector("#preview-status");
-const modalItemList = document.querySelector("#modal-item-list");
-const modalCloseButton = document.querySelector("#modal-close");
-const descriptionModal = document.querySelector("#description-modal");
-const descriptionTitle = document.querySelector("#description-title");
-const descriptionOwner = document.querySelector("#description-owner");
-const descriptionFull = document.querySelector("#description-full");
-const descriptionCloseButton = document.querySelector("#description-close");
 const selectionPanel = document.querySelector("#selection-panel");
 const selectionSummary = document.querySelector("#selection-summary");
 const selectedListChips = document.querySelector("#selected-list-chips");
@@ -49,19 +39,19 @@ const state = {
   pagination: null,
   results: [],
   limit: 30,
-  activePreviewButton: null,
   sort: "relevance",
   sortDirection: "desc",
   selection: createSelectionState(),
 };
+const itemPreviewUi = createItemPreviewUi({ itemPreviewLimit: ITEMS_PREVIEW_LIMIT });
 const nuvioExportUi = createNuvioExportUi({ selection: state.selection });
 const resultsView = createResultsView({
   posterSampleLimit: POSTER_SAMPLE_LIMIT,
   posterSampleConcurrency: 4,
   isSelected: (result) => state.selection.has(result),
   onLoadUserLists: loadUserLists,
-  onOpenDescription: openDescription,
-  onOpenPreview: openPreview,
+  onOpenDescription: itemPreviewUi.openDescription,
+  onOpenPreview: itemPreviewUi.openPreview,
   onToggleSelectedList: toggleSelectedList,
 });
 
@@ -116,28 +106,18 @@ clearButton.addEventListener("click", () => {
   queryInput.focus();
 });
 
-modalCloseButton.addEventListener("click", closePreview);
-descriptionCloseButton.addEventListener("click", closeDescription);
 selectionCloseButton.addEventListener("click", closeSelectionManager);
 manageSelectionButton.addEventListener("click", openSelectionManager);
 openNuvioExportButton.addEventListener("click", nuvioExportUi.open);
 clearSelectionButton.addEventListener("click", clearSelection);
-
-previewModal.addEventListener("click", (event) => {
-  if (event.target.matches("[data-close-modal]")) closePreview();
-});
-
-descriptionModal.addEventListener("click", (event) => {
-  if (event.target.matches("[data-close-description]")) closeDescription();
-});
 
 selectionModal.addEventListener("click", (event) => {
   if (event.target.matches("[data-close-selection]")) closeSelectionManager();
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !previewModal.hidden) closePreview();
-  if (event.key === "Escape" && !descriptionModal.hidden) closeDescription();
+  if (event.key === "Escape" && itemPreviewUi.isPreviewOpen()) itemPreviewUi.closePreview();
+  if (event.key === "Escape" && itemPreviewUi.isDescriptionOpen()) itemPreviewUi.closeDescription();
   if (event.key === "Escape" && !selectionModal.hidden) closeSelectionManager();
   if (event.key === "Escape" && nuvioExportUi.isOpen()) nuvioExportUi.close();
 });
@@ -305,68 +285,6 @@ async function loadUserLists(username) {
   await runSearch(1);
 }
 
-async function openPreview(result, button) {
-  state.activePreviewButton = button;
-  if (button) {
-    button.disabled = true;
-    button.classList.add("loading");
-  }
-  previewTitle.textContent = result.name || "List Preview";
-  previewOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
-  previewStatus.textContent = "Loading preview...";
-  modalItemList.textContent = "";
-  previewModal.hidden = false;
-  document.body.classList.add("modal-open");
-
-  try {
-    const payload = await fetchTraktListItems({
-      user: result.user.username,
-      slug: result.ids.slug,
-      limit: ITEMS_PREVIEW_LIMIT,
-    });
-
-    const items = payload.items || [];
-    renderItems(modalItemList, items);
-    const total = payload.pagination?.item_count || items.length || 0;
-    previewStatus.textContent = total
-      ? `Preview only: showing first ${formatNumber(Math.min(ITEMS_PREVIEW_LIMIT, items.length))} of ${formatNumber(total)}.`
-      : "No items found.";
-  } catch (error) {
-    previewStatus.textContent = error.message;
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.classList.remove("loading");
-    }
-  }
-}
-
-function closePreview() {
-  previewModal.hidden = true;
-  document.body.classList.remove("modal-open");
-  previewTitle.textContent = "List Preview";
-  previewOwner.textContent = "";
-  previewStatus.textContent = "";
-  modalItemList.textContent = "";
-  state.activePreviewButton = null;
-}
-
-function openDescription(result, text) {
-  descriptionTitle.textContent = result.name || "Description";
-  descriptionOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
-  descriptionFull.textContent = text;
-  descriptionModal.hidden = false;
-  document.body.classList.add("modal-open");
-}
-
-function closeDescription() {
-  descriptionModal.hidden = true;
-  document.body.classList.remove("modal-open");
-  descriptionTitle.textContent = "Description";
-  descriptionOwner.textContent = "";
-  descriptionFull.textContent = "";
-}
-
 function toggleSelectedList(result) {
   state.selection.toggle(result);
   updateSelectionUi();
@@ -476,43 +394,6 @@ function renderSelectedTable() {
 
     row.append(listCell, userCell, idCell, itemsCell, likesCell, actionCell);
     selectedTableBody.append(row);
-  });
-}
-
-function renderItems(container, items) {
-  container.textContent = "";
-
-  if (!items.length) {
-    const empty = document.createElement("p");
-    empty.className = "item-empty";
-    empty.textContent = "No preview items returned for this list.";
-    container.append(empty);
-    return;
-  }
-
-  items.forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "preview-item";
-    card.title = item.title || "";
-
-    const posterWrap = document.createElement("div");
-    posterWrap.className = "preview-poster";
-    if (item.poster) {
-      const image = document.createElement("img");
-      image.src = item.poster;
-      image.alt = "";
-      image.loading = "lazy";
-      posterWrap.append(image);
-    } else {
-      posterWrap.textContent = "No poster";
-    }
-
-    const traktId = document.createElement("code");
-    traktId.className = "preview-trakt-id";
-    traktId.textContent = item.ids?.trakt ? `trakt:${item.ids.trakt}` : "trakt:n/a";
-
-    card.append(posterWrap, traktId);
-    container.append(card);
   });
 }
 
