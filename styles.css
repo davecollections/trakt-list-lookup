@@ -860,7 +860,7 @@ body.modal-open {
 }
 
 .nuvio-dialog {
-  width: min(980px, 100%);
+  width: min(860px, 100%);
 }
 
 .selected-table-wrap {
@@ -923,8 +923,8 @@ body.modal-open {
 }
 
 .nuvio-warning {
-  margin-bottom: 14px;
-  padding: 9px 11px;
+  margin-bottom: 10px;
+  padding: 7px 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
   border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -935,7 +935,7 @@ body.modal-open {
 
 .nuvio-grid {
   display: grid;
-  gap: 12px;
+  gap: 9px;
 }
 
 .nuvio-grid label,
@@ -955,10 +955,10 @@ body.modal-open {
 
 .nuvio-panel-heading {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: baseline;
   justify-content: space-between;
-  padding: 11px 12px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -979,15 +979,15 @@ body.modal-open {
 
 .nuvio-field-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(210px, 0.8fr);
-  gap: 12px;
-  padding: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(190px, 0.75fr);
+  gap: 9px;
+  padding: 10px;
 }
 
 .nuvio-merge-options {
   display: grid;
-  gap: 10px;
-  padding-bottom: 12px;
+  gap: 8px;
+  padding-bottom: 10px;
 }
 
 .nuvio-merge-options[hidden] {
@@ -996,9 +996,9 @@ body.modal-open {
 
 .nuvio-option-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px 12px 0;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  padding: 10px 10px 0;
 }
 
 .existing-json-option:has(:disabled) {
@@ -1008,8 +1008,8 @@ body.modal-open {
 .radio-label {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
-  min-height: 64px;
-  padding: 10px;
+  min-height: 52px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -1036,7 +1036,7 @@ body.modal-open {
 
 .radio-label small {
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 700;
   line-height: 1.3;
 }
@@ -1058,12 +1058,12 @@ body.modal-open {
 }
 
 .nuvio-grid input {
-  min-height: 40px;
+  min-height: 34px;
   padding: 0 10px;
 }
 
 .nuvio-grid select {
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 10px;
 }
 
@@ -1082,7 +1082,7 @@ body.modal-open {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 8px 10px;
   cursor: pointer;
   color: var(--text);
   font-size: 0.82rem;
@@ -1098,19 +1098,19 @@ body.modal-open {
 .nuvio-source-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.45fr);
-  gap: 12px;
-  padding: 0 12px 12px;
+  gap: 10px;
+  padding: 0 10px 10px;
 }
 
 .nuvio-target-field {
-  margin: 0 12px;
+  margin: 0 10px;
 }
 
 .nuvio-list-mapping {
   display: grid;
-  gap: 8px;
-  max-height: 240px;
-  margin: 0 12px;
+  gap: 6px;
+  max-height: 220px;
+  margin: 0 10px;
   overflow: auto;
 }
 
@@ -1121,7 +1121,7 @@ body.modal-open {
 .nuvio-map-row {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
   align-items: center;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -1133,6 +1133,10 @@ body.modal-open {
   color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.compact-mapping {
+  padding-top: 0;
 }
 
 .export-preview-details textarea {

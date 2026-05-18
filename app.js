@@ -49,6 +49,7 @@ const nuvioExistingFileInput = document.querySelector("#nuvio-existing-file");
 const nuvioMergeOptions = document.querySelector("#nuvio-merge-options");
 const nuvioExistingSummary = document.querySelector("#nuvio-existing-summary");
 const nuvioTargetCollectionSelect = document.querySelector("#nuvio-target-collection");
+const nuvioSplitMapping = document.querySelector("#nuvio-split-mapping");
 const nuvioListMapping = document.querySelector("#nuvio-list-mapping");
 const nuvioOutput = document.querySelector("#nuvio-output");
 const copyNuvioJsonButton = document.querySelector("#copy-nuvio-json");
@@ -138,8 +139,9 @@ nuvioCoverUrlInput.addEventListener("input", updateNuvioOutput);
 nuvioSortAlphaInput.addEventListener("change", updateNuvioOutput);
 nuvioExistingJsonInput.addEventListener("input", updateNuvioOutput);
 nuvioExistingFileInput.addEventListener("change", loadNuvioExistingFile);
-nuvioTargetCollectionSelect.addEventListener("change", updateNuvioOutput);
-nuvioListMapping.addEventListener("change", updateNuvioOutput);
+nuvioTargetCollectionSelect.addEventListener("change", refreshNuvioGeneratedOutput);
+nuvioSplitMapping.addEventListener("input", refreshNuvioGeneratedOutput);
+nuvioListMapping.addEventListener("change", refreshNuvioGeneratedOutput);
 document.querySelectorAll("input[name='nuvio-merge-mode']").forEach((radio) => {
   radio.addEventListener("change", () => {
     updateNuvioMergeControls();
@@ -746,6 +748,15 @@ async function loadNuvioExistingFile() {
 function updateNuvioOutput() {
   try {
     updateNuvioMergeControls();
+    refreshNuvioGeneratedOutput();
+  } catch (error) {
+    nuvioOutput.value = `Could not build JSON: ${error.message}`;
+    nuvioExportSummary.textContent = "Fix the highlighted export settings before copying.";
+  }
+}
+
+function refreshNuvioGeneratedOutput() {
+  try {
     const exportJson = createNuvioExportJson();
     nuvioOutput.value = JSON.stringify(exportJson, null, 2);
     updateNuvioExportSummary(exportJson);
@@ -802,7 +813,8 @@ function updateNuvioExportSummary(exportJson) {
   const collectionCount = Array.isArray(exportJson) ? exportJson.length : 0;
 
   if (mode === "split") {
-    nuvioExportSummary.textContent = `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(selectedCount)} new collection${selectedCount === 1 ? "" : "s"}${coverUrl ? " with a cover URL" : ""}.`;
+    const splitCount = getNuvioSplitGroups().size;
+    nuvioExportSummary.textContent = `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(splitCount)} new collection${splitCount === 1 ? "" : "s"}${coverUrl ? " with a cover URL" : ""}.`;
     return;
   }
 
@@ -824,25 +836,36 @@ function updateNuvioExportSummary(exportJson) {
 
 function updateNuvioMergeControls() {
   const collections = getExistingNuvioCollections();
+  const hasExistingJson = collections.length > 0;
+  const canSplit = state.selectedLists.size > 1;
   nuvioMergeOptions.hidden = false;
   nuvioExistingSummary.textContent = collections.length
-    ? `Detected ${formatNumber(collections.length)} collection${collections.length === 1 ? "" : "s"} in the existing JSON.`
-    : "No existing collections detected. You can still export one new collection or split selected lists into separate collections.";
+    ? `${formatNumber(collections.length)} existing collection${collections.length === 1 ? "" : "s"} detected.`
+    : "Create new collection output.";
 
+  nuvioMergeOptions.querySelectorAll(".existing-json-option").forEach((element) => {
+    element.hidden = !hasExistingJson;
+  });
+  nuvioMergeOptions.querySelector(".split-option").hidden = !canSplit;
   const existingOnlyInputs = nuvioMergeOptions.querySelectorAll(".existing-json-option input, .existing-json-option select");
   existingOnlyInputs.forEach((input) => {
-    input.disabled = collections.length === 0;
+    input.disabled = !hasExistingJson;
   });
 
-  if (!collections.length && (getNuvioMergeMode() === "existing" || getNuvioMergeMode() === "mapped")) {
+  if (!hasExistingJson && (getNuvioMergeMode() === "existing" || getNuvioMergeMode() === "mapped")) {
+    document.querySelector("input[name='nuvio-merge-mode'][value='new']").checked = true;
+  }
+  if (!canSplit && getNuvioMergeMode() === "split") {
     document.querySelector("input[name='nuvio-merge-mode'][value='new']").checked = true;
   }
 
   populateCollectionSelect(nuvioTargetCollectionSelect, collections);
 
   const mergeMode = getNuvioMergeMode();
-  const mergeIntoExisting = mergeMode === "existing" && collections.length > 0;
+  const mergeIntoExisting = mergeMode === "existing" && hasExistingJson;
   nuvioTargetCollectionSelect.disabled = !mergeIntoExisting;
+  nuvioTargetCollectionSelect.closest(".nuvio-target-field").hidden = !mergeIntoExisting;
+  renderNuvioSplitMapping(mergeMode);
   renderNuvioListMapping(collections, mergeMode);
 }
 
@@ -884,6 +907,57 @@ function renderNuvioListMapping(collections, mergeMode) {
     row.append(title, select);
     nuvioListMapping.append(row);
   });
+}
+
+function renderNuvioSplitMapping(mergeMode) {
+  if (!nuvioSplitMapping) return;
+  nuvioSplitMapping.hidden = mergeMode !== "split";
+  if (nuvioSplitMapping.hidden) {
+    nuvioSplitMapping.textContent = "";
+    return;
+  }
+
+  const previous = getNuvioSplitMappingValues();
+  nuvioSplitMapping.textContent = "";
+
+  getSelectedListsForExport().forEach((result) => {
+    const row = document.createElement("label");
+    row.className = "nuvio-map-row";
+
+    const title = document.createElement("span");
+    title.textContent = result.name || "Untitled list";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.dataset.listKey = getListSelectionKey(result);
+    input.value = previous.get(getListSelectionKey(result)) || result.name || "Trakt List";
+    input.placeholder = "Collection name";
+
+    row.append(title, input);
+    nuvioSplitMapping.append(row);
+  });
+}
+
+function getNuvioSplitMappingValues() {
+  const values = new Map();
+  nuvioSplitMapping?.querySelectorAll("input[data-list-key]").forEach((input) => {
+    values.set(input.dataset.listKey, input.value.trim());
+  });
+  return values;
+}
+
+function getNuvioSplitGroups() {
+  const mapping = getNuvioSplitMappingValues();
+  const groups = new Map();
+  getSelectedListsForExport().forEach((result) => {
+    const key = getListSelectionKey(result);
+    const title = mapping.get(key) || result.name || "Trakt List";
+    const normalizedTitle = title.trim() || result.name || "Trakt List";
+    const lists = groups.get(normalizedTitle) || [];
+    lists.push(result);
+    groups.set(normalizedTitle, lists);
+  });
+  return groups;
 }
 
 function getNuvioListMappingValues() {
@@ -960,10 +1034,10 @@ function createNuvioCollection() {
 }
 
 function createSplitNuvioCollections() {
-  return getSelectedListsForExport().map((result) => ({
+  return [...getNuvioSplitGroups()].map(([title, lists]) => ({
     id: createNuvioId("collection"),
-    title: result.name || "Trakt List",
-    folders: [createNuvioFolder(result)],
+    title,
+    folders: lists.map(createNuvioFolder),
     pinToTop: false,
     viewMode: "TABBED_GRID",
     showAllTab: false,

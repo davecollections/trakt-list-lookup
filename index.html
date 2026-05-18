@@ -234,7 +234,7 @@
           <button id="nuvio-close" type="button" class="ghost-button">Close</button>
         </div>
 
-        <p class="nuvio-warning">Export is ready for draft use. Direct Trakt source imports still need validation in Nuvio before relying on them for a final collection.</p>
+        <p class="nuvio-warning">Draft export. Direct Trakt source imports still need validation in Nuvio.</p>
 
         <div class="nuvio-grid">
           <section class="nuvio-panel nuvio-wide">
@@ -288,11 +288,11 @@
                   <small>Add all selected lists as folders in one new collection.</small>
                 </span>
               </label>
-              <label class="radio-label">
+              <label class="radio-label split-option">
                 <input type="radio" name="nuvio-merge-mode" value="split">
                 <span>
-                  <strong>Split collections</strong>
-                  <small>Create one new collection for each selected list.</small>
+                  <strong>Split into collections</strong>
+                  <small>Group selected lists into multiple new collections.</small>
                 </span>
               </label>
               <label class="radio-label existing-json-option">
@@ -310,6 +310,7 @@
                 </span>
               </label>
             </div>
+            <div id="nuvio-split-mapping" class="nuvio-list-mapping compact-mapping" hidden></div>
             <label class="existing-json-option nuvio-target-field">
               Existing collection
               <select id="nuvio-target-collection" disabled></select>
