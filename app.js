@@ -1,24 +1,18 @@
-import { cleanDescription, compareNumber, compareText, formatDate, formatNumber, hasDescription } from "./js/formatting.js";
+import { compareText, formatNumber } from "./js/formatting.js";
 import { fetchTraktListItems, fetchTraktLists } from "./js/api-client.js";
 import { getListSelectionKey as getNuvioListSelectionKey } from "./js/nuvio-export.js";
 import { createNuvioExportUi } from "./js/nuvio-export-ui.js";
+import { createResultsView } from "./js/results-view.js";
 import { createSelectionState } from "./js/selection-state.js";
 
 const form = document.querySelector("#search-form");
 const queryInput = document.querySelector("#query");
 const statusEl = document.querySelector("#status");
-const resultsEl = document.querySelector("#results");
-const resultsHeader = document.querySelector(".results-header");
-const quickUsers = document.querySelector("#quick-users");
-const quickUserButtons = document.querySelector("#quick-user-buttons");
 const clearButton = document.querySelector("#clear-button");
-const template = document.querySelector("#result-template");
-const pager = document.querySelector("#pager");
 const firstPageButton = document.querySelector("#first-page");
 const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
 const lastPageButton = document.querySelector("#last-page");
-const pageLabel = document.querySelector("#page-label");
 const themeToggle = document.querySelector("#theme-toggle");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
@@ -47,7 +41,6 @@ const selectedTableBody = document.querySelector("#selected-table-body");
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 15;
 const POSTER_SAMPLE_LIMIT = 3;
-const POSTER_SAMPLE_CONCURRENCY = 4;
 
 const state = {
   mode: "search",
@@ -60,9 +53,17 @@ const state = {
   sort: "relevance",
   sortDirection: "desc",
   selection: createSelectionState(),
-  posterSamples: new Map(),
 };
 const nuvioExportUi = createNuvioExportUi({ selection: state.selection });
+const resultsView = createResultsView({
+  posterSampleLimit: POSTER_SAMPLE_LIMIT,
+  posterSampleConcurrency: 4,
+  isSelected: (result) => state.selection.has(result),
+  onLoadUserLists: loadUserLists,
+  onOpenDescription: openDescription,
+  onOpenPreview: openPreview,
+  onToggleSelectedList: toggleSelectedList,
+});
 
 const placeholders = {
   search: "Search public lists by title or description",
@@ -109,9 +110,9 @@ clearButton.addEventListener("click", () => {
   state.page = 1;
   state.pagination = null;
   setStatus("");
-  renderResults([]);
-  renderQuickUsers([]);
-  renderPagination(null);
+  resultsView.renderResults([]);
+  resultsView.renderQuickUsers([]);
+  resultsView.renderPagination(null, state.page);
   queryInput.focus();
 });
 
@@ -208,17 +209,17 @@ async function runSearch(page) {
     state.results = results;
     state.pagination = payload.pagination || null;
     renderCurrentResults();
-    renderQuickUsers(results);
-    renderPagination(state.pagination);
+    resultsView.renderQuickUsers(results);
+    resultsView.renderPagination(state.pagination, state.page);
 
     const total = state.pagination?.item_count;
     const countText = total ? `${formatNumber(total)} total` : `${results.length} on this page`;
     setStatus(results.length ? `Found ${countText}.` : "No matching public lists found.");
   } catch (error) {
-    renderResults([]);
+    resultsView.renderResults([]);
     state.results = [];
-    renderQuickUsers([]);
-    renderPagination(null);
+    resultsView.renderQuickUsers([]);
+    resultsView.renderPagination(null, state.page);
     setStatus(error.message, true);
   } finally {
     setLoading(false);
@@ -226,7 +227,7 @@ async function runSearch(page) {
 }
 
 function renderCurrentResults() {
-  renderResults(state.results);
+  resultsView.renderResults(state.results);
 }
 
 function getMode() {
@@ -252,169 +253,6 @@ function setLoading(isLoading) {
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.classList.toggle("error", isError);
-}
-
-function renderResults(results) {
-  resultsEl.textContent = "";
-  resultsEl.classList.toggle("empty-state", results.length === 0);
-  resultsHeader.hidden = results.length === 0;
-
-  if (!results.length) {
-    const empty = document.createElement("p");
-    empty.textContent = "Results will appear here.";
-    resultsEl.append(empty);
-    return;
-  }
-
-  results.forEach((result, index) => {
-    const node = template.content.cloneNode(true);
-    const card = node.querySelector(".result-card");
-    const title = result.name || "Untitled list";
-    const owner = result.user?.username || result.user?.name || "unknown";
-    const url = result.url || "";
-
-    card.id = `result-${index + 1}`;
-    card.dataset.sampleKey = getPosterSampleKey(result);
-    const ownerButton = node.querySelector(".result-owner");
-    ownerButton.textContent = `@${owner}`;
-    ownerButton.disabled = !result.user?.username;
-    ownerButton.addEventListener("click", () => loadUserLists(result.user.username));
-    node.querySelector(".result-title").textContent = title;
-    const fullDescription = cleanDescription(result.description);
-    const readMoreButton = node.querySelector(".read-more-button");
-    readMoreButton.hidden = !hasDescription(result.description);
-    readMoreButton.addEventListener("click", () => openDescription(result, fullDescription));
-    node.querySelector(".trakt-id-button").textContent = result.ids?.trakt || "n/a";
-    node.querySelector(".items").textContent = formatNumber(result.item_count);
-    node.querySelector(".likes").textContent = formatNumber(result.like_count);
-    node.querySelector(".updated").textContent = formatDate(result.updated_at);
-
-    const openLink = node.querySelector(".open-link");
-    openLink.href = url;
-    openLink.hidden = !url;
-
-    card.querySelectorAll("[data-copy]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const value = getCopyValue(button.dataset.copy, result);
-        if (!value) return;
-        await navigator.clipboard.writeText(value);
-        flashButton(button);
-      });
-    });
-
-    const posterButton = node.querySelector(".poster-samples");
-    posterButton.disabled = !result.user?.username || !result.ids?.slug;
-    posterButton.addEventListener("click", () => openPreview(result, posterButton));
-
-    const selectListButton = node.querySelector(".select-list-button");
-    updateSelectListButton(selectListButton, result);
-    selectListButton.addEventListener("click", () => toggleSelectedList(result));
-
-    resultsEl.append(node);
-  });
-
-  loadPosterSamplesForResults(results);
-}
-
-function renderQuickUsers(results) {
-  quickUserButtons.textContent = "";
-  const users = getPopularUsersFromResults(results);
-  quickUsers.hidden = users.length === 0;
-
-  users.forEach((user) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = `@${user.username}`;
-    button.title = `${formatNumber(user.lists)} list${user.lists === 1 ? "" : "s"} in results`;
-    button.addEventListener("click", () => loadUserLists(user.username));
-    quickUserButtons.append(button);
-  });
-}
-
-function getPopularUsersFromResults(results) {
-  const users = new Map();
-  results.forEach((result) => {
-    const username = result.user?.username;
-    if (!username) return;
-    const existing = users.get(username) || { username, lists: 0, likes: 0 };
-    existing.lists += 1;
-    existing.likes += Number(result.like_count || 0);
-    users.set(username, existing);
-  });
-
-  return [...users.values()]
-    .sort((a, b) => compareNumber(b.likes, a.likes) || compareNumber(b.lists, a.lists) || compareText(a.username, b.username))
-    .slice(0, 6);
-}
-
-async function loadPosterSamplesForResults(results) {
-  const queue = results.filter((result) => {
-    const key = getPosterSampleKey(result);
-    return key && !state.posterSamples.has(key) && result.user?.username && result.ids?.slug;
-  });
-
-  if (!queue.length) {
-    results.forEach((result) => renderPosterSamples(result));
-    return;
-  }
-
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(POSTER_SAMPLE_CONCURRENCY, queue.length) }, async () => {
-    while (cursor < queue.length) {
-      const result = queue[cursor];
-      cursor += 1;
-      await loadPosterSamples(result);
-      renderPosterSamples(result);
-    }
-  });
-
-  await Promise.all(workers);
-  results.forEach((result) => renderPosterSamples(result));
-}
-
-async function loadPosterSamples(result) {
-  const key = getPosterSampleKey(result);
-  if (!key) return;
-
-  try {
-    const payload = await fetchTraktListItems({
-      user: result.user.username,
-      slug: result.ids.slug,
-      limit: POSTER_SAMPLE_LIMIT,
-    });
-    const posters = (payload.items || []).map((item) => item.poster).filter(Boolean).slice(0, POSTER_SAMPLE_LIMIT);
-    state.posterSamples.set(key, posters);
-  } catch {
-    state.posterSamples.set(key, []);
-  }
-}
-
-function renderPosterSamples(result) {
-  const key = getPosterSampleKey(result);
-  if (!key) return;
-  const card = resultsEl.querySelector(`[data-sample-key="${CSS.escape(key)}"]`);
-  if (!card) return;
-
-  const sampleWrap = card.querySelector(".poster-samples");
-  const posters = state.posterSamples.get(key) || [];
-  sampleWrap.textContent = "";
-
-  for (let index = 0; index < POSTER_SAMPLE_LIMIT; index += 1) {
-    const poster = document.createElement("div");
-    poster.className = posters[index] ? "sample-poster" : "sample-poster placeholder";
-    if (posters[index]) {
-      const image = document.createElement("img");
-      image.src = posters[index];
-      image.alt = "";
-      image.loading = "lazy";
-      poster.append(image);
-    }
-    sampleWrap.append(poster);
-  }
-}
-
-function getPosterSampleKey(result) {
-  return getListSelectionKey(result);
 }
 
 function getSortedResults(results) {
@@ -465,17 +303,6 @@ async function loadUserLists(username) {
   state.query = username;
   state.page = 1;
   await runSearch(1);
-}
-
-function renderPagination(pagination) {
-  const page = pagination?.page || state.page;
-  const pageCount = pagination?.page_count || 1;
-  pager.hidden = pageCount <= 1;
-  pageLabel.textContent = `Page ${formatNumber(page)} of ${formatNumber(pageCount)}`;
-  firstPageButton.disabled = page <= 1;
-  prevPageButton.disabled = page <= 1;
-  nextPageButton.disabled = page >= pageCount;
-  lastPageButton.disabled = page >= pageCount;
 }
 
 async function openPreview(result, button) {
@@ -544,12 +371,6 @@ function toggleSelectedList(result) {
   state.selection.toggle(result);
   updateSelectionUi();
   renderCurrentResults();
-}
-
-function updateSelectListButton(button, result) {
-  const selected = state.selection.has(result);
-  button.textContent = selected ? "Remove" : "Add";
-  button.classList.toggle("selected", selected);
 }
 
 function getListSelectionKey(result) {
@@ -693,12 +514,6 @@ function renderItems(container, items) {
     card.append(posterWrap, traktId);
     container.append(card);
   });
-}
-
-function getCopyValue(kind, result) {
-  if (kind === "id") return result.ids?.trakt ? String(result.ids.trakt) : "";
-  if (kind === "url") return result.url || "";
-  return "";
 }
 
 function flashButton(button) {
