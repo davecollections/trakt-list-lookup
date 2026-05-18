@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check app.js && node --check js/api-client.js && node --check js/formatting.js && node --check js/nuvio-export.js && node --check functions/api/trakt.js",
+    "check": "node --check app.js && node --check js/api-client.js && node --check js/formatting.js && node --check js/nuvio-export.js && node --check js/selection-state.js && node --check functions/api/trakt.js",
     "test": "node tests/nuvio-export.test.mjs",
     "dev": "wrangler pages dev ."
   }
