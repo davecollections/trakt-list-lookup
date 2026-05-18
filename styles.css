@@ -941,10 +941,22 @@ body.modal-open {
 .nuvio-grid label,
 .nuvio-field-grid label {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 800;
+}
+
+.field-status {
+  min-height: 13px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.field-status.invalid {
+  color: var(--accent);
 }
 
 .nuvio-panel {
