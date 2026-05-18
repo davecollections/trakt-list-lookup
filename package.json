@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check app.js && node --check js/api-client.js && node --check js/formatting.js && node --check js/item-preview-ui.js && node --check js/nuvio-export.js && node --check js/nuvio-export-ui.js && node --check js/results-view.js && node --check js/selection-state.js && node --check js/selection-ui.js && node --check functions/api/trakt.js",
+    "check": "node --check app.js && node --check js/api-client.js && node --check js/formatting.js && node --check js/item-preview-ui.js && node --check js/nuvio-export.js && node --check js/nuvio-export-ui.js && node --check js/results-view.js && node --check js/selection-state.js && node --check js/selection-ui.js && node --check functions/api/trakt.js && node --check tests/run-tests.mjs && node --check tests/nuvio-export.test.mjs && node --check tests/selection-state.test.mjs && node --check tests/trakt-api-helpers.test.mjs",
     "test": "node tests/run-tests.mjs",
     "dev": "wrangler pages dev ."
   }

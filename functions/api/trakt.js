@@ -700,3 +700,27 @@ function json(payload, status = 200, cacheable = false) {
     },
   });
 }
+
+export const __testables = {
+  clampPositiveInteger,
+  compareNumber,
+  compareText,
+  dedupeLists,
+  getPagination,
+  getPublicErrorMessage,
+  isSafePathSegment,
+  listMatchesTerms,
+  normalizeGlobalListEntry,
+  normalizeList,
+  normalizeListItem,
+  normalizeOptionalCount,
+  normalizeSearchText,
+  normalizeSort,
+  normalizeSortOrder,
+  parseTraktListUrl,
+  parseUserListQuery,
+  rankSearchResults,
+  scoreListSearchMatch,
+  singleResultPagination,
+  sortLists,
+};
