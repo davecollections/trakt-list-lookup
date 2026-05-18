@@ -225,7 +225,7 @@ h2 {
 
 .query-row input {
   min-width: 0;
-  height: 44px;
+  height: 42px;
   padding: 0 13px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -257,7 +257,7 @@ a:focus-visible {
 }
 
 .query-row button {
-  height: 44px;
+  height: 42px;
   padding: 0 16px;
   background: var(--button-bg);
   color: white;
@@ -268,7 +268,9 @@ a:focus-visible {
 }
 
 .query-row .ghost-button {
-  height: 44px;
+  height: 42px;
+  background: var(--soft);
+  color: var(--text);
 }
 
 .status {
@@ -350,8 +352,8 @@ a:focus-visible {
 
 .selection-actions button,
 .modal-actions button {
-  min-height: 36px;
-  padding: 0 13px;
+  min-height: 34px;
+  padding: 0 12px;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -364,6 +366,18 @@ a:focus-visible {
 .selection-actions button:hover,
 .modal-actions button:hover {
   background: var(--button-bg-hover);
+}
+
+.selection-actions .ghost-button,
+.modal-actions .ghost-button {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.selection-actions .ghost-button:hover,
+.modal-actions .ghost-button:hover,
+.query-row .ghost-button:hover {
+  background: color-mix(in srgb, var(--soft) 72%, var(--text));
 }
 
 .results-toolbar {
@@ -1036,7 +1050,16 @@ body.modal-open {
   }
 
   .query-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .query-row input {
+    grid-column: 1 / -1;
+  }
+
+  .query-row button {
+    width: 100%;
+    height: 40px;
   }
 
   .results {
