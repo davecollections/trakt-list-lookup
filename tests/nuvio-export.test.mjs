@@ -6,6 +6,11 @@ const lists = [
   list("Horror Finds", 102),
   list("More Comedy", 103),
 ];
+const fiveLists = [
+  ...lists,
+  list("Documentary Shelf", 104),
+  list("Recently Watched", 105),
+];
 
 let nextId = 0;
 const createId = (prefix) => `${prefix}-${++nextId}`;
@@ -26,6 +31,23 @@ assert.equal(freshExport[0].title, "Trakt Picks");
 assert.equal(freshExport[0].folders.length, 3);
 assert.equal(freshExport[0].folders[0].sources[0].provider, "trakt");
 assert.equal(freshExport[0].backdropImageUrl, "https://example.com/cover.jpg");
+
+nextId = 0;
+const mostItemsExport = buildNuvioExport({
+  lists,
+  sortMode: "items-desc",
+  createId,
+});
+assert.deepEqual(mostItemsExport[0].folders.map((folder) => folder.title), ["More Comedy", "Horror Finds", "Comedy Nights"]);
+
+nextId = 0;
+const fiveListExport = buildNuvioExport({
+  lists: fiveLists,
+  sortMode: "selected",
+  createId,
+});
+assert.equal(fiveListExport[0].folders.length, 5);
+assert.deepEqual(fiveListExport[0].folders.map((folder) => folder.title), fiveLists.map((item) => item.name));
 
 nextId = 0;
 const splitExport = buildNuvioExport({
@@ -66,6 +88,9 @@ assert.equal(mappedExport[1].folders.length, 1);
 function list(name, traktId) {
   return {
     name,
+    item_count: traktId - 100,
+    like_count: traktId * 2,
+    updated_at: `2026-05-${String(traktId - 100).padStart(2, "0")}T00:00:00.000Z`,
     ids: {
       trakt: traktId,
       slug: name.toLowerCase().replaceAll(" ", "-"),

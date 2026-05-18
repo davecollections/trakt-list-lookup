@@ -9,24 +9,34 @@ export function createNuvioExportUi({ selection }) {
   const collectionNameInput = document.querySelector("#nuvio-collection-name");
   const coverUrlInput = document.querySelector("#nuvio-cover-url");
   const coverStatus = document.querySelector("#nuvio-cover-status");
-  const sortAlphaInput = document.querySelector("#nuvio-sort-alpha");
+  const sortModeSelect = document.querySelector("#nuvio-sort-mode");
   const existingJsonInput = document.querySelector("#nuvio-existing-json");
   const existingFileInput = document.querySelector("#nuvio-existing-file");
+  const existingFileStatus = document.querySelector("#nuvio-file-status");
   const mergeOptions = document.querySelector("#nuvio-merge-options");
   const existingSummary = document.querySelector("#nuvio-existing-summary");
   const targetCollectionSelect = document.querySelector("#nuvio-target-collection");
   const splitMapping = document.querySelector("#nuvio-split-mapping");
   const listMapping = document.querySelector("#nuvio-list-mapping");
   const output = document.querySelector("#nuvio-output");
+  const outputSummary = document.querySelector("#nuvio-output-summary");
+  const previewJsonButton = document.querySelector("#preview-nuvio-json");
   const copyButton = document.querySelector("#copy-nuvio-json");
   const downloadButton = document.querySelector("#download-nuvio-json");
+  const jsonPreviewModal = document.querySelector("#json-preview-modal");
+  const jsonPreviewOutput = document.querySelector("#json-preview-output");
+  const jsonPreviewClose = document.querySelector("#json-preview-close");
+  const jsonPreviewCopy = document.querySelector("#copy-json-preview");
 
   closeButton.addEventListener("click", close);
+  previewJsonButton.addEventListener("click", openJsonPreview);
   copyButton.addEventListener("click", copyJson);
   downloadButton.addEventListener("click", downloadJson);
+  jsonPreviewClose.addEventListener("click", closeJsonPreview);
+  jsonPreviewCopy.addEventListener("click", copyJsonPreview);
   collectionNameInput.addEventListener("input", update);
   coverUrlInput.addEventListener("input", update);
-  sortAlphaInput.addEventListener("change", update);
+  sortModeSelect.addEventListener("change", update);
   existingJsonInput.addEventListener("input", update);
   existingFileInput.addEventListener("change", loadExistingFile);
   targetCollectionSelect.addEventListener("change", refreshGeneratedOutput);
@@ -51,12 +61,15 @@ export function createNuvioExportUi({ selection }) {
   modal.addEventListener("click", (event) => {
     if (event.target.matches("[data-close-nuvio]")) close();
   });
+  jsonPreviewModal.addEventListener("click", (event) => {
+    if (event.target.matches("[data-close-json-preview]")) closeJsonPreview();
+  });
 
   return {
     open,
     close,
     update,
-    isOpen: () => !modal.hidden,
+    isOpen: () => !modal.hidden || !jsonPreviewModal.hidden,
   };
 
   function open() {
@@ -69,6 +82,7 @@ export function createNuvioExportUi({ selection }) {
 
   function close() {
     modal.hidden = true;
+    closeJsonPreview();
     document.body.classList.remove("modal-open");
   }
 
@@ -76,6 +90,7 @@ export function createNuvioExportUi({ selection }) {
     const file = existingFileInput.files?.[0];
     if (!file) return;
     existingJsonInput.value = await file.text();
+    existingFileStatus.textContent = file.name;
     update();
   }
 
@@ -94,9 +109,11 @@ export function createNuvioExportUi({ selection }) {
       updateCoverStatus();
       const exportJson = createExportJson();
       output.value = JSON.stringify(exportJson, null, 2);
+      outputSummary.textContent = `${formatNumber(output.value.length)} chars`;
       updateExportSummary(exportJson);
     } catch (error) {
       output.value = `Could not build JSON: ${error.message}`;
+      outputSummary.textContent = "Needs attention";
       exportSummary.textContent = "Fix the highlighted export settings before copying.";
     }
   }
@@ -109,7 +126,7 @@ export function createNuvioExportUi({ selection }) {
       mode: getMergeMode(),
       collectionName: collectionNameInput.value.trim() || "Trakt Lists",
       coverUrl: coverUrlInput.value,
-      sortAlpha: sortAlphaInput.checked,
+      sortMode: sortModeSelect.value,
       splitAssignments: selection.splitAssignmentObject(),
       mappedAssignments: selection.mappedAssignmentObject(),
       targetCollectionKey: targetCollectionSelect.value,
@@ -295,9 +312,7 @@ export function createNuvioExportUi({ selection }) {
 
   function getSelectedListsForExport() {
     let lists = selection.values();
-    if (sortAlphaInput.checked) {
-      lists = lists.sort((a, b) => compareText(a.name, b.name));
-    }
+    lists = sortSelectedLists(lists, sortModeSelect.value);
     return lists;
   }
 
@@ -310,6 +325,20 @@ export function createNuvioExportUi({ selection }) {
     flashButton(copyButton);
   }
 
+  function openJsonPreview() {
+    jsonPreviewOutput.value = output.value;
+    jsonPreviewModal.hidden = false;
+  }
+
+  function closeJsonPreview() {
+    jsonPreviewModal.hidden = true;
+  }
+
+  async function copyJsonPreview() {
+    await navigator.clipboard.writeText(jsonPreviewOutput.value);
+    flashButton(jsonPreviewCopy);
+  }
+
   function downloadJson() {
     const blob = new Blob([`${output.value}\n`], { type: "application/json" });
     const link = document.createElement("a");
@@ -318,6 +347,24 @@ export function createNuvioExportUi({ selection }) {
     link.click();
     URL.revokeObjectURL(link.href);
   }
+}
+
+function sortSelectedLists(lists, sortMode) {
+  const selectedLists = [...lists];
+  if (sortMode === "selected") return selectedLists;
+  if (sortMode === "title-desc") return selectedLists.sort((a, b) => compareText(b.name, a.name));
+  if (sortMode === "items-desc") return selectedLists.sort((a, b) => compareNumber(b.item_count, a.item_count) || compareText(a.name, b.name));
+  if (sortMode === "likes-desc") return selectedLists.sort((a, b) => compareNumber(b.like_count, a.like_count) || compareText(a.name, b.name));
+  if (sortMode === "updated-desc") return selectedLists.sort((a, b) => compareDate(b.updated_at, a.updated_at) || compareText(a.name, b.name));
+  return selectedLists.sort((a, b) => compareText(a.name, b.name));
+}
+
+function compareNumber(a, b) {
+  return (Number(a) || 0) - (Number(b) || 0);
+}
+
+function compareDate(a, b) {
+  return new Date(a || 0).getTime() - new Date(b || 0).getTime();
 }
 
 function flashButton(button) {

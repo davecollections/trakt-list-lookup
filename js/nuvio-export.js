@@ -5,12 +5,13 @@ export function buildNuvioExport({
   collectionName = "Trakt Lists",
   coverUrl = "",
   sortAlpha = true,
+  sortMode = "",
   splitAssignments = {},
   mappedAssignments = {},
   targetCollectionKey = "",
   createId = createNuvioId,
 } = {}) {
-  const selectedLists = getSelectedLists(lists, sortAlpha);
+  const selectedLists = getSelectedLists(lists, sortMode || (sortAlpha ? "title-asc" : "selected"));
   const safeCoverUrl = getSafeHttpsUrl(coverUrl);
 
   if (mode === "split") {
@@ -52,10 +53,31 @@ export function getListSelectionKey(result) {
   return result?.ids?.trakt ? String(result.ids.trakt) : result?.url || "";
 }
 
-function getSelectedLists(lists, sortAlpha) {
+function getSelectedLists(lists, sortMode) {
   const selectedLists = [...(lists || [])];
-  if (!sortAlpha) return selectedLists;
-  return selectedLists.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }));
+  const mode = sortMode || "title-asc";
+  if (mode === "selected") return selectedLists;
+  return selectedLists.sort((a, b) => compareLists(a, b, mode));
+}
+
+function compareLists(a, b, sortMode) {
+  if (sortMode === "title-desc") return compareText(b.name, a.name);
+  if (sortMode === "items-desc") return compareNumber(b.item_count, a.item_count) || compareText(a.name, b.name);
+  if (sortMode === "likes-desc") return compareNumber(b.like_count, a.like_count) || compareText(a.name, b.name);
+  if (sortMode === "updated-desc") return compareDate(b.updated_at, a.updated_at) || compareText(a.name, b.name);
+  return compareText(a.name, b.name);
+}
+
+function compareText(a, b) {
+  return String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base" });
+}
+
+function compareNumber(a, b) {
+  return (Number(a) || 0) - (Number(b) || 0);
+}
+
+function compareDate(a, b) {
+  return new Date(a || 0).getTime() - new Date(b || 0).getTime();
 }
 
 function createNuvioCollection({ title, lists, coverUrl, createId }) {

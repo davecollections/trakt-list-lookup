@@ -253,9 +253,16 @@
                 <input id="nuvio-cover-url" type="url" placeholder="https://...">
                 <small id="nuvio-cover-status" class="field-status"></small>
               </label>
-              <label class="checkbox-label">
-                <input id="nuvio-sort-alpha" type="checkbox" checked>
-                Sort selected lists alphabetically
+              <label>
+                List order
+                <select id="nuvio-sort-mode">
+                  <option value="title-asc" selected>Title A-Z</option>
+                  <option value="title-desc">Title Z-A</option>
+                  <option value="selected">Selection order</option>
+                  <option value="items-desc">Most items</option>
+                  <option value="likes-desc">Most likes</option>
+                  <option value="updated-desc">Recently updated</option>
+                </select>
               </label>
             </div>
           </section>
@@ -270,9 +277,11 @@
                 Paste existing Nuvio JSON
                 <textarea id="nuvio-existing-json" rows="5" placeholder="Paste an existing Nuvio JSON array to append into it."></textarea>
               </label>
-              <label>
+              <label class="nuvio-file-field">
                 Upload existing Nuvio JSON
                 <input id="nuvio-existing-file" type="file" accept="application/json,.json">
+                <span class="nuvio-file-button">Choose JSON file</span>
+                <small id="nuvio-file-status" class="field-status">No file selected</small>
               </label>
             </div>
           </details>
@@ -320,18 +329,38 @@
             <div id="nuvio-list-mapping" class="nuvio-list-mapping" hidden></div>
           </div>
 
-          <details class="nuvio-wide nuvio-panel nuvio-details export-preview-details">
-            <summary>
-              <span>Export preview</span>
-              <small>Generated JSON</small>
-            </summary>
-            <textarea id="nuvio-output" rows="8" readonly></textarea>
-          </details>
+          <section class="nuvio-wide nuvio-panel export-preview-panel">
+            <div class="nuvio-panel-heading">
+              <h3>Export preview</h3>
+              <p id="nuvio-output-summary">Generated JSON</p>
+            </div>
+            <div class="nuvio-output-actions">
+              <button id="preview-nuvio-json" type="button" class="ghost-button">Preview JSON</button>
+            </div>
+            <textarea id="nuvio-output" rows="8" readonly hidden></textarea>
+          </section>
         </div>
 
         <div class="modal-actions">
           <button id="copy-nuvio-json" type="button">Copy JSON</button>
           <button id="download-nuvio-json" type="button" class="ghost-button">Download JSON</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="json-preview-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-json-preview></div>
+      <section class="modal-dialog json-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="json-preview-title">
+        <div class="modal-header">
+          <div>
+            <p class="result-owner">Generated export</p>
+            <h2 id="json-preview-title">JSON preview</h2>
+          </div>
+          <button id="json-preview-close" type="button" class="ghost-button">Close</button>
+        </div>
+        <textarea id="json-preview-output" rows="18" readonly></textarea>
+        <div class="modal-actions">
+          <button id="copy-json-preview" type="button">Copy JSON</button>
         </div>
       </section>
     </div>
