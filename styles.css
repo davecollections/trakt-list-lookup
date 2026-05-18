@@ -873,7 +873,7 @@ body.modal-open {
 }
 
 .preview-dialog {
-  width: min(620px, 100%);
+  width: min(720px, 100%);
 }
 
 .modal-header {
@@ -971,9 +971,8 @@ body.modal-open {
 
 .item-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 140px));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 14px;
-  justify-content: start;
   margin-top: 12px;
 }
 
