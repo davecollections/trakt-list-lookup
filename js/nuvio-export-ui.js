@@ -1,5 +1,10 @@
 import { compareText, formatNumber, slugifyFilename } from "./formatting.js";
+import { fetchTraktListItems } from "./api-client.js";
 import { buildNuvioExport, getListSelectionKey, getSafeHttpsUrl } from "./nuvio-export.js";
+
+const FOLDER_IMAGE_LOOKUP_LIMIT = 15;
+const FOLDER_IMAGE_MAX_PAGES = 3;
+const FOLDER_IMAGE_CONCURRENCY = 3;
 
 export function createNuvioExportUi({ selection }) {
   const modal = document.querySelector("#nuvio-modal");
@@ -10,6 +15,8 @@ export function createNuvioExportUi({ selection }) {
   const coverUrlInput = document.querySelector("#nuvio-cover-url");
   const coverStatus = document.querySelector("#nuvio-cover-status");
   const sortModeSelect = document.querySelector("#nuvio-sort-mode");
+  const folderImageModeSelect = document.querySelector("#nuvio-folder-image-mode");
+  const folderImageStatus = document.querySelector("#nuvio-folder-image-status");
   const existingJsonInput = document.querySelector("#nuvio-existing-json");
   const existingFileInput = document.querySelector("#nuvio-existing-file");
   const existingFileStatus = document.querySelector("#nuvio-file-status");
@@ -27,6 +34,8 @@ export function createNuvioExportUi({ selection }) {
   const jsonPreviewOutput = document.querySelector("#json-preview-output");
   const jsonPreviewClose = document.querySelector("#json-preview-close");
   const jsonPreviewCopy = document.querySelector("#copy-json-preview");
+  const folderImageCache = new Map();
+  let folderImageRequestId = 0;
 
   closeButton.addEventListener("click", close);
   previewJsonButton.addEventListener("click", openJsonPreview);
@@ -37,6 +46,10 @@ export function createNuvioExportUi({ selection }) {
   collectionNameInput.addEventListener("input", update);
   coverUrlInput.addEventListener("input", update);
   sortModeSelect.addEventListener("change", update);
+  folderImageModeSelect.addEventListener("change", () => {
+    update();
+    refreshFolderImages();
+  });
   existingJsonInput.addEventListener("input", update);
   existingFileInput.addEventListener("change", loadExistingFile);
   targetCollectionSelect.addEventListener("change", refreshGeneratedOutput);
@@ -76,6 +89,7 @@ export function createNuvioExportUi({ selection }) {
     if (!selection.size) return;
     count.textContent = `${formatNumber(selection.size)} selected`;
     update();
+    refreshFolderImages();
     modal.hidden = false;
     document.body.classList.add("modal-open");
   }
@@ -107,6 +121,7 @@ export function createNuvioExportUi({ selection }) {
   function refreshGeneratedOutput() {
     try {
       updateCoverStatus();
+      updateFolderImageStatus();
       const exportJson = createExportJson();
       output.value = JSON.stringify(exportJson, null, 2);
       outputSummary.textContent = `${formatNumber(output.value.length)} chars`;
@@ -126,6 +141,8 @@ export function createNuvioExportUi({ selection }) {
       mode: getMergeMode(),
       collectionName: collectionNameInput.value.trim() || "Trakt Lists",
       coverUrl: coverUrlInput.value,
+      folderCoverUrl: getFolderCoverFallbackUrl(),
+      folderImages: getFolderImageObject(),
       sortMode: sortModeSelect.value,
       splitAssignments: selection.splitAssignmentObject(),
       mappedAssignments: selection.mappedAssignmentObject(),
@@ -194,6 +211,29 @@ export function createNuvioExportUi({ selection }) {
     const safeUrl = getCoverUrl();
     coverStatus.textContent = safeUrl ? "Cover URL will be included." : "Use a valid https:// URL.";
     coverStatus.classList.toggle("invalid", !safeUrl);
+  }
+
+  function updateFolderImageStatus(isLoading = false) {
+    const mode = folderImageModeSelect.value;
+    if (mode === "none") {
+      folderImageStatus.textContent = "Folder image fields will be blank.";
+      return;
+    }
+    if (mode === "cover") {
+      folderImageStatus.textContent = getCoverUrl() ? "Folder covers will use the collection cover URL." : "Add a cover URL to apply it to folders.";
+      return;
+    }
+
+    if (isLoading) {
+      folderImageStatus.textContent = "Finding list poster images...";
+      return;
+    }
+
+    const selected = getSelectedListsForExport();
+    const found = selected.filter((result) => folderImageCache.get(getListSelectionKey(result))).length;
+    folderImageStatus.textContent = selected.length
+      ? `${formatNumber(found)}/${formatNumber(selected.length)} folder images found.`
+      : "";
   }
 
   function updateMergeControls() {
@@ -318,6 +358,78 @@ export function createNuvioExportUi({ selection }) {
 
   function getCoverUrl() {
     return getSafeHttpsUrl(coverUrlInput.value);
+  }
+
+  function getFolderCoverFallbackUrl() {
+    if (folderImageModeSelect.value === "none") return "";
+    return getCoverUrl();
+  }
+
+  function getFolderImageObject() {
+    if (folderImageModeSelect.value !== "auto") return {};
+    return Object.fromEntries(
+      getSelectedListsForExport()
+        .map((result) => [getListSelectionKey(result), folderImageCache.get(getListSelectionKey(result)) || ""])
+        .filter(([, value]) => value),
+    );
+  }
+
+  async function refreshFolderImages() {
+    const requestId = ++folderImageRequestId;
+    if (folderImageModeSelect.value !== "auto") {
+      updateFolderImageStatus();
+      refreshGeneratedOutput();
+      return;
+    }
+
+    const selectedLists = getSelectedListsForExport();
+    const missing = selectedLists.filter((result) => {
+      const key = getListSelectionKey(result);
+      return key && !folderImageCache.has(key) && result.user?.username && result.ids?.slug;
+    });
+
+    if (!missing.length) {
+      updateFolderImageStatus();
+      refreshGeneratedOutput();
+      return;
+    }
+
+    updateFolderImageStatus(true);
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(FOLDER_IMAGE_CONCURRENCY, missing.length) }, async () => {
+      while (cursor < missing.length && requestId === folderImageRequestId) {
+        const result = missing[cursor];
+        cursor += 1;
+        folderImageCache.set(getListSelectionKey(result), await fetchFirstPosterForList(result));
+      }
+    });
+
+    await Promise.all(workers);
+    if (requestId !== folderImageRequestId) return;
+    updateFolderImageStatus();
+    refreshGeneratedOutput();
+  }
+
+  async function fetchFirstPosterForList(result) {
+    let page = 1;
+    let pageCount = 1;
+    while (page <= pageCount && page <= FOLDER_IMAGE_MAX_PAGES) {
+      try {
+        const payload = await fetchTraktListItems({
+          user: result.user.username,
+          slug: result.ids.slug,
+          limit: FOLDER_IMAGE_LOOKUP_LIMIT,
+          page,
+        });
+        const poster = (payload.items || []).find((item) => item.poster)?.poster || "";
+        if (poster) return poster;
+        pageCount = payload.pagination?.page_count || pageCount;
+      } catch {
+        return "";
+      }
+      page += 1;
+    }
+    return "";
   }
 
   async function copyJson() {

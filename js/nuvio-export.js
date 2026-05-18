@@ -4,24 +4,29 @@ export function buildNuvioExport({
   mode = "new",
   collectionName = "Trakt Lists",
   coverUrl = "",
+  folderCoverUrl = null,
   sortAlpha = true,
   sortMode = "",
   splitAssignments = {},
   mappedAssignments = {},
   targetCollectionKey = "",
+  folderImages = {},
   createId = createNuvioId,
 } = {}) {
   const selectedLists = getSelectedLists(lists, sortMode || (sortAlpha ? "title-asc" : "selected"));
   const safeCoverUrl = getSafeHttpsUrl(coverUrl);
+  const safeFolderCoverUrl = folderCoverUrl === null ? safeCoverUrl : getSafeHttpsUrl(folderCoverUrl);
 
   if (mode === "split") {
-    return [...(existing || []), ...createSplitNuvioCollections(selectedLists, splitAssignments, safeCoverUrl, createId)];
+    return [...(existing || []), ...createSplitNuvioCollections(selectedLists, splitAssignments, safeCoverUrl, safeFolderCoverUrl, folderImages, createId)];
   }
 
   const newCollection = createNuvioCollection({
     title: collectionName || "Trakt Lists",
     lists: selectedLists,
     coverUrl: safeCoverUrl,
+    folderCoverUrl: safeFolderCoverUrl,
+    folderImages,
     createId,
   });
 
@@ -32,7 +37,7 @@ export function buildNuvioExport({
   }
 
   if (mode === "mapped") {
-    return mergeFoldersByListMapping(existing, selectedLists, mappedAssignments, targetCollectionKey, safeCoverUrl, createId);
+    return mergeFoldersByListMapping(existing, selectedLists, mappedAssignments, targetCollectionKey, safeFolderCoverUrl, folderImages, createId);
   }
 
   return [...existing, newCollection];
@@ -80,11 +85,11 @@ function compareDate(a, b) {
   return new Date(a || 0).getTime() - new Date(b || 0).getTime();
 }
 
-function createNuvioCollection({ title, lists, coverUrl, createId }) {
+function createNuvioCollection({ title, lists, coverUrl, folderCoverUrl, folderImages = {}, createId }) {
   return {
     id: createId("collection"),
     title,
-    folders: lists.map((result) => createNuvioFolder(result, coverUrl, createId)),
+    folders: lists.map((result) => createNuvioFolder(result, getFolderCoverUrl(result, folderImages, folderCoverUrl), createId)),
     pinToTop: false,
     viewMode: "TABBED_GRID",
     showAllTab: false,
@@ -93,11 +98,13 @@ function createNuvioCollection({ title, lists, coverUrl, createId }) {
   };
 }
 
-function createSplitNuvioCollections(lists, splitAssignments, coverUrl, createId) {
+function createSplitNuvioCollections(lists, splitAssignments, coverUrl, folderCoverUrl, folderImages, createId) {
   return [...getNuvioSplitGroups(lists, splitAssignments)].map(([title, groupedLists]) => createNuvioCollection({
     title,
     lists: groupedLists,
     coverUrl,
+    folderCoverUrl,
+    folderImages,
     createId,
   }));
 }
@@ -132,7 +139,7 @@ function mergeFoldersIntoExistingCollection(existing, foldersToAdd, targetCollec
   return merged;
 }
 
-function mergeFoldersByListMapping(existing, lists, mappedAssignments, targetCollectionKey, coverUrl, createId) {
+function mergeFoldersByListMapping(existing, lists, mappedAssignments, targetCollectionKey, coverUrl, folderImages, createId) {
   if (!existing?.length) throw new Error("Provide existing Nuvio JSON before mapping lists.");
 
   const foldersByCollection = new Map();
@@ -140,7 +147,7 @@ function mergeFoldersByListMapping(existing, lists, mappedAssignments, targetCol
     const targetKey = mappedAssignments[getListSelectionKey(result)] || targetCollectionKey;
     if (!targetKey) throw new Error(`Choose a target collection for ${result.name || "a selected list"}.`);
     const folders = foldersByCollection.get(targetKey) || [];
-    folders.push(createNuvioFolder(result, coverUrl, createId));
+    folders.push(createNuvioFolder(result, getFolderCoverUrl(result, folderImages, coverUrl), createId));
     foldersByCollection.set(targetKey, folders);
   });
 
@@ -175,6 +182,10 @@ function createNuvioFolder(result, coverUrl, createId) {
     focusGifEnabled: false,
     heroBackdropUrl: "",
   };
+}
+
+function getFolderCoverUrl(result, folderImages, fallbackCoverUrl) {
+  return getSafeHttpsUrl(folderImages[getListSelectionKey(result)]) || fallbackCoverUrl;
 }
 
 function createNuvioTraktSource(result) {

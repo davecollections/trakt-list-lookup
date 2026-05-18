@@ -33,6 +33,30 @@ assert.equal(freshExport[0].folders[0].sources[0].provider, "trakt");
 assert.equal(freshExport[0].backdropImageUrl, "https://example.com/cover.jpg");
 
 nextId = 0;
+const imageExport = buildNuvioExport({
+  lists,
+  collectionName: "Image Picks",
+  coverUrl: "https://example.com/collection.jpg",
+  folderImages: {
+    101: "https://image.tmdb.org/t/p/w342/demo.jpg",
+  },
+  createId,
+});
+assert.equal(imageExport[0].backdropImageUrl, "https://example.com/collection.jpg");
+assert.equal(imageExport[0].folders[0].coverImageUrl, "https://image.tmdb.org/t/p/w342/demo.jpg");
+assert.equal(imageExport[0].folders[1].coverImageUrl, "https://example.com/collection.jpg");
+
+nextId = 0;
+const noFolderImageExport = buildNuvioExport({
+  lists,
+  coverUrl: "https://example.com/collection.jpg",
+  folderCoverUrl: "",
+  createId,
+});
+assert.equal(noFolderImageExport[0].backdropImageUrl, "https://example.com/collection.jpg");
+assert.equal(noFolderImageExport[0].folders[0].coverImageUrl, "");
+
+nextId = 0;
 const mostItemsExport = buildNuvioExport({
   lists,
   sortMode: "items-desc",
