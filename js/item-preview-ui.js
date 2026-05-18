@@ -142,6 +142,7 @@ function renderItems(container, items) {
 function renderSourceLinks(item) {
   const links = document.createElement("div");
   links.className = "preview-source-links";
+  let linkCount = 0;
 
   const traktUrl = getTraktItemUrl(item);
   if (traktUrl) {
@@ -150,19 +151,28 @@ function renderSourceLinks(item) {
       href: traktUrl,
       iconSrc: "./assets/trakt.ico",
       label: "Trakt",
-      value: item.ids.trakt,
     }));
+    linkCount += 1;
   }
 
   const tmdbUrl = getTmdbItemUrl(item);
-  const tmdbId = getTmdbId(item);
-  if (tmdbUrl && tmdbId) {
+  if (tmdbUrl) {
     links.append(createSourceLink({
       className: "tmdb-source",
       href: tmdbUrl,
       label: "TMDB",
-      value: tmdbId,
     }));
+    linkCount += 1;
+  }
+
+  const imdbUrl = getImdbItemUrl(item);
+  if (imdbUrl) {
+    links.append(createSourceLink({
+      className: "imdb-source",
+      href: imdbUrl,
+      label: "IMDb",
+    }));
+    linkCount += 1;
   }
 
   if (!links.children.length) {
@@ -172,17 +182,18 @@ function renderSourceLinks(item) {
     links.append(empty);
   }
 
+  links.style.setProperty("--source-count", String(Math.max(linkCount, 1)));
   return links;
 }
 
-function createSourceLink({ className, href, iconSrc = "", label, value }) {
+function createSourceLink({ className, href, iconSrc = "", label }) {
   const link = document.createElement("a");
   link.className = `preview-source-link ${className}`;
   link.href = href;
   link.target = "_blank";
   link.rel = "noreferrer";
-  link.title = `${label} ID ${value}`;
-  link.setAttribute("aria-label", `Open ${label} ID ${value}`);
+  link.title = `Open on ${label}`;
+  link.setAttribute("aria-label", `Open on ${label}`);
 
   if (iconSrc) {
     const icon = document.createElement("img");
@@ -191,21 +202,16 @@ function createSourceLink({ className, href, iconSrc = "", label, value }) {
     icon.loading = "lazy";
     link.append(icon);
   } else {
-    link.append(createTmdbIcon());
+    link.append(createSourceBadge(label));
   }
-
-  const id = document.createElement("span");
-  id.className = "preview-source-id";
-  id.textContent = value;
-  link.append(id);
 
   return link;
 }
 
-function createTmdbIcon() {
+function createSourceBadge(label) {
   const icon = document.createElement("span");
   icon.className = "preview-source-badge";
-  icon.textContent = "TMDB";
+  icon.textContent = label;
   icon.setAttribute("aria-hidden", "true");
   return icon;
 }
@@ -226,4 +232,8 @@ function getTmdbItemUrl(item) {
 
 function getTmdbId(item) {
   return item.ids?.show_tmdb || item.ids?.tmdb || "";
+}
+
+function getImdbItemUrl(item) {
+  return item.ids?.imdb ? `https://www.imdb.com/title/${encodeURIComponent(item.ids.imdb)}/` : "";
 }

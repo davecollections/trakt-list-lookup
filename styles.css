@@ -1011,29 +1011,25 @@ body.modal-open {
 .preview-source-links {
   position: absolute;
   inset: auto 0 0;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(var(--source-count, 3), minmax(0, 1fr));
   gap: 4px;
-  padding: 6px;
-  background: linear-gradient(to top, rgba(10, 12, 16, 0.9), rgba(10, 12, 16, 0.62) 72%, transparent);
+  padding: 8px;
+  background: linear-gradient(to top, rgba(10, 12, 16, 0.82), rgba(10, 12, 16, 0.58) 72%, transparent);
 }
 
 .preview-source-link,
 .preview-source-empty {
-  display: inline-grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  flex: 1 1 54px;
-  gap: 4px;
+  display: grid;
+  place-items: center;
   min-width: 0;
-  min-height: 22px;
-  padding: 0 5px;
+  min-height: 30px;
+  padding: 0;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 5px;
-  background: rgba(17, 19, 24, 0.78);
+  border-radius: 999px;
+  background: rgba(17, 19, 24, 0.7);
   color: white;
-  font-size: 0.66rem;
   font-weight: 700;
   line-height: 1;
   text-decoration: none;
@@ -1048,34 +1044,35 @@ body.modal-open {
 
 .preview-source-link img {
   display: block;
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
   object-fit: contain;
 }
 
 .preview-source-badge {
   display: inline-grid;
-  min-width: 22px;
-  min-height: 13px;
+  min-width: 30px;
+  min-height: 16px;
   place-items: center;
   border-radius: 3px;
-  background: linear-gradient(90deg, #01b4e4, #90cea1);
-  color: #081018;
-  font-size: 0.42rem;
+  font-size: 0.5rem;
   font-weight: 900;
   letter-spacing: 0;
 }
 
-.preview-source-id {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.tmdb-source .preview-source-badge {
+  background: linear-gradient(90deg, #01b4e4, #90cea1);
+  color: #081018;
+}
+
+.imdb-source .preview-source-badge {
+  background: #f5c518;
+  color: #0b0b0b;
 }
 
 .preview-source-empty {
-  display: grid;
-  grid-template-columns: 1fr;
   color: rgba(255, 255, 255, 0.78);
+  font-size: 0.66rem;
 }
 
 .item-empty {
