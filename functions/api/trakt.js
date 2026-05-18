@@ -8,7 +8,6 @@ import {
   getPagination,
   isSafePathSegment,
   listMatchesTerms,
-  mapWithConcurrency,
   normalizeGlobalListEntry,
   normalizeList,
   normalizeListItem,
@@ -23,10 +22,14 @@ import {
   singleResultPagination,
   sortLists,
 } from "../lib/trakt-api-helpers.js";
+import { enrichItemsWithTmdbPosters } from "../lib/tmdb-client.js";
+import {
+  enrichListsWithLikeCounts,
+  getListItems,
+  getTraktClientId,
+  traktFetch,
+} from "../lib/trakt-client.js";
 
-const TRAKT_API_BASE = "https://api.trakt.tv";
-const TMDB_API_BASE = "https://api.themoviedb.org";
-const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w342";
 const MAX_RESULT_LIMIT = 50;
 const ITEM_LIMIT = 15;
 const MAX_PAGE = 25;
@@ -34,8 +37,6 @@ const MAX_ITEM_LIMIT = 15;
 const MAX_QUERY_LENGTH = 220;
 const SUCCESS_CACHE_SECONDS = 300;
 const USER_FILTER_LIMIT = 100;
-const LIKE_COUNT_CONCURRENCY = 5;
-const TMDB_POSTER_CONCURRENCY = 5;
 const SORT_FETCH_LIMIT = 50;
 const SORT_MAX_ITEMS = 250;
 const CURATED_USER_FALLBACKS = ["snoak"];
@@ -48,7 +49,7 @@ export async function onRequestGet({ request, env }) {
   const resultLimit = clampPositiveInteger(url.searchParams.get("limit"), RESULT_LIMIT, MAX_RESULT_LIMIT);
   const sort = normalizeSort(url.searchParams.get("sort"));
   const order = normalizeSortOrder(url.searchParams.get("order"));
-  const clientId = getClientId(env);
+  const clientId = getTraktClientId(env);
 
   if (!clientId) {
     return json({ error: "TRAKT_CLIENT_ID is not configured in Cloudflare." }, 500);
@@ -281,162 +282,8 @@ async function resolveListUrl(value, clientId) {
   throw httpError("Unsupported Trakt list URL.", 400);
 }
 
-async function getListItems(username, slug, page, limit, clientId) {
-  const safeUsername = encodeURIComponent(username);
-  const safeSlug = encodeURIComponent(slug);
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-    extended: "full",
-  });
-  return traktFetch(`/users/${safeUsername}/lists/${safeSlug}/items?${params.toString()}`, clientId);
-}
-
-async function traktFetch(path, clientId) {
-  const response = await fetch(`${TRAKT_API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": "trakt-list-lookup/0.1 (+https://trakt-list-lookup.pages.dev)",
-      "trakt-api-version": "2",
-      "trakt-api-key": clientId,
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    console.error("Trakt API error", {
-      status: response.status,
-      path,
-      body: body.slice(0, 500),
-    });
-    throw httpError(getTraktErrorMessage(response.status, body), response.status);
-  }
-
-  return {
-    data: await response.json(),
-    pagination: getPagination(response),
-  };
-}
-
-async function enrichListsWithLikeCounts(lists, clientId) {
-  return mapWithConcurrency(lists, LIKE_COUNT_CONCURRENCY, async (list) => {
-    const likeCount = await getListLikeCount(list, clientId);
-    if (likeCount === null) return list;
-    return {
-      ...list,
-      like_count: likeCount,
-    };
-  });
-}
-
-async function getListLikeCount(list, clientId) {
-  const existingCount = normalizeOptionalCount(list?.like_count);
-  if (existingCount !== null) return existingCount;
-
-  const id = list?.ids?.trakt;
-  if (!id) return null;
-
-  try {
-    const payload = await traktFetch(`/lists/${encodeURIComponent(id)}/likes?page=1&limit=1`, clientId);
-    return normalizeOptionalCount(payload.pagination?.item_count);
-  } catch (error) {
-    console.warn("Could not fetch Trakt list likes", {
-      id,
-      status: error.status,
-      message: error.message,
-    });
-    return normalizeOptionalCount(list?.like_count);
-  }
-}
-
-async function enrichItemsWithTmdbPosters(items, env) {
-  if (!hasTmdbAuth(env)) return items;
-
-  return mapWithConcurrency(items, TMDB_POSTER_CONCURRENCY, async (item) => {
-    const posterPath = await getTmdbPosterPath(item, env);
-    if (!posterPath) return item;
-    return {
-      ...item,
-      poster: `${TMDB_IMAGE_BASE}${posterPath}`,
-    };
-  });
-}
-
-async function getTmdbPosterPath(item, env) {
-  const lookup = getTmdbPosterLookup(item);
-  if (!lookup) return "";
-
-  try {
-    const payload = await tmdbFetch(`/3/${lookup.type}/${encodeURIComponent(lookup.id)}`, env);
-    return payload?.poster_path || "";
-  } catch (error) {
-    console.warn("Could not fetch TMDB poster", {
-      type: lookup.type,
-      id: lookup.id,
-      message: error.message,
-    });
-    return "";
-  }
-}
-
-function getTmdbPosterLookup(item) {
-  if (!item?.ids) return null;
-  if (item.type === "movie" && item.ids.tmdb) return { type: "movie", id: item.ids.tmdb };
-  if ((item.type === "show" || item.type === "season" || item.type === "episode") && item.ids.show_tmdb) {
-    return { type: "tv", id: item.ids.show_tmdb };
-  }
-  if (item.type === "show" && item.ids.tmdb) return { type: "tv", id: item.ids.tmdb };
-  return null;
-}
-
-async function tmdbFetch(path, env) {
-  const url = new URL(path, TMDB_API_BASE);
-  const headers = {
-    "Content-Type": "application/json",
-    "User-Agent": "trakt-list-lookup/0.1 (+https://trakt-list-lookup.pages.dev)",
-  };
-
-  const bearerToken = getTmdbBearerToken(env);
-  if (bearerToken) {
-    headers.Authorization = `Bearer ${bearerToken}`;
-  } else {
-    url.searchParams.set("api_key", getTmdbApiKey(env));
-  }
-
-  const response = await fetch(url.toString(), { headers });
-  if (!response.ok) {
-    throw httpError(`TMDB returned HTTP ${response.status}.`, response.status);
-  }
-  return response.json();
-}
-
-function getClientId(env) {
-  return String(env.TRAKT_CLIENT_ID || "").trim();
-}
-
-function getTmdbApiKey(env) {
-  return String(env.TMDB_API_KEY || env.TMDB_CLIENT_ID || "").trim();
-}
-
-function getTmdbBearerToken(env) {
-  return String(env.TMDB_ACCESS_TOKEN || env.TMDB_READ_ACCESS_TOKEN || "").trim();
-}
-
-function hasTmdbAuth(env) {
-  return Boolean(getTmdbApiKey(env) || getTmdbBearerToken(env));
-}
-
 function isGlobalListMode(mode) {
   return mode === "popular" || mode === "trending";
-}
-
-function getTraktErrorMessage(status, body = "") {
-  const detail = body ? ` Trakt response: ${body.slice(0, 240)}` : "";
-  if (status === 401) return "Trakt requires OAuth for that request.";
-  if (status === 403) return `Trakt rejected the API key or the app is not approved.${detail}`;
-  if (status === 404) return "No matching Trakt list was found.";
-  if (status === 429) return "Trakt rate limit exceeded. Try again shortly.";
-  return `Trakt returned HTTP ${status}.${detail}`;
 }
 
 function getPublicErrorMessage(error, status) {
