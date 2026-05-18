@@ -1,15 +1,18 @@
 :root {
   color-scheme: light;
-  --bg: #f7f8fa;
+  --bg: #f6f7f9;
   --panel: #ffffff;
   --text: #15171d;
-  --muted: #667085;
+  --muted: #5f6877;
   --border: #d9dee7;
-  --accent: #e53345;
-  --accent-dark: #bb2635;
+  --accent: #d83345;
+  --accent-dark: #b92737;
+  --accent-soft: #fff0f2;
+  --button-bg: #d83345;
+  --button-bg-hover: #b92737;
   --soft: #f0f3f7;
-  --shadow: 0 14px 32px rgba(31, 41, 55, 0.08);
-  --card-shadow: 0 8px 22px rgba(31, 41, 55, 0.08);
+  --shadow: 0 10px 26px rgba(31, 41, 55, 0.06);
+  --card-shadow: 0 6px 18px rgba(31, 41, 55, 0.08);
   --item-bg: #ffffff;
   --primary-tile: #17191f;
   --primary-tile-muted: rgba(255, 255, 255, 0.68);
@@ -18,17 +21,20 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #111318;
-  --panel: #181b22;
-  --text: #f3f5f7;
-  --muted: #a0a8b5;
-  --border: #303642;
-  --accent: #ff5263;
-  --accent-dark: #ff6d7b;
-  --soft: #242934;
-  --shadow: 0 18px 45px rgba(0, 0, 0, 0.34);
-  --card-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
-  --item-bg: #20242d;
+  --bg: #0f1217;
+  --panel: #171b22;
+  --text: #f4f6f8;
+  --muted: #b3bbc8;
+  --border: #343b48;
+  --accent: #ff5a68;
+  --accent-dark: #ff7782;
+  --accent-soft: rgba(255, 90, 104, 0.12);
+  --button-bg: #e64b5b;
+  --button-bg-hover: #f15d6b;
+  --soft: #222832;
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+  --card-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  --item-bg: #1f2530;
   --primary-tile: #f3f5f7;
   --primary-tile-muted: rgba(17, 19, 24, 0.68);
   --code: #d6dbe3;
@@ -44,6 +50,11 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -52,14 +63,18 @@ select {
   font: inherit;
 }
 
+button {
+  line-height: 1.15;
+}
+
 input {
   background: var(--panel);
 }
 
 .app-shell {
-  width: min(1180px, calc(100% - 32px));
+  width: min(1220px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 36px 0;
+  padding: 24px 0;
 }
 
 .search-panel,
@@ -72,7 +87,7 @@ input {
 }
 
 .search-panel {
-  padding: 28px;
+  padding: 22px 24px;
 }
 
 .title-row,
@@ -95,7 +110,7 @@ input {
   margin: 0 0 6px;
   color: var(--accent);
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 750;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -109,26 +124,27 @@ dl {
 }
 
 h1 {
-  max-width: 620px;
-  font-size: clamp(1.9rem, 4vw, 3.4rem);
-  line-height: 1;
+  max-width: 680px;
+  font-size: clamp(1.85rem, 3.2vw, 2.85rem);
+  line-height: 1.05;
   letter-spacing: 0;
 }
 
 h2 {
-  font-size: 1rem;
+  font-size: 0.96rem;
+  font-weight: 750;
 }
 
 .trakt-link,
 .open-link,
 .site-footer a {
   color: var(--accent);
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
 }
 
 .search-form {
-  margin-top: 28px;
+  margin-top: 24px;
 }
 
 .mode-tabs {
@@ -152,13 +168,14 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 13px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--panel);
   color: var(--muted);
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -190,7 +207,7 @@ h2 {
 }
 
 .discovery-tab input:checked + .mode-label {
-  background: var(--accent);
+  background: var(--button-bg);
   color: white;
 }
 
@@ -208,8 +225,8 @@ h2 {
 
 .query-row input {
   min-width: 0;
-  height: 50px;
-  padding: 0 14px;
+  height: 44px;
+  padding: 0 13px;
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
@@ -220,30 +237,38 @@ h2 {
   outline: 3px solid rgba(229, 51, 69, 0.18);
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  outline-offset: 2px;
+}
+
 .query-row button,
 .result-actions button,
 .ghost-button,
 .theme-toggle {
-  min-height: 40px;
+  min-height: 36px;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .query-row button {
-  height: 50px;
-  padding: 0 18px;
-  background: var(--accent);
+  height: 44px;
+  padding: 0 16px;
+  background: var(--button-bg);
   color: white;
 }
 
 .query-row button:hover {
-  background: var(--accent-dark);
+  background: var(--button-bg-hover);
 }
 
 .query-row .ghost-button {
-  height: 50px;
+  height: 44px;
 }
 
 .status {
@@ -265,7 +290,7 @@ h2 {
   margin-top: 8px;
   color: var(--muted);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .quick-users[hidden] {
@@ -287,7 +312,7 @@ h2 {
   color: var(--text);
   cursor: pointer;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .results-wrap {
@@ -301,7 +326,7 @@ h2 {
   justify-content: space-between;
   gap: 16px;
   margin-top: 18px;
-  padding: 16px 18px;
+  padding: 14px 18px;
 }
 
 .selection-panel[hidden] {
@@ -311,41 +336,8 @@ h2 {
 .selection-panel p {
   margin-top: 4px;
   color: var(--muted);
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.selected-list-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.selected-chip,
-.selected-more {
-  max-width: 220px;
-  min-height: 28px;
-  padding: 0 9px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--soft);
-  color: var(--text);
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.selected-chip {
-  cursor: pointer;
-}
-
-.selected-more {
-  display: inline-grid;
-  align-items: center;
-  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 650;
 }
 
 .selection-actions,
@@ -358,18 +350,24 @@ h2 {
 
 .selection-actions button,
 .modal-actions button {
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 36px;
+  padding: 0 13px;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
-  background: var(--accent);
+  background: var(--button-bg);
   color: white;
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.selection-actions button:hover,
+.modal-actions button:hover {
+  background: var(--button-bg-hover);
 }
 
 .results-toolbar {
-  min-height: 62px;
+  min-height: 54px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--border);
 }
@@ -387,12 +385,12 @@ h2 {
 .sort-control {
   gap: 8px;
   color: var(--muted);
-  font-size: 0.9rem;
-  font-weight: 800;
+  font-size: 0.86rem;
+  font-weight: 650;
 }
 
 .sort-control select {
-  min-height: 36px;
+  min-height: 34px;
   padding: 0 34px 0 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -404,7 +402,7 @@ h2 {
 .pager {
   color: var(--muted);
   font-size: 0.9rem;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .pager .ghost-button {
@@ -417,9 +415,16 @@ h2 {
 }
 
 .ghost-button {
-  padding: 0 14px;
+  padding: 0 13px;
   background: var(--soft);
   color: var(--text);
+}
+
+.ghost-button:hover,
+.quick-users button:hover,
+.trakt-id-button:hover,
+.table-copy-button:hover {
+  background: color-mix(in srgb, var(--soft) 72%, var(--text));
 }
 
 .theme-toggle {
@@ -502,7 +507,7 @@ h2 {
   background: color-mix(in srgb, var(--soft) 54%, var(--panel));
   color: var(--muted);
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 750;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -515,7 +520,7 @@ h2 {
   display: block;
   margin-top: 1px;
   font-size: 0.58rem;
-  font-weight: 800;
+  font-weight: 650;
   text-transform: none;
 }
 
@@ -572,7 +577,7 @@ h2 {
   grid-template-columns: 118px minmax(180px, 1.7fr) minmax(96px, 0.7fr) minmax(70px, 0.5fr) minmax(70px, 0.45fr) minmax(106px, 0.72fr) 44px minmax(116px, auto);
   align-items: center;
   gap: 12px;
-  min-height: 92px;
+  min-height: 86px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
@@ -659,7 +664,7 @@ h2 {
   cursor: pointer;
   color: var(--muted);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 650;
   text-align: left;
 }
 
@@ -684,8 +689,9 @@ h2 {
 .result-title {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   line-height: 1.25;
+  font-weight: 700;
 }
 
 .open-link {
@@ -725,7 +731,7 @@ h2 {
   color: var(--text);
   cursor: pointer;
   font-size: 0.8rem;
-  font-weight: 900;
+  font-weight: 750;
   line-height: 1.05;
   text-align: left;
 }
@@ -733,7 +739,7 @@ h2 {
 .result-counts,
 .result-likes {
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .result-likes {
@@ -756,7 +762,7 @@ h2 {
   border-radius: 0;
   background: transparent;
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 650;
   line-height: 1.2;
 }
 
@@ -774,7 +780,7 @@ h2 {
   color: var(--accent);
   cursor: pointer;
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .read-more-button[hidden] {
@@ -789,20 +795,21 @@ h2 {
 }
 
 .result-actions button {
-  min-height: 32px;
-  min-width: 92px;
-  padding: 0 12px;
+  min-height: 30px;
+  min-width: 78px;
+  padding: 0 10px;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
   background: var(--text);
   color: var(--bg);
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .select-list-button.selected {
-  background: var(--soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--border));
+  background: var(--accent-soft);
   color: var(--text);
 }
 
@@ -884,7 +891,7 @@ body.modal-open {
   background: color-mix(in srgb, var(--soft) 58%, var(--panel));
   color: var(--muted);
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 750;
   text-transform: uppercase;
 }
 
@@ -905,7 +912,7 @@ body.modal-open {
   border-radius: 7px;
   cursor: pointer;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .table-copy-button {
@@ -931,7 +938,7 @@ body.modal-open {
 .item-status {
   color: var(--muted);
   font-size: 0.85rem;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .item-list {
@@ -959,7 +966,7 @@ body.modal-open {
   background: var(--soft);
   color: var(--muted);
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: 650;
   text-align: center;
 }
 
@@ -976,7 +983,7 @@ body.modal-open {
   border-top: 1px solid var(--border);
   color: var(--code);
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 650;
   line-height: 1.15;
 }
 
