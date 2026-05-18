@@ -46,11 +46,14 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
       });
 
       const items = payload.items || [];
-      renderItems(modalItemList, items);
+      const posterItems = items.filter((item) => item.poster);
+      renderItems(modalItemList, posterItems);
       const total = payload.pagination?.item_count || items.length || 0;
-      previewStatus.textContent = total
-        ? `Preview only: showing first ${formatNumber(Math.min(itemPreviewLimit, items.length))} of ${formatNumber(total)}.`
-        : "No items found.";
+      previewStatus.textContent = posterItems.length
+        ? `Preview only: showing ${formatNumber(posterItems.length)} poster-backed items from the first ${formatNumber(Math.min(itemPreviewLimit, items.length))} of ${formatNumber(total)}.`
+        : total
+          ? `No poster previews available in the first ${formatNumber(Math.min(itemPreviewLimit, items.length))} of ${formatNumber(total)}.`
+          : "No items found.";
     } catch (error) {
       previewStatus.textContent = error.message;
     } finally {
@@ -110,7 +113,7 @@ function renderItems(container, items) {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "item-empty";
-    empty.textContent = "No preview items returned for this list.";
+    empty.textContent = "No poster previews available for this list sample.";
     container.append(empty);
     return;
   }
@@ -221,17 +224,17 @@ function getTraktItemUrl(item) {
 }
 
 function getTmdbItemUrl(item) {
-  const id = getTmdbId(item);
+  const id = getTmdbIdForUrl(item);
   if (!id) return "";
   if (item.type === "movie") return `https://www.themoviedb.org/movie/${encodeURIComponent(id)}`;
-  if (item.type === "show" || item.type === "season" || item.type === "episode") {
-    return `https://www.themoviedb.org/tv/${encodeURIComponent(id)}`;
-  }
+  if (item.type === "show" || item.type === "season" || item.type === "episode") return `https://www.themoviedb.org/tv/${encodeURIComponent(id)}`;
   return `https://www.themoviedb.org/search?query=${encodeURIComponent(id)}`;
 }
 
-function getTmdbId(item) {
-  return item.ids?.show_tmdb || item.ids?.tmdb || "";
+function getTmdbIdForUrl(item) {
+  if (item.type === "movie" || item.type === "show") return item.ids?.tmdb || "";
+  if (item.type === "season" || item.type === "episode") return item.ids?.show_tmdb || "";
+  return item.ids?.tmdb || "";
 }
 
 function getImdbItemUrl(item) {
