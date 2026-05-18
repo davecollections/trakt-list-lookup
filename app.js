@@ -1,10 +1,10 @@
 import { compareText, formatNumber } from "./js/formatting.js";
 import { fetchTraktLists } from "./js/api-client.js";
 import { createItemPreviewUi } from "./js/item-preview-ui.js";
-import { getListSelectionKey as getNuvioListSelectionKey } from "./js/nuvio-export.js";
 import { createNuvioExportUi } from "./js/nuvio-export-ui.js";
 import { createResultsView } from "./js/results-view.js";
 import { createSelectionState } from "./js/selection-state.js";
+import { createSelectionUi } from "./js/selection-ui.js";
 
 const form = document.querySelector("#search-form");
 const queryInput = document.querySelector("#query");
@@ -17,16 +17,6 @@ const lastPageButton = document.querySelector("#last-page");
 const themeToggle = document.querySelector("#theme-toggle");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
-const selectionPanel = document.querySelector("#selection-panel");
-const selectionSummary = document.querySelector("#selection-summary");
-const selectedListChips = document.querySelector("#selected-list-chips");
-const manageSelectionButton = document.querySelector("#manage-selection");
-const openNuvioExportButton = document.querySelector("#open-nuvio-export");
-const clearSelectionButton = document.querySelector("#clear-selection");
-const selectionModal = document.querySelector("#selection-modal");
-const selectionCloseButton = document.querySelector("#selection-close");
-const selectionModalCount = document.querySelector("#selection-modal-count");
-const selectedTableBody = document.querySelector("#selected-table-body");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 15;
@@ -45,6 +35,12 @@ const state = {
 };
 const itemPreviewUi = createItemPreviewUi({ itemPreviewLimit: ITEMS_PREVIEW_LIMIT });
 const nuvioExportUi = createNuvioExportUi({ selection: state.selection });
+const selectionUi = createSelectionUi({
+  selection: state.selection,
+  onClearSelection: clearSelection,
+  onOpenNuvioExport: nuvioExportUi.open,
+  onToggleSelectedList: toggleSelectedList,
+});
 const resultsView = createResultsView({
   posterSampleLimit: POSTER_SAMPLE_LIMIT,
   posterSampleConcurrency: 4,
@@ -106,19 +102,10 @@ clearButton.addEventListener("click", () => {
   queryInput.focus();
 });
 
-selectionCloseButton.addEventListener("click", closeSelectionManager);
-manageSelectionButton.addEventListener("click", openSelectionManager);
-openNuvioExportButton.addEventListener("click", nuvioExportUi.open);
-clearSelectionButton.addEventListener("click", clearSelection);
-
-selectionModal.addEventListener("click", (event) => {
-  if (event.target.matches("[data-close-selection]")) closeSelectionManager();
-});
-
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && itemPreviewUi.isPreviewOpen()) itemPreviewUi.closePreview();
   if (event.key === "Escape" && itemPreviewUi.isDescriptionOpen()) itemPreviewUi.closeDescription();
-  if (event.key === "Escape" && !selectionModal.hidden) closeSelectionManager();
+  if (event.key === "Escape" && selectionUi.isOpen()) selectionUi.close();
   if (event.key === "Escape" && nuvioExportUi.isOpen()) nuvioExportUi.close();
 });
 
@@ -291,118 +278,15 @@ function toggleSelectedList(result) {
   renderCurrentResults();
 }
 
-function getListSelectionKey(result) {
-  return getNuvioListSelectionKey(result);
-}
-
 function updateSelectionUi() {
-  const count = state.selection.size;
-  selectionPanel.hidden = count === 0;
-  selectionSummary.textContent = count
-    ? `${formatNumber(count)} list${count === 1 ? "" : "s"} selected.`
-    : "No lists selected.";
-  renderSelectedListChips();
-  renderSelectedTable();
-  manageSelectionButton.disabled = count === 0;
-  openNuvioExportButton.disabled = count === 0;
-  clearSelectionButton.disabled = count === 0;
-  if (!selectionModal.hidden && count === 0) closeSelectionManager();
+  selectionUi.render();
   if (nuvioExportUi.isOpen()) nuvioExportUi.update();
-}
-
-function renderSelectedListChips() {
-  selectedListChips.textContent = "";
-
-  state.selection.values().slice(0, 6).forEach((result) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "selected-chip";
-    chip.textContent = result.name || "Untitled list";
-    chip.title = "Remove from selection";
-    chip.addEventListener("click", () => toggleSelectedList(result));
-    selectedListChips.append(chip);
-  });
-
-  if (state.selection.size > 6) {
-    const more = document.createElement("span");
-    more.className = "selected-more";
-    more.textContent = `+${formatNumber(state.selection.size - 6)} more`;
-    selectedListChips.append(more);
-  }
 }
 
 function clearSelection() {
   state.selection.clear();
   updateSelectionUi();
   renderCurrentResults();
-}
-
-function openSelectionManager() {
-  if (!state.selection.size) return;
-  renderSelectedTable();
-  selectionModal.hidden = false;
-  document.body.classList.add("modal-open");
-}
-
-function closeSelectionManager() {
-  selectionModal.hidden = true;
-  document.body.classList.remove("modal-open");
-}
-
-function renderSelectedTable() {
-  if (!selectedTableBody) return;
-  const lists = state.selection.values().sort((a, b) => compareText(a.name, b.name));
-  selectionModalCount.textContent = `${formatNumber(lists.length)} selected`;
-  selectedTableBody.textContent = "";
-
-  lists.forEach((result) => {
-    const row = document.createElement("tr");
-
-    const listCell = document.createElement("td");
-    const title = document.createElement("strong");
-    title.textContent = result.name || "Untitled list";
-    listCell.append(title);
-
-    const userCell = document.createElement("td");
-    userCell.textContent = result.user?.username ? `@${result.user.username}` : "n/a";
-
-    const idCell = document.createElement("td");
-    const idButton = document.createElement("button");
-    idButton.type = "button";
-    idButton.className = "table-copy-button";
-    idButton.textContent = result.ids?.trakt || "n/a";
-    idButton.disabled = !result.ids?.trakt;
-    idButton.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(String(result.ids.trakt));
-      flashButton(idButton);
-    });
-    idCell.append(idButton);
-
-    const itemsCell = document.createElement("td");
-    itemsCell.textContent = formatNumber(result.item_count);
-
-    const likesCell = document.createElement("td");
-    likesCell.textContent = formatNumber(result.like_count);
-
-    const actionCell = document.createElement("td");
-    const removeButton = document.createElement("button");
-    removeButton.type = "button";
-    removeButton.className = "remove-selected-button";
-    removeButton.textContent = "Remove";
-    removeButton.addEventListener("click", () => toggleSelectedList(result));
-    actionCell.append(removeButton);
-
-    row.append(listCell, userCell, idCell, itemsCell, likesCell, actionCell);
-    selectedTableBody.append(row);
-  });
-}
-
-function flashButton(button) {
-  const original = button.textContent;
-  button.textContent = "Copied";
-  window.setTimeout(() => {
-    button.textContent = original;
-  }, 900);
 }
 
 function setTheme(theme) {
