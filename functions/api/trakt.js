@@ -1,26 +1,13 @@
 import {
   RESULT_LIMIT,
   clampPositiveInteger,
-  compareNumber,
-  compareText,
-  dedupeLists,
-  getPagination,
   isSafePathSegment,
-  listMatchesTerms,
-  normalizeGlobalListEntry,
   normalizeList,
   normalizeListItem,
-  normalizeOptionalCount,
-  normalizeSearchText,
   normalizeSort,
   normalizeSortOrder,
-  parseTraktListUrl,
-  parseUserListQuery,
-  rankSearchResults,
-  scoreListSearchMatch,
-  singleResultPagination,
-  sortLists,
 } from "../lib/trakt-api-helpers.js";
+import { getPublicErrorMessage, json } from "../lib/http-response.js";
 import { enrichItemsWithTmdbPosters } from "../lib/tmdb-client.js";
 import {
   getGlobalLists,
@@ -40,7 +27,6 @@ const ITEM_LIMIT = 15;
 const MAX_PAGE = 25;
 const MAX_ITEM_LIMIT = 15;
 const MAX_QUERY_LENGTH = 220;
-const SUCCESS_CACHE_SECONDS = 300;
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -113,50 +99,3 @@ export async function onRequestGet({ request, env }) {
 function isGlobalListMode(mode) {
   return mode === "popular" || mode === "trending";
 }
-
-function getPublicErrorMessage(error, status) {
-  if (status >= 500) return "Trakt request failed. Try again shortly.";
-  return error.message || "Trakt request failed.";
-}
-
-function httpError(message, status) {
-  const error = new Error(message);
-  error.status = status;
-  return error;
-}
-
-function json(payload, status = 200, cacheable = false) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": cacheable
-        ? `public, max-age=${SUCCESS_CACHE_SECONDS}, s-maxage=${SUCCESS_CACHE_SECONDS}`
-        : "no-store",
-    },
-  });
-}
-
-export const __testables = {
-  clampPositiveInteger,
-  compareNumber,
-  compareText,
-  dedupeLists,
-  getPagination,
-  getPublicErrorMessage,
-  isSafePathSegment,
-  listMatchesTerms,
-  normalizeGlobalListEntry,
-  normalizeList,
-  normalizeListItem,
-  normalizeOptionalCount,
-  normalizeSearchText,
-  normalizeSort,
-  normalizeSortOrder,
-  parseTraktListUrl,
-  parseUserListQuery,
-  rankSearchResults,
-  scoreListSearchMatch,
-  singleResultPagination,
-  sortLists,
-};

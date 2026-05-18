@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { __testables } from "../functions/api/trakt.js";
+import { getPublicErrorMessage } from "../functions/lib/http-response.js";
 import {
   clampPositiveInteger,
   dedupeLists,
@@ -19,8 +19,6 @@ import {
   singleResultPagination,
   sortLists,
 } from "../functions/lib/trakt-api-helpers.js";
-
-const { getPublicErrorMessage } = __testables;
 
 assert.deepEqual(parseUserListQuery("@snoak horror movies"), {
   username: "snoak",
