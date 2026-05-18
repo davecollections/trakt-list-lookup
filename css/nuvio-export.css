@@ -18,6 +18,10 @@
   gap: 9px;
 }
 
+.nuvio-grid [hidden] {
+  display: none !important;
+}
+
 .nuvio-grid label,
 .nuvio-field-grid label {
   display: grid;

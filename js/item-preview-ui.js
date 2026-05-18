@@ -1,6 +1,8 @@
 import { fetchTraktListItems } from "./api-client.js";
 import { formatNumber } from "./formatting.js";
 
+const MAX_PREVIEW_ITEM_PAGES = 5;
+
 export function createItemPreviewUi({ itemPreviewLimit }) {
   const previewModal = document.querySelector("#preview-modal");
   const previewTitle = document.querySelector("#preview-title");
@@ -39,20 +41,13 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
     document.body.classList.add("modal-open");
 
     try {
-      const payload = await fetchTraktListItems({
-        user: result.user.username,
-        slug: result.ids.slug,
-        limit: itemPreviewLimit,
-      });
-
-      const items = payload.items || [];
-      const posterItems = items.filter((item) => item.poster);
+      const preview = await fetchPosterPreviewItems(result);
+      const posterItems = preview.items;
       renderItems(modalItemList, posterItems);
-      const total = payload.pagination?.item_count || items.length || 0;
       previewStatus.textContent = posterItems.length
-        ? `Preview only: showing ${formatNumber(posterItems.length)} poster-backed items from the first ${formatNumber(Math.min(itemPreviewLimit, items.length))} of ${formatNumber(total)}.`
-        : total
-          ? `No poster previews available in the first ${formatNumber(Math.min(itemPreviewLimit, items.length))} of ${formatNumber(total)}.`
+        ? `Preview only: showing ${formatNumber(posterItems.length)}/${formatNumber(itemPreviewLimit)} poster previews.`
+        : preview.total
+          ? `No poster previews available in the first ${formatNumber(preview.scanned)} of ${formatNumber(preview.total)}.`
           : "No items found.";
     } catch (error) {
       previewStatus.textContent = error.message;
@@ -62,6 +57,39 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
         button.classList.remove("loading");
       }
     }
+  }
+
+  async function fetchPosterPreviewItems(result) {
+    const posterItems = [];
+    let page = 1;
+    let pageCount = 1;
+    let scanned = 0;
+    let total = 0;
+
+    while (posterItems.length < itemPreviewLimit && page <= pageCount && page <= MAX_PREVIEW_ITEM_PAGES) {
+      const payload = await fetchTraktListItems({
+        user: result.user.username,
+        slug: result.ids.slug,
+        limit: itemPreviewLimit,
+        page,
+      });
+      const items = payload.items || [];
+      const pagination = payload.pagination || {};
+
+      scanned += items.length;
+      total = pagination.item_count || total || items.length;
+      pageCount = pagination.page_count || pageCount;
+      posterItems.push(...items.filter((item) => item.poster));
+
+      if (!items.length) break;
+      page += 1;
+    }
+
+    return {
+      items: posterItems.slice(0, itemPreviewLimit),
+      scanned,
+      total,
+    };
   }
 
   function closePreview() {

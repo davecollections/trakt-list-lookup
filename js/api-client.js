@@ -14,11 +14,12 @@ export async function fetchTraktLists({ mode, query, page, limit, sort, sortDire
   return fetchTraktJson(params, "Trakt request failed.");
 }
 
-export async function fetchTraktListItems({ user, slug, limit }) {
+export async function fetchTraktListItems({ user, slug, limit, page = 1 }) {
   const params = new URLSearchParams({
     mode: "items",
     user,
     slug,
+    page: String(page),
     limit: String(limit),
   });
 
