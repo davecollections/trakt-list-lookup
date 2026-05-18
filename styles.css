@@ -1285,6 +1285,41 @@ body.modal-open {
     gap: 10px;
   }
 
+  .preview-poster {
+    margin-bottom: 38px;
+    overflow: visible;
+  }
+
+  .preview-poster img {
+    border-radius: 8px 8px 0 0;
+  }
+
+  .preview-source-links {
+    inset: 100% 0 auto;
+    gap: 4px;
+    padding: 5px 6px 6px;
+    border-top: 1px solid var(--border);
+    background: rgba(17, 19, 24, 0.86);
+  }
+
+  .preview-source-link,
+  .preview-source-empty {
+    min-height: 26px;
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(10, 12, 16, 0.64);
+  }
+
+  .preview-source-link img {
+    width: 15px;
+    height: 15px;
+  }
+
+  .preview-source-badge {
+    min-width: 24px;
+    min-height: 14px;
+    font-size: 0.42rem;
+  }
+
   .preview-dialog {
     padding: 16px;
   }
