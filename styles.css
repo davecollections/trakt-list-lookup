@@ -860,7 +860,7 @@ body.modal-open {
 }
 
 .nuvio-dialog {
-  width: min(920px, 100%);
+  width: min(980px, 100%);
 }
 
 .selected-table-wrap {
@@ -924,22 +924,22 @@ body.modal-open {
 
 .nuvio-warning {
   margin-bottom: 14px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
   border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--text);
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   line-height: 1.35;
 }
 
 .nuvio-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
-  gap: 14px;
+  gap: 12px;
 }
 
-.nuvio-grid label {
+.nuvio-grid label,
+.nuvio-field-grid label {
   display: grid;
   gap: 6px;
   color: var(--muted);
@@ -947,23 +947,58 @@ body.modal-open {
   font-weight: 800;
 }
 
+.nuvio-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--soft) 34%, transparent);
+}
+
+.nuvio-panel-heading {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.nuvio-panel-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+.nuvio-panel-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.nuvio-field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(210px, 0.8fr);
+  gap: 12px;
+  padding: 12px;
+}
+
 .nuvio-merge-options {
   display: grid;
   gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--soft) 54%, transparent);
+  padding-bottom: 12px;
 }
 
 .nuvio-merge-options[hidden] {
   display: none;
 }
 
-.nuvio-merge-options p {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 800;
+.nuvio-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 12px 0;
 }
 
 .existing-json-option:has(:disabled) {
@@ -972,12 +1007,43 @@ body.modal-open {
 
 .radio-label {
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
+  min-height: 64px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
 }
 
 .radio-label input {
   width: auto;
   min-height: 0;
+  margin-top: 2px;
+}
+
+.radio-label span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.radio-label strong {
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.radio-label small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.radio-label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 64%, var(--border));
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
 }
 
 .nuvio-grid input,
@@ -1012,30 +1078,40 @@ body.modal-open {
   grid-column: 1 / -1;
 }
 
-.export-preview-details {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--soft) 38%, transparent);
-}
-
-.export-preview-details summary {
+.nuvio-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 10px 12px;
   cursor: pointer;
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.82rem;
   font-weight: 800;
 }
 
+.nuvio-details summary small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
 .nuvio-source-fields {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.45fr);
   gap: 12px;
   padding: 0 12px 12px;
+}
+
+.nuvio-target-field {
+  margin: 0 12px;
 }
 
 .nuvio-list-mapping {
   display: grid;
   gap: 8px;
-  padding-top: 2px;
+  max-height: 240px;
+  margin: 0 12px;
+  overflow: auto;
 }
 
 .nuvio-list-mapping[hidden] {
@@ -1045,10 +1121,10 @@ body.modal-open {
 .nuvio-map-row {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
   align-items: center;
-  padding: 8px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--panel) 72%, var(--soft));
+  background: var(--panel);
 }
 
 .nuvio-map-row span {
@@ -1258,6 +1334,26 @@ body.modal-open {
   .nuvio-grid {
     grid-template-columns: 1fr;
   }
+
+  .nuvio-panel-heading,
+  .nuvio-field-grid,
+  .nuvio-option-grid,
+  .nuvio-source-fields,
+  .nuvio-map-row {
+    grid-template-columns: 1fr;
+  }
+
+  .nuvio-panel-heading {
+    display: grid;
+  }
+
+  .nuvio-panel-heading p {
+    text-align: left;
+  }
+
+  .nuvio-map-row {
+    gap: 8px;
+  }
 }
 
 @media (min-width: 721px) and (max-width: 1060px) {
@@ -1270,5 +1366,13 @@ body.modal-open {
   .result-actions {
     grid-column: 2 / -1;
     justify-self: start;
+  }
+
+  .nuvio-field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nuvio-field-grid .checkbox-label {
+    grid-column: 1 / -1;
   }
 }

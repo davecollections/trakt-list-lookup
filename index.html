@@ -234,27 +234,39 @@
           <button id="nuvio-close" type="button" class="ghost-button">Close</button>
         </div>
 
-        <p class="nuvio-warning">Trakt list export is pending validation against a real Nuvio Trakt collection. Use this as a draft until the source schema is confirmed.</p>
+        <p class="nuvio-warning">Export is ready for draft use. Direct Trakt source imports still need validation in Nuvio before relying on them for a final collection.</p>
 
         <div class="nuvio-grid">
-          <label>
-            Collection name
-            <input id="nuvio-collection-name" type="text" value="Trakt Lists">
-          </label>
-          <label>
-            Cover image URL
-            <input id="nuvio-cover-url" type="url" placeholder="https://...">
-          </label>
-          <label class="checkbox-label">
-            <input id="nuvio-sort-alpha" type="checkbox" checked>
-            Sort selected lists alphabetically
-          </label>
-          <details class="nuvio-wide export-preview-details">
-            <summary>Existing Nuvio JSON source</summary>
+          <section class="nuvio-panel nuvio-wide">
+            <div class="nuvio-panel-heading">
+              <h3>Collection setup</h3>
+              <p id="nuvio-export-summary">Selected lists will be exported as Trakt folders.</p>
+            </div>
+            <div class="nuvio-field-grid">
+              <label>
+                Collection name
+                <input id="nuvio-collection-name" type="text" value="Trakt Lists">
+              </label>
+              <label>
+                Cover image URL
+                <input id="nuvio-cover-url" type="url" placeholder="https://...">
+              </label>
+              <label class="checkbox-label">
+                <input id="nuvio-sort-alpha" type="checkbox" checked>
+                Sort selected lists alphabetically
+              </label>
+            </div>
+          </section>
+
+          <details class="nuvio-wide nuvio-panel nuvio-details">
+            <summary>
+              <span>Existing Nuvio JSON</span>
+              <small>Optional</small>
+            </summary>
             <div class="nuvio-source-fields">
               <label>
                 Paste existing Nuvio JSON
-                <textarea id="nuvio-existing-json" rows="5" placeholder="Paste an existing Nuvio JSON array here."></textarea>
+                <textarea id="nuvio-existing-json" rows="5" placeholder="Paste an existing Nuvio JSON array to append into it."></textarea>
               </label>
               <label>
                 Upload existing Nuvio JSON
@@ -262,32 +274,54 @@
               </label>
             </div>
           </details>
-          <div id="nuvio-merge-options" class="nuvio-wide nuvio-merge-options" hidden>
-            <p id="nuvio-existing-summary"></p>
-            <label class="radio-label">
-              <input type="radio" name="nuvio-merge-mode" value="new" checked>
-              Add selected lists as a new collection
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="nuvio-merge-mode" value="split">
-              Create one new collection per selected list
-            </label>
-            <label class="radio-label existing-json-option">
-              <input type="radio" name="nuvio-merge-mode" value="existing">
-              Add selected lists as folders in an existing collection
-            </label>
-            <label class="radio-label existing-json-option">
-              <input type="radio" name="nuvio-merge-mode" value="mapped">
-              Choose an existing collection for each selected list
-            </label>
-            <label class="existing-json-option">
+
+          <div id="nuvio-merge-options" class="nuvio-wide nuvio-panel nuvio-merge-options" hidden>
+            <div class="nuvio-panel-heading">
+              <h3>Destination</h3>
+              <p id="nuvio-existing-summary"></p>
+            </div>
+            <div class="nuvio-option-grid">
+              <label class="radio-label">
+                <input type="radio" name="nuvio-merge-mode" value="new" checked>
+                <span>
+                  <strong>New collection</strong>
+                  <small>Add all selected lists as folders in one new collection.</small>
+                </span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="nuvio-merge-mode" value="split">
+                <span>
+                  <strong>Split collections</strong>
+                  <small>Create one new collection for each selected list.</small>
+                </span>
+              </label>
+              <label class="radio-label existing-json-option">
+                <input type="radio" name="nuvio-merge-mode" value="existing">
+                <span>
+                  <strong>Add to existing</strong>
+                  <small>Put every selected list into the same existing collection.</small>
+                </span>
+              </label>
+              <label class="radio-label existing-json-option">
+                <input type="radio" name="nuvio-merge-mode" value="mapped">
+                <span>
+                  <strong>Map per list</strong>
+                  <small>Choose a different destination collection for each selected list.</small>
+                </span>
+              </label>
+            </div>
+            <label class="existing-json-option nuvio-target-field">
               Existing collection
               <select id="nuvio-target-collection" disabled></select>
             </label>
             <div id="nuvio-list-mapping" class="nuvio-list-mapping" hidden></div>
           </div>
-          <details class="nuvio-wide export-preview-details">
-            <summary>Export preview</summary>
+
+          <details class="nuvio-wide nuvio-panel nuvio-details export-preview-details">
+            <summary>
+              <span>Export preview</span>
+              <small>Generated JSON</small>
+            </summary>
             <textarea id="nuvio-output" rows="12" readonly></textarea>
           </details>
         </div>

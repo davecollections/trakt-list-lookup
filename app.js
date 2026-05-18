@@ -40,6 +40,7 @@ const selectedTableBody = document.querySelector("#selected-table-body");
 const nuvioModal = document.querySelector("#nuvio-modal");
 const nuvioCloseButton = document.querySelector("#nuvio-close");
 const nuvioCount = document.querySelector("#nuvio-count");
+const nuvioExportSummary = document.querySelector("#nuvio-export-summary");
 const nuvioCollectionNameInput = document.querySelector("#nuvio-collection-name");
 const nuvioCoverUrlInput = document.querySelector("#nuvio-cover-url");
 const nuvioSortAlphaInput = document.querySelector("#nuvio-sort-alpha");
@@ -745,9 +746,12 @@ async function loadNuvioExistingFile() {
 function updateNuvioOutput() {
   try {
     updateNuvioMergeControls();
-    nuvioOutput.value = JSON.stringify(createNuvioExportJson(), null, 2);
+    const exportJson = createNuvioExportJson();
+    nuvioOutput.value = JSON.stringify(exportJson, null, 2);
+    updateNuvioExportSummary(exportJson);
   } catch (error) {
     nuvioOutput.value = `Could not build JSON: ${error.message}`;
+    nuvioExportSummary.textContent = "Fix the highlighted export settings before copying.";
   }
 }
 
@@ -788,6 +792,34 @@ function getExistingNuvioCollections() {
 
 function getNuvioMergeMode() {
   return document.querySelector("input[name='nuvio-merge-mode']:checked")?.value || "new";
+}
+
+function updateNuvioExportSummary(exportJson) {
+  const mode = getNuvioMergeMode();
+  const selectedCount = state.selectedLists.size;
+  const coverUrl = getNuvioCoverUrl();
+  const existingCount = getExistingNuvioCollections().length;
+  const collectionCount = Array.isArray(exportJson) ? exportJson.length : 0;
+
+  if (mode === "split") {
+    nuvioExportSummary.textContent = `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(selectedCount)} new collection${selectedCount === 1 ? "" : "s"}${coverUrl ? " with a cover URL" : ""}.`;
+    return;
+  }
+
+  if (mode === "existing") {
+    nuvioExportSummary.textContent = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added to one existing collection.`;
+    return;
+  }
+
+  if (mode === "mapped") {
+    const mappedCollections = new Set(getNuvioListMappingValues().values());
+    nuvioExportSummary.textContent = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} mapped across ${formatNumber(mappedCollections.size || existingCount)} existing collection${(mappedCollections.size || existingCount) === 1 ? "" : "s"}.`;
+    return;
+  }
+
+  nuvioExportSummary.textContent = existingCount
+    ? `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added as one new collection. Output contains ${formatNumber(collectionCount)} total collections.`
+    : `${formatNumber(selectedCount)} selected list${selectedCount === 1 ? "" : "s"} will be exported as folders in one collection${coverUrl ? " with a cover URL" : ""}.`;
 }
 
 function updateNuvioMergeControls() {
