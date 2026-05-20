@@ -545,7 +545,7 @@ a:focus-visible {
 
 .results-header {
   display: grid;
-  grid-template-columns: 118px minmax(180px, 1.7fr) minmax(96px, 0.7fr) minmax(70px, 0.5fr) minmax(70px, 0.45fr) minmax(106px, 0.72fr) minmax(70px, auto) minmax(116px, auto);
+  grid-template-columns: 118px minmax(180px, 1.55fr) minmax(126px, 0.85fr) minmax(64px, 0.45fr) minmax(64px, 0.4fr) minmax(96px, 0.62fr) minmax(64px, auto) minmax(104px, auto);
   align-items: center;
   gap: 12px;
   padding: 9px 14px;
@@ -619,8 +619,9 @@ a:focus-visible {
 }
 
 .result-card {
+  position: relative;
   display: grid;
-  grid-template-columns: 118px minmax(180px, 1.7fr) minmax(96px, 0.7fr) minmax(70px, 0.5fr) minmax(70px, 0.45fr) minmax(106px, 0.72fr) minmax(70px, auto) minmax(116px, auto);
+  grid-template-columns: 118px minmax(180px, 1.55fr) minmax(126px, 0.85fr) minmax(64px, 0.45fr) minmax(64px, 0.4fr) minmax(96px, 0.62fr) minmax(64px, auto) minmax(104px, auto);
   align-items: center;
   gap: 12px;
   min-height: 86px;
@@ -749,6 +750,9 @@ a:focus-visible {
 }
 
 .media-type-badge {
+  position: absolute;
+  top: 9px;
+  right: 14px;
   display: inline-flex;
   align-items: center;
   min-height: 20px;
@@ -801,6 +805,7 @@ a:focus-visible {
 .trakt-id-button {
   justify-self: start;
   min-height: 28px;
+  min-width: 86px;
   max-width: 100%;
   padding: 0 9px;
   overflow-wrap: anywhere;
@@ -835,6 +840,8 @@ a:focus-visible {
 }
 
 .updated-line {
+  display: grid;
+  gap: 1px;
   justify-self: start;
   padding: 0;
   border: 0;
@@ -843,6 +850,15 @@ a:focus-visible {
   font-size: 0.75rem;
   font-weight: 650;
   line-height: 1.2;
+}
+
+.updated-line::before {
+  content: "Last updated";
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 750;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .updated-line span {
@@ -1286,15 +1302,9 @@ body.modal-open {
     content: "Likes";
   }
 
-  .updated-line {
-    display: inline-flex;
-    gap: 6px;
-  }
-
   .updated-line::before {
-    content: "Last updated";
-    font-size: 0.68rem;
-    text-transform: none;
+    font-size: 0.62rem;
+    text-transform: uppercase;
   }
 
   .result-actions button {
@@ -1350,7 +1360,7 @@ body.modal-open {
 @media (min-width: 721px) and (max-width: 1060px) {
   .result-card,
   .results-header {
-    grid-template-columns: 112px minmax(180px, 1.6fr) minmax(88px, 0.7fr) minmax(66px, 0.5fr) minmax(62px, 0.45fr) minmax(100px, 0.75fr);
+    grid-template-columns: 112px minmax(180px, 1.45fr) minmax(118px, 0.82fr) minmax(64px, 0.45fr) minmax(62px, 0.4fr) minmax(94px, 0.62fr);
   }
 
   .open-link,

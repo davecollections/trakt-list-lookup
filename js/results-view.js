@@ -58,7 +58,7 @@ export function createResultsView({
       const titleNode = node.querySelector(".result-title");
       titleNode.textContent = title;
       const mediaBadge = createMediaBadge(result);
-      if (mediaBadge) titleNode.after(mediaBadge);
+      if (mediaBadge) card.append(mediaBadge);
       const fullDescription = cleanDescription(result.description);
       const readMoreButton = node.querySelector(".read-more-button");
       readMoreButton.hidden = !hasDescription(result.description);
