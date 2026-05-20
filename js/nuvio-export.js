@@ -194,9 +194,15 @@ function createNuvioTraktSource(result) {
     sortBy: "rank",
     sortHow: "asc",
     provider: "trakt",
-    mediaType: "MOVIE",
+    mediaType: getNuvioMediaType(result),
     traktListId: Number(result.ids?.trakt || 0) || null,
   };
+}
+
+function getNuvioMediaType(result) {
+  const value = String(result?.nuvioMediaType || result?.mediaType || "").toUpperCase();
+  if (value === "TV" || value === "SHOW" || value === "SERIES") return "TV";
+  return "MOVIE";
 }
 
 function createNuvioId(prefix) {

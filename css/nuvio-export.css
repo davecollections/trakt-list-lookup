@@ -27,12 +27,18 @@
 }
 
 .nuvio-grid label,
-.nuvio-field-grid label {
+.nuvio-field-grid label,
+.nuvio-status-field {
   display: grid;
   gap: 4px;
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 800;
+}
+
+.nuvio-status-field {
+  align-content: start;
+  min-height: 34px;
 }
 
 .field-status {

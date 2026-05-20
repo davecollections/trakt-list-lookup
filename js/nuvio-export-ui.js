@@ -1,10 +1,11 @@
 import { formatNumber, slugifyFilename } from "./formatting.js";
-import { canFetchListItems, fetchFirstPosterUrl } from "./list-item-cache.js";
+import { canFetchListItems, fetchFirstPosterUrl, fetchListMediaType } from "./list-item-cache.js";
 import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
 import { buildNuvioExport, getListSelectionKey, getSafeHttpsUrl, sortNuvioLists } from "./nuvio-export.js";
 
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
+const MEDIA_TYPE_CONCURRENCY = 3;
 
 export function createNuvioExportUi({ selection }) {
   const modal = document.querySelector("#nuvio-modal");
@@ -17,6 +18,7 @@ export function createNuvioExportUi({ selection }) {
   const sortModeSelect = document.querySelector("#nuvio-sort-mode");
   const folderImageModeSelect = document.querySelector("#nuvio-folder-image-mode");
   const folderImageStatus = document.querySelector("#nuvio-folder-image-status");
+  const mediaTypeStatus = document.querySelector("#nuvio-media-type-status");
   const existingJsonInput = document.querySelector("#nuvio-existing-json");
   const existingFileInput = document.querySelector("#nuvio-existing-file");
   const existingFileStatus = document.querySelector("#nuvio-file-status");
@@ -36,7 +38,10 @@ export function createNuvioExportUi({ selection }) {
   const jsonPreviewClose = document.querySelector("#json-preview-close");
   const jsonPreviewCopy = document.querySelector("#copy-json-preview");
   const folderImageCache = new Map();
+  const mediaTypeCache = new Map();
   let folderImageRequestId = 0;
+  let mediaTypeRequestId = 0;
+  let mediaTypeLoading = false;
 
   closeButton.addEventListener("click", close);
   previewJsonButton.addEventListener("click", openJsonPreview);
@@ -91,6 +96,7 @@ export function createNuvioExportUi({ selection }) {
     count.textContent = `${formatNumber(selection.size)} selected`;
     update();
     refreshFolderImages();
+    refreshMediaTypes();
     openModal(modal, {
       focusTarget: collectionNameInput,
       onClose: close,
@@ -125,21 +131,24 @@ export function createNuvioExportUi({ selection }) {
       updateCoverStatus();
       updateExistingJsonStatus();
       updateFolderImageStatus();
+      updateMediaTypeStatus();
       const exportJson = createExportJson();
       output.value = JSON.stringify(exportJson, null, 2);
       outputSummary.textContent = `${formatNumber(output.value.length)} chars`;
       updateExportSummary(exportJson);
+      setJsonActionsDisabled(mediaTypeLoading);
     } catch (error) {
       output.value = `Could not build JSON: ${error.message}`;
       outputSummary.textContent = "Needs attention";
       exportSummary.textContent = "Fix the highlighted export settings before copying.";
+      setJsonActionsDisabled(true);
     }
   }
 
   function createExportJson() {
     const existing = parseExistingJson();
     return buildNuvioExport({
-      lists: selection.values(),
+      lists: getSelectedListsForExport(),
       existing,
       mode: getMergeMode(),
       collectionName: collectionNameInput.value.trim() || "Trakt Lists",
@@ -275,6 +284,30 @@ export function createNuvioExportUi({ selection }) {
       : "";
   }
 
+  function updateMediaTypeStatus(isLoading = mediaTypeLoading) {
+    const selected = getSelectedListsForExport();
+    if (!selected.length) {
+      mediaTypeStatus.textContent = "";
+      return;
+    }
+
+    if (isLoading) {
+      mediaTypeStatus.textContent = "Detecting movie/series...";
+      return;
+    }
+
+    const counts = selected.reduce((summary, result) => {
+      const type = getDetectedMediaType(result);
+      summary[type] += 1;
+      return summary;
+    }, { MOVIE: 0, TV: 0 });
+
+    const parts = [];
+    if (counts.MOVIE) parts.push(`${formatNumber(counts.MOVIE)} movie`);
+    if (counts.TV) parts.push(`${formatNumber(counts.TV)} series`);
+    mediaTypeStatus.textContent = `Source type: ${parts.join(", ")}.`;
+  }
+
   function updateMergeControls() {
     const collections = getExistingCollections();
     const hasExistingJson = collections.length > 0;
@@ -390,7 +423,14 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function getSelectedListsForExport() {
-    return sortNuvioLists(selection.values(), sortModeSelect.value);
+    return sortNuvioLists(selection.values().map((result) => ({
+      ...result,
+      nuvioMediaType: getDetectedMediaType(result),
+    })), sortModeSelect.value);
+  }
+
+  function getDetectedMediaType(result) {
+    return mediaTypeCache.get(getListSelectionKey(result)) || "MOVIE";
   }
 
   function getCoverUrl() {
@@ -447,6 +487,51 @@ export function createNuvioExportUi({ selection }) {
     if (requestId !== folderImageRequestId) return;
     updateFolderImageStatus();
     refreshGeneratedOutput();
+  }
+
+  async function refreshMediaTypes() {
+    const requestId = ++mediaTypeRequestId;
+    const selectedLists = sortNuvioLists(selection.values(), sortModeSelect.value);
+    const missing = selectedLists.filter((result) => {
+      const key = getListSelectionKey(result);
+      return key && !mediaTypeCache.has(key) && canFetchListItems(result);
+    });
+
+    if (!missing.length) {
+      mediaTypeLoading = false;
+      updateMediaTypeStatus(false);
+      refreshGeneratedOutput();
+      return;
+    }
+
+    mediaTypeLoading = true;
+    updateMediaTypeStatus(true);
+    setJsonActionsDisabled(true);
+
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(MEDIA_TYPE_CONCURRENCY, missing.length) }, async () => {
+      while (cursor < missing.length && requestId === mediaTypeRequestId) {
+        const result = missing[cursor];
+        cursor += 1;
+        try {
+          mediaTypeCache.set(getListSelectionKey(result), await fetchListMediaType(result));
+        } catch {
+          mediaTypeCache.set(getListSelectionKey(result), "MOVIE");
+        }
+      }
+    });
+
+    await Promise.all(workers);
+    if (requestId !== mediaTypeRequestId) return;
+    mediaTypeLoading = false;
+    updateMediaTypeStatus(false);
+    refreshGeneratedOutput();
+  }
+
+  function setJsonActionsDisabled(disabled) {
+    previewJsonButton.disabled = disabled;
+    copyButton.disabled = disabled;
+    downloadButton.disabled = disabled;
   }
 
   async function copyJson() {

@@ -3,6 +3,7 @@ import { getListSelectionKey } from "./nuvio-export.js";
 
 const DEFAULT_ITEM_PAGE_LIMIT = 15;
 const pageCache = new Map();
+const TV_ITEM_TYPES = new Set(["show", "season", "episode"]);
 
 export function canFetchListItems(result) {
   return Boolean(result?.user?.username && result?.ids?.slug);
@@ -62,6 +63,35 @@ export async function fetchFirstPosterUrl(result, { maxPages = 3 } = {}) {
   } catch {
     return "";
   }
+}
+
+export async function fetchListMediaType(result, {
+  pageLimit = 50,
+  maxPages = 2,
+} = {}) {
+  if (!canFetchListItems(result)) return "MOVIE";
+
+  let page = 1;
+  let pageCount = 1;
+  let movieCount = 0;
+  let tvCount = 0;
+
+  while (page <= pageCount && page <= maxPages) {
+    const payload = await fetchCachedListItemsPage(result, { page, limit: pageLimit });
+    const items = payload.items || [];
+    const pagination = payload.pagination || {};
+
+    items.forEach((item) => {
+      if (TV_ITEM_TYPES.has(item.type)) tvCount += 1;
+      if (item.type === "movie") movieCount += 1;
+    });
+
+    pageCount = pagination.page_count || pageCount;
+    if (!items.length) break;
+    page += 1;
+  }
+
+  return tvCount > movieCount ? "TV" : "MOVIE";
 }
 
 export function clearListItemCache() {

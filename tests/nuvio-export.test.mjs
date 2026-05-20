@@ -32,6 +32,19 @@ assert.equal(freshExport[0].title, "Trakt Picks");
 assert.equal(freshExport[0].folders.length, 3);
 assert.equal(freshExport[0].folders[0].sources[0].provider, "trakt");
 assert.equal(freshExport[0].backdropImageUrl, "https://example.com/cover.jpg");
+assert.equal(freshExport[0].folders[0].sources[0].mediaType, "MOVIE");
+
+nextId = 0;
+const seriesExport = buildNuvioExport({
+  lists: [
+    {
+      ...list("IMDB: Top Rated TV Shows", 2143363),
+      nuvioMediaType: "TV",
+    },
+  ],
+  createId,
+});
+assert.equal(seriesExport[0].folders[0].sources[0].mediaType, "TV");
 
 nextId = 0;
 const imageExport = buildNuvioExport({
