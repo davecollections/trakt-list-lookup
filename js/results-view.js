@@ -30,14 +30,14 @@ export function createResultsView({
     renderPagination,
   };
 
-  function renderResults(results) {
+  function renderResults(results, { emptyMessage = "Results will appear here." } = {}) {
     resultsEl.textContent = "";
     resultsEl.classList.toggle("empty-state", results.length === 0);
     resultsHeader.hidden = results.length === 0;
 
     if (!results.length) {
       const empty = document.createElement("p");
-      empty.textContent = "Results will appear here.";
+      empty.textContent = emptyMessage;
       resultsEl.append(empty);
       return;
     }
@@ -55,7 +55,10 @@ export function createResultsView({
       ownerButton.textContent = `@${owner}`;
       ownerButton.disabled = !result.user?.username;
       ownerButton.addEventListener("click", () => onLoadUserLists(result.user.username));
-      node.querySelector(".result-title").textContent = title;
+      const titleNode = node.querySelector(".result-title");
+      titleNode.textContent = title;
+      const mediaBadge = createMediaBadge(result);
+      if (mediaBadge) titleNode.after(mediaBadge);
       const fullDescription = cleanDescription(result.description);
       const readMoreButton = node.querySelector(".read-more-button");
       readMoreButton.hidden = !hasDescription(result.description);
@@ -90,6 +93,16 @@ export function createResultsView({
     });
 
     loadPosterSamplesForResults(results);
+  }
+
+  function createMediaBadge(result) {
+    const mediaType = result.nuvioMediaType || result.mediaType;
+    if (!mediaType) return null;
+
+    const badge = document.createElement("span");
+    badge.className = "media-type-badge";
+    badge.textContent = mediaType === "TV" ? "Series" : "Movie";
+    return badge;
   }
 
   function renderQuickUsers(results) {

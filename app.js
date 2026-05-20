@@ -1,6 +1,7 @@
-import { compareText, formatNumber } from "./js/formatting.js";
+import { formatNumber } from "./js/formatting.js";
 import { fetchTraktLists } from "./js/api-client.js";
 import { createItemPreviewUi } from "./js/item-preview-ui.js";
+import { canFetchListItems, fetchListMediaType } from "./js/list-item-cache.js";
 import { initModalSystem } from "./js/modal-utils.js";
 import { createNuvioExportUi } from "./js/nuvio-export-ui.js";
 import { createResultsView } from "./js/results-view.js";
@@ -18,10 +19,12 @@ const lastPageButton = document.querySelector("#last-page");
 const themeToggle = document.querySelector("#theme-toggle");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
+const mediaFilterStatus = document.querySelector("#media-filter-status");
 
 const DESCRIPTION_LIMIT = 360;
 const ITEMS_PREVIEW_LIMIT = 15;
 const POSTER_SAMPLE_LIMIT = 3;
+const MEDIA_TYPE_CONCURRENCY = 4;
 
 const state = {
   mode: "search",
@@ -32,8 +35,12 @@ const state = {
   limit: 30,
   sort: "relevance",
   sortDirection: "desc",
+  mediaTypeFilter: "all",
+  mediaTypeLoading: false,
   selection: createSelectionState(),
 };
+const mediaTypeCache = new Map();
+let mediaTypeRequestId = 0;
 const itemPreviewUi = createItemPreviewUi({ itemPreviewLimit: ITEMS_PREVIEW_LIMIT });
 const nuvioExportUi = createNuvioExportUi({ selection: state.selection });
 const selectionUi = createSelectionUi({
@@ -93,14 +100,26 @@ document.querySelectorAll("input[name='mode']").forEach((radio) => {
   });
 });
 
+document.querySelectorAll("input[name='media-type']").forEach((radio) => {
+  radio.addEventListener("change", () => {
+    state.mediaTypeFilter = getMediaTypeFilter();
+    renderCurrentResults();
+    updateMediaFilterStatus();
+  });
+});
+
 clearButton.addEventListener("click", () => {
   queryInput.value = "";
   state.page = 1;
   state.pagination = null;
+  state.results = [];
+  state.mediaTypeLoading = false;
+  mediaTypeRequestId += 1;
   setStatus("");
   resultsView.renderResults([]);
   resultsView.renderQuickUsers([]);
   resultsView.renderPagination(null, state.page);
+  updateMediaFilterStatus();
   queryInput.focus();
 });
 
@@ -154,6 +173,9 @@ form.addEventListener("submit", async (event) => {
 
 async function runSearch(page) {
   state.page = page;
+  state.mediaTypeLoading = false;
+  mediaTypeRequestId += 1;
+  updateMediaFilterStatus();
   setLoading(true);
   setStatus("Searching Trakt...");
 
@@ -173,6 +195,7 @@ async function runSearch(page) {
     renderCurrentResults();
     resultsView.renderQuickUsers(results);
     resultsView.renderPagination(state.pagination, state.page);
+    detectMediaTypesForResults(results);
 
     const total = state.pagination?.item_count;
     const countText = total ? `${formatNumber(total)} total` : `${results.length} on this page`;
@@ -180,8 +203,10 @@ async function runSearch(page) {
   } catch (error) {
     resultsView.renderResults([]);
     state.results = [];
+    state.mediaTypeLoading = false;
     resultsView.renderQuickUsers([]);
     resultsView.renderPagination(null, state.page);
+    updateMediaFilterStatus();
     setStatus(error.message, true);
   } finally {
     setLoading(false);
@@ -189,11 +214,18 @@ async function runSearch(page) {
 }
 
 function renderCurrentResults() {
-  resultsView.renderResults(state.results);
+  const results = getMediaFilteredResults();
+  resultsView.renderResults(results, {
+    emptyMessage: getResultsEmptyMessage(),
+  });
 }
 
 function getMode() {
   return document.querySelector("input[name='mode']:checked").value;
+}
+
+function getMediaTypeFilter() {
+  return document.querySelector("input[name='media-type']:checked")?.value || "all";
 }
 
 function isDiscoveryMode(mode) {
@@ -217,23 +249,98 @@ function setStatus(message, isError = false) {
   statusEl.classList.toggle("error", isError);
 }
 
-function getSortedResults(results) {
-  const sort = state.sort;
-  const sorted = [...results];
-  if (sort === "title") {
-    sorted.sort((a, b) => compareText(a.name, b.name));
-  } else if (sort === "items") {
-    sorted.sort((a, b) => compareNumber(b.item_count, a.item_count));
-  } else if (sort === "likes") {
-    sorted.sort((a, b) => compareNumber(b.like_count, a.like_count));
-  } else if (sort === "updated") {
-    sorted.sort((a, b) => compareNumber(Date.parse(b.updated_at), Date.parse(a.updated_at)));
+async function detectMediaTypesForResults(results) {
+  const requestId = ++mediaTypeRequestId;
+  applyCachedMediaTypes(results);
+
+  const missing = results.filter((result) => {
+    const key = getMediaTypeCacheKey(result);
+    return key && !mediaTypeCache.has(key) && canFetchListItems(result);
+  });
+
+  if (!missing.length) {
+    state.mediaTypeLoading = false;
+    renderCurrentResults();
+    updateMediaFilterStatus();
+    return;
   }
 
-  if (state.sortDirection === "asc" && sort !== "relevance") {
-    sorted.reverse();
+  state.mediaTypeLoading = true;
+  updateMediaFilterStatus();
+
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(MEDIA_TYPE_CONCURRENCY, missing.length) }, async () => {
+    while (cursor < missing.length && requestId === mediaTypeRequestId) {
+      const result = missing[cursor];
+      cursor += 1;
+      const key = getMediaTypeCacheKey(result);
+      try {
+        mediaTypeCache.set(key, await fetchListMediaType(result));
+      } catch {
+        mediaTypeCache.set(key, "MOVIE");
+      }
+    }
+  });
+
+  await Promise.all(workers);
+  if (requestId !== mediaTypeRequestId) return;
+
+  applyCachedMediaTypes(state.results);
+  state.mediaTypeLoading = false;
+  renderCurrentResults();
+  updateMediaFilterStatus();
+}
+
+function applyCachedMediaTypes(results) {
+  results.forEach((result) => {
+    const key = getMediaTypeCacheKey(result);
+    const mediaType = mediaTypeCache.get(key);
+    if (mediaType) result.nuvioMediaType = mediaType;
+  });
+}
+
+function getMediaTypeCacheKey(result) {
+  return result?.ids?.trakt ? String(result.ids.trakt) : result?.url || "";
+}
+
+function getMediaFilteredResults() {
+  if (state.mediaTypeFilter === "all") return state.results;
+  const target = state.mediaTypeFilter === "tv" ? "TV" : "MOVIE";
+  return state.results.filter((result) => result.nuvioMediaType === target);
+}
+
+function getResultsEmptyMessage() {
+  if (!state.results.length) return "Results will appear here.";
+  if (state.mediaTypeFilter === "movie") return state.mediaTypeLoading ? "Detecting movie lists on this page..." : "No movie lists detected on this page.";
+  if (state.mediaTypeFilter === "tv") return state.mediaTypeLoading ? "Detecting series lists on this page..." : "No series lists detected on this page.";
+  return "No matching public lists found.";
+}
+
+function updateMediaFilterStatus() {
+  if (!state.results.length) {
+    mediaFilterStatus.textContent = "";
+    return;
   }
-  return sorted;
+
+  const detected = state.results.filter((result) => result.nuvioMediaType).length;
+  const movieCount = state.results.filter((result) => result.nuvioMediaType === "MOVIE").length;
+  const tvCount = state.results.filter((result) => result.nuvioMediaType === "TV").length;
+  const unknownCount = Math.max(state.results.length - detected, 0);
+  const visibleCount = getMediaFilteredResults().length;
+
+  if (state.mediaTypeLoading) {
+    mediaFilterStatus.textContent = `Detecting page media: ${formatNumber(detected)}/${formatNumber(state.results.length)}`;
+    return;
+  }
+
+  const countText = [
+    `${formatNumber(movieCount)} movie`,
+    `${formatNumber(tvCount)} series`,
+    unknownCount ? `${formatNumber(unknownCount)} unknown` : "",
+  ].filter(Boolean).join(", ");
+  mediaFilterStatus.textContent = state.mediaTypeFilter === "all"
+    ? `This page: ${countText}`
+    : `Showing ${formatNumber(visibleCount)} of ${formatNumber(state.results.length)} on this page`;
 }
 
 function setSort(sort) {

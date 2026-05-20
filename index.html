@@ -22,27 +22,51 @@
         </div>
 
         <form id="search-form" class="search-form">
-          <div class="mode-tabs" role="tablist" aria-label="Search mode">
-            <label>
-              <input type="radio" name="mode" value="search" checked>
-              <span class="mode-label">Keyword</span>
-            </label>
-            <label>
-              <input type="radio" name="mode" value="user">
-              <span class="mode-label">User Search</span>
-            </label>
-            <label>
-              <input type="radio" name="mode" value="url">
-              <span class="mode-label">URL</span>
-            </label>
-            <label class="discovery-tab">
-              <input type="radio" name="mode" value="popular">
-              <span class="mode-label mode-popular">Popular</span>
-            </label>
-            <label class="discovery-tab">
-              <input type="radio" name="mode" value="trending">
-              <span class="mode-label mode-trending">Trending</span>
-            </label>
+          <div class="search-control-grid">
+            <div class="control-group">
+              <span class="control-label">Search by</span>
+              <div class="mode-tabs" role="tablist" aria-label="Search mode">
+                <label>
+                  <input type="radio" name="mode" value="search" checked>
+                  <span class="mode-label">Keyword</span>
+                </label>
+                <label>
+                  <input type="radio" name="mode" value="user">
+                  <span class="mode-label">User</span>
+                </label>
+                <label>
+                  <input type="radio" name="mode" value="url">
+                  <span class="mode-label">URL</span>
+                </label>
+                <label class="discovery-tab">
+                  <input type="radio" name="mode" value="popular">
+                  <span class="mode-label mode-popular">Popular</span>
+                </label>
+                <label class="discovery-tab">
+                  <input type="radio" name="mode" value="trending">
+                  <span class="mode-label mode-trending">Trending</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="control-group media-filter-group">
+              <span class="control-label">Media</span>
+              <div class="media-filter-tabs" role="tablist" aria-label="Media type">
+                <label>
+                  <input type="radio" name="media-type" value="all" checked>
+                  <span class="media-filter-label">All</span>
+                </label>
+                <label>
+                  <input type="radio" name="media-type" value="movie">
+                  <span class="media-filter-label">Movies</span>
+                </label>
+                <label>
+                  <input type="radio" name="media-type" value="tv">
+                  <span class="media-filter-label">Series</span>
+                </label>
+              </div>
+              <small id="media-filter-status" class="media-filter-status"></small>
+            </div>
           </div>
 
           <div class="query-row">
@@ -136,7 +160,9 @@
         <div class="result-main">
           <div>
             <button type="button" class="result-owner"></button>
-            <h3 class="result-title"></h3>
+            <div class="result-title-row">
+              <h3 class="result-title"></h3>
+            </div>
           </div>
           <button type="button" class="read-more-button">See Description</button>
         </div>
