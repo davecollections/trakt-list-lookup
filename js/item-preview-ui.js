@@ -221,6 +221,16 @@ function createSourceBadge(label) {
 }
 
 function getTraktItemUrl(item) {
+  const slug = item.ids?.slug;
+  const showSlug = item.ids?.show_slug;
+  if (item.type === "movie" && slug) return `https://trakt.tv/movies/${encodeURIComponent(slug)}`;
+  if (item.type === "show" && slug) return `https://trakt.tv/shows/${encodeURIComponent(slug)}`;
+  if (item.type === "season" && showSlug && item.number) {
+    return `https://trakt.tv/shows/${encodeURIComponent(showSlug)}/seasons/${encodeURIComponent(item.number)}`;
+  }
+  if (item.type === "episode" && showSlug && item.season && item.number) {
+    return `https://trakt.tv/shows/${encodeURIComponent(showSlug)}/seasons/${encodeURIComponent(item.season)}/episodes/${encodeURIComponent(item.number)}`;
+  }
   return item.ids?.trakt ? `https://trakt.tv/search/trakt/${encodeURIComponent(item.ids.trakt)}` : "";
 }
 

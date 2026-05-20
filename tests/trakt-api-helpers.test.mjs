@@ -135,6 +135,7 @@ const movieItem = normalizeListItem({
       trakt: 10,
       tmdb: 20,
       imdb: "tt123",
+      slug: "demo-movie-2024",
     },
   },
 });
@@ -143,11 +144,15 @@ assert.deepEqual(movieItem, {
   type: "movie",
   title: "Demo Movie",
   year: 2024,
+  season: "",
+  number: "",
   ids: {
     trakt: 10,
     tmdb: 20,
     show_tmdb: undefined,
     imdb: "tt123",
+    slug: "demo-movie-2024",
+    show_slug: undefined,
   },
 });
 
@@ -159,10 +164,13 @@ const episodeItem = normalizeListItem({
     year: 2020,
     ids: {
       tmdb: 999,
+      slug: "demo-show",
     },
   },
   episode: {
     title: "Pilot",
+    season: 1,
+    number: 1,
     ids: {
       trakt: 30,
       tmdb: 40,
@@ -171,6 +179,9 @@ const episodeItem = normalizeListItem({
 });
 assert.equal(episodeItem.title, "Demo Show: Pilot");
 assert.equal(episodeItem.ids.show_tmdb, 999);
+assert.equal(episodeItem.ids.show_slug, "demo-show");
+assert.equal(episodeItem.season, 1);
+assert.equal(episodeItem.number, 1);
 
 assert.equal(getPublicErrorMessage(new Error("Bad request"), 400), "Bad request");
 assert.equal(getPublicErrorMessage(new Error("Upstream details"), 502), "Trakt request failed. Try again shortly.");

@@ -239,11 +239,15 @@ export function normalizeListItem(item) {
     type: item.type,
     title,
     year: media.year || item.show?.year || "",
+    season: media.season ?? item.episode?.season ?? "",
+    number: media.number ?? "",
     ids: {
       trakt: media.ids?.trakt,
       tmdb: media.ids?.tmdb,
       show_tmdb: item.show?.ids?.tmdb,
       imdb: media.ids?.imdb,
+      slug: media.ids?.slug,
+      show_slug: item.show?.ids?.slug,
     },
   };
 }
