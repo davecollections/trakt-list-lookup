@@ -1,5 +1,6 @@
-import { fetchTraktListItems } from "./api-client.js";
 import { formatNumber } from "./formatting.js";
+import { fetchPosterPreviewItems } from "./list-item-cache.js";
+import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
 
 const MAX_PREVIEW_ITEM_PAGES = 5;
 
@@ -37,11 +38,16 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
     previewOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
     previewStatus.textContent = "Loading preview...";
     modalItemList.textContent = "";
-    previewModal.hidden = false;
-    document.body.classList.add("modal-open");
+    openModal(previewModal, {
+      focusTarget: modalCloseButton,
+      onClose: closePreview,
+    });
 
     try {
-      const preview = await fetchPosterPreviewItems(result);
+      const preview = await fetchPosterPreviewItems(result, {
+        targetCount: itemPreviewLimit,
+        maxPages: MAX_PREVIEW_ITEM_PAGES,
+      });
       const posterItems = preview.items;
       renderItems(modalItemList, posterItems);
       previewStatus.textContent = posterItems.length
@@ -59,42 +65,8 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
     }
   }
 
-  async function fetchPosterPreviewItems(result) {
-    const posterItems = [];
-    let page = 1;
-    let pageCount = 1;
-    let scanned = 0;
-    let total = 0;
-
-    while (posterItems.length < itemPreviewLimit && page <= pageCount && page <= MAX_PREVIEW_ITEM_PAGES) {
-      const payload = await fetchTraktListItems({
-        user: result.user.username,
-        slug: result.ids.slug,
-        limit: itemPreviewLimit,
-        page,
-      });
-      const items = payload.items || [];
-      const pagination = payload.pagination || {};
-
-      scanned += items.length;
-      total = pagination.item_count || total || items.length;
-      pageCount = pagination.page_count || pageCount;
-      posterItems.push(...items.filter((item) => item.poster));
-
-      if (!items.length) break;
-      page += 1;
-    }
-
-    return {
-      items: posterItems.slice(0, itemPreviewLimit),
-      scanned,
-      total,
-    };
-  }
-
   function closePreview() {
-    previewModal.hidden = true;
-    document.body.classList.remove("modal-open");
+    closeModal(previewModal);
     previewTitle.textContent = "List Preview";
     previewOwner.textContent = "";
     previewStatus.textContent = "";
@@ -105,24 +77,25 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
     descriptionTitle.textContent = result.name || "Description";
     descriptionOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
     descriptionFull.textContent = text;
-    descriptionModal.hidden = false;
-    document.body.classList.add("modal-open");
+    openModal(descriptionModal, {
+      focusTarget: descriptionCloseButton,
+      onClose: closeDescription,
+    });
   }
 
   function closeDescription() {
-    descriptionModal.hidden = true;
-    document.body.classList.remove("modal-open");
+    closeModal(descriptionModal);
     descriptionTitle.textContent = "Description";
     descriptionOwner.textContent = "";
     descriptionFull.textContent = "";
   }
 
   function isPreviewOpen() {
-    return !previewModal.hidden;
+    return isModalOpen(previewModal);
   }
 
   function isDescriptionOpen() {
-    return !descriptionModal.hidden;
+    return isModalOpen(descriptionModal);
   }
 
   return {

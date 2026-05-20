@@ -1,4 +1,5 @@
 import { compareText, formatNumber } from "./formatting.js";
+import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
 
 export function createSelectionUi({ selection, onClearSelection, onOpenNuvioExport, onToggleSelectedList }) {
   const selectionPanel = document.querySelector("#selection-panel");
@@ -84,17 +85,18 @@ export function createSelectionUi({ selection, onClearSelection, onOpenNuvioExpo
   function open() {
     if (!selection.size) return;
     renderTable();
-    selectionModal.hidden = false;
-    document.body.classList.add("modal-open");
+    openModal(selectionModal, {
+      focusTarget: selectionCloseButton,
+      onClose: close,
+    });
   }
 
   function close() {
-    selectionModal.hidden = true;
-    document.body.classList.remove("modal-open");
+    closeModal(selectionModal);
   }
 
   function isOpen() {
-    return !selectionModal.hidden;
+    return isModalOpen(selectionModal);
   }
 
   return {

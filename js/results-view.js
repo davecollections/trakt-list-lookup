@@ -1,5 +1,5 @@
-import { fetchTraktListItems } from "./api-client.js";
 import { cleanDescription, compareNumber, compareText, formatDate, formatNumber, hasDescription } from "./formatting.js";
+import { canFetchListItems, fetchPosterSampleUrls } from "./list-item-cache.js";
 import { getListSelectionKey } from "./nuvio-export.js";
 
 export function createResultsView({
@@ -137,7 +137,7 @@ export function createResultsView({
   async function loadPosterSamplesForResults(results) {
     const queue = results.filter((result) => {
       const key = getPosterSampleKey(result);
-      return key && !posterSamples.has(key) && result.user?.username && result.ids?.slug;
+      return key && !posterSamples.has(key) && canFetchListItems(result);
     });
 
     if (!queue.length) {
@@ -164,13 +164,7 @@ export function createResultsView({
     if (!key) return;
 
     try {
-      const payload = await fetchTraktListItems({
-        user: result.user.username,
-        slug: result.ids.slug,
-        limit: posterSampleLimit,
-      });
-      const posters = (payload.items || []).map((item) => item.poster).filter(Boolean).slice(0, posterSampleLimit);
-      posterSamples.set(key, posters);
+      posterSamples.set(key, await fetchPosterSampleUrls(result, { targetCount: posterSampleLimit }));
     } catch {
       posterSamples.set(key, []);
     }

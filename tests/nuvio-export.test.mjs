@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildNuvioExport, getSafeHttpsUrl } from "../js/nuvio-export.js";
+import { buildNuvioExport, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
 
 const lists = [
   list("Comedy Nights", 101),
@@ -18,6 +18,7 @@ const createId = (prefix) => `${prefix}-${++nextId}`;
 assert.equal(getSafeHttpsUrl("http://example.com/cover.jpg"), "");
 assert.equal(getSafeHttpsUrl("not a url"), "");
 assert.equal(getSafeHttpsUrl("https://example.com/cover.jpg"), "https://example.com/cover.jpg");
+assert.deepEqual(sortNuvioLists(lists, "likes-desc").map((item) => item.name), ["More Comedy", "Horror Finds", "Comedy Nights"]);
 
 nextId = 0;
 const freshExport = buildNuvioExport({

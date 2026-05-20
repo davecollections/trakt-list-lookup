@@ -1,8 +1,8 @@
-import { compareText, formatNumber, slugifyFilename } from "./formatting.js";
-import { fetchTraktListItems } from "./api-client.js";
-import { buildNuvioExport, getListSelectionKey, getSafeHttpsUrl } from "./nuvio-export.js";
+import { formatNumber, slugifyFilename } from "./formatting.js";
+import { canFetchListItems, fetchFirstPosterUrl } from "./list-item-cache.js";
+import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
+import { buildNuvioExport, getListSelectionKey, getSafeHttpsUrl, sortNuvioLists } from "./nuvio-export.js";
 
-const FOLDER_IMAGE_LOOKUP_LIMIT = 15;
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
 
@@ -20,6 +20,7 @@ export function createNuvioExportUi({ selection }) {
   const existingJsonInput = document.querySelector("#nuvio-existing-json");
   const existingFileInput = document.querySelector("#nuvio-existing-file");
   const existingFileStatus = document.querySelector("#nuvio-file-status");
+  const existingJsonStatus = document.querySelector("#nuvio-existing-status");
   const mergeOptions = document.querySelector("#nuvio-merge-options");
   const existingSummary = document.querySelector("#nuvio-existing-summary");
   const targetCollectionSelect = document.querySelector("#nuvio-target-collection");
@@ -82,7 +83,7 @@ export function createNuvioExportUi({ selection }) {
     open,
     close,
     update,
-    isOpen: () => !modal.hidden || !jsonPreviewModal.hidden,
+    isOpen: () => isModalOpen(modal) || isModalOpen(jsonPreviewModal),
   };
 
   function open() {
@@ -90,14 +91,15 @@ export function createNuvioExportUi({ selection }) {
     count.textContent = `${formatNumber(selection.size)} selected`;
     update();
     refreshFolderImages();
-    modal.hidden = false;
-    document.body.classList.add("modal-open");
+    openModal(modal, {
+      focusTarget: collectionNameInput,
+      onClose: close,
+    });
   }
 
   function close() {
-    modal.hidden = true;
     closeJsonPreview();
-    document.body.classList.remove("modal-open");
+    closeModal(modal);
   }
 
   async function loadExistingFile() {
@@ -121,6 +123,7 @@ export function createNuvioExportUi({ selection }) {
   function refreshGeneratedOutput() {
     try {
       updateCoverStatus();
+      updateExistingJsonStatus();
       updateFolderImageStatus();
       const exportJson = createExportJson();
       output.value = JSON.stringify(exportJson, null, 2);
@@ -159,12 +162,7 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function getExistingCollections() {
-    try {
-      const existing = parseExistingJson();
-      return existing || [];
-    } catch {
-      return [];
-    }
+    return getExistingJsonState().collections;
   }
 
   function getMergeMode() {
@@ -211,6 +209,47 @@ export function createNuvioExportUi({ selection }) {
     const safeUrl = getCoverUrl();
     coverStatus.textContent = safeUrl ? "Cover URL will be included." : "Use a valid https:// URL.";
     coverStatus.classList.toggle("invalid", !safeUrl);
+  }
+
+  function updateExistingJsonStatus() {
+    const state = getExistingJsonState();
+    existingJsonStatus.classList.toggle("invalid", Boolean(state.error));
+    existingJsonStatus.textContent = state.message;
+  }
+
+  function getExistingJsonState() {
+    const text = existingJsonInput.value.trim();
+    if (!text) {
+      return {
+        collections: [],
+        error: "",
+        message: "",
+      };
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) {
+        return {
+          collections: [],
+          error: "Existing Nuvio JSON must be an array.",
+          message: "Existing Nuvio JSON must be an array.",
+        };
+      }
+
+      const folderCount = parsed.reduce((count, collection) => count + (Array.isArray(collection?.folders) ? collection.folders.length : 0), 0);
+      return {
+        collections: parsed,
+        error: "",
+        message: `Detected ${formatNumber(parsed.length)} collection${parsed.length === 1 ? "" : "s"} and ${formatNumber(folderCount)} folder${folderCount === 1 ? "" : "s"}.`,
+      };
+    } catch (error) {
+      return {
+        collections: [],
+        error: error.message,
+        message: "Could not read that as JSON.",
+      };
+    }
   }
 
   function updateFolderImageStatus(isLoading = false) {
@@ -351,9 +390,7 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function getSelectedListsForExport() {
-    let lists = selection.values();
-    lists = sortSelectedLists(lists, sortModeSelect.value);
-    return lists;
+    return sortNuvioLists(selection.values(), sortModeSelect.value);
   }
 
   function getCoverUrl() {
@@ -385,7 +422,7 @@ export function createNuvioExportUi({ selection }) {
     const selectedLists = getSelectedListsForExport();
     const missing = selectedLists.filter((result) => {
       const key = getListSelectionKey(result);
-      return key && !folderImageCache.has(key) && result.user?.username && result.ids?.slug;
+      return key && !folderImageCache.has(key) && canFetchListItems(result);
     });
 
     if (!missing.length) {
@@ -400,7 +437,9 @@ export function createNuvioExportUi({ selection }) {
       while (cursor < missing.length && requestId === folderImageRequestId) {
         const result = missing[cursor];
         cursor += 1;
-        folderImageCache.set(getListSelectionKey(result), await fetchFirstPosterForList(result));
+        folderImageCache.set(getListSelectionKey(result), await fetchFirstPosterUrl(result, {
+          maxPages: FOLDER_IMAGE_MAX_PAGES,
+        }));
       }
     });
 
@@ -410,28 +449,6 @@ export function createNuvioExportUi({ selection }) {
     refreshGeneratedOutput();
   }
 
-  async function fetchFirstPosterForList(result) {
-    let page = 1;
-    let pageCount = 1;
-    while (page <= pageCount && page <= FOLDER_IMAGE_MAX_PAGES) {
-      try {
-        const payload = await fetchTraktListItems({
-          user: result.user.username,
-          slug: result.ids.slug,
-          limit: FOLDER_IMAGE_LOOKUP_LIMIT,
-          page,
-        });
-        const poster = (payload.items || []).find((item) => item.poster)?.poster || "";
-        if (poster) return poster;
-        pageCount = payload.pagination?.page_count || pageCount;
-      } catch {
-        return "";
-      }
-      page += 1;
-    }
-    return "";
-  }
-
   async function copyJson() {
     await navigator.clipboard.writeText(output.value);
     flashButton(copyButton);
@@ -439,11 +456,14 @@ export function createNuvioExportUi({ selection }) {
 
   function openJsonPreview() {
     jsonPreviewOutput.value = output.value;
-    jsonPreviewModal.hidden = false;
+    openModal(jsonPreviewModal, {
+      focusTarget: jsonPreviewClose,
+      onClose: closeJsonPreview,
+    });
   }
 
   function closeJsonPreview() {
-    jsonPreviewModal.hidden = true;
+    closeModal(jsonPreviewModal);
   }
 
   async function copyJsonPreview() {
@@ -459,24 +479,6 @@ export function createNuvioExportUi({ selection }) {
     link.click();
     URL.revokeObjectURL(link.href);
   }
-}
-
-function sortSelectedLists(lists, sortMode) {
-  const selectedLists = [...lists];
-  if (sortMode === "selected") return selectedLists;
-  if (sortMode === "title-desc") return selectedLists.sort((a, b) => compareText(b.name, a.name));
-  if (sortMode === "items-desc") return selectedLists.sort((a, b) => compareNumber(b.item_count, a.item_count) || compareText(a.name, b.name));
-  if (sortMode === "likes-desc") return selectedLists.sort((a, b) => compareNumber(b.like_count, a.like_count) || compareText(a.name, b.name));
-  if (sortMode === "updated-desc") return selectedLists.sort((a, b) => compareDate(b.updated_at, a.updated_at) || compareText(a.name, b.name));
-  return selectedLists.sort((a, b) => compareText(a.name, b.name));
-}
-
-function compareNumber(a, b) {
-  return (Number(a) || 0) - (Number(b) || 0);
-}
-
-function compareDate(a, b) {
-  return new Date(a || 0).getTime() - new Date(b || 0).getTime();
 }
 
 function flashButton(button) {

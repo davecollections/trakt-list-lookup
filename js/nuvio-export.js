@@ -13,7 +13,7 @@ export function buildNuvioExport({
   folderImages = {},
   createId = createNuvioId,
 } = {}) {
-  const selectedLists = getSelectedLists(lists, sortMode || (sortAlpha ? "title-asc" : "selected"));
+  const selectedLists = sortNuvioLists(lists, sortMode || (sortAlpha ? "title-asc" : "selected"));
   const safeCoverUrl = getSafeHttpsUrl(coverUrl);
   const safeFolderCoverUrl = folderCoverUrl === null ? safeCoverUrl : getSafeHttpsUrl(folderCoverUrl);
 
@@ -58,7 +58,7 @@ export function getListSelectionKey(result) {
   return result?.ids?.trakt ? String(result.ids.trakt) : result?.url || "";
 }
 
-function getSelectedLists(lists, sortMode) {
+export function sortNuvioLists(lists, sortMode) {
   const selectedLists = [...(lists || [])];
   const mode = sortMode || "title-asc";
   if (mode === "selected") return selectedLists;

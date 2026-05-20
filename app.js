@@ -1,6 +1,7 @@
 import { compareText, formatNumber } from "./js/formatting.js";
 import { fetchTraktLists } from "./js/api-client.js";
 import { createItemPreviewUi } from "./js/item-preview-ui.js";
+import { initModalSystem } from "./js/modal-utils.js";
 import { createNuvioExportUi } from "./js/nuvio-export-ui.js";
 import { createResultsView } from "./js/results-view.js";
 import { createSelectionState } from "./js/selection-state.js";
@@ -59,10 +60,11 @@ const placeholders = {
   trending: "No search text needed",
 };
 
-const savedTheme = localStorage.getItem("theme");
-const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+const savedTheme = getStoredTheme();
+const preferredTheme = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
 setTheme(savedTheme || preferredTheme);
 updateModeControls(getMode());
+initModalSystem();
 
 themeToggle.addEventListener("click", () => {
   const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
@@ -100,13 +102,6 @@ clearButton.addEventListener("click", () => {
   resultsView.renderQuickUsers([]);
   resultsView.renderPagination(null, state.page);
   queryInput.focus();
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && itemPreviewUi.isPreviewOpen()) itemPreviewUi.closePreview();
-  if (event.key === "Escape" && itemPreviewUi.isDescriptionOpen()) itemPreviewUi.closeDescription();
-  if (event.key === "Escape" && selectionUi.isOpen()) selectionUi.close();
-  if (event.key === "Escape" && nuvioExportUi.isOpen()) nuvioExportUi.close();
 });
 
 firstPageButton.addEventListener("click", () => {
@@ -291,9 +286,27 @@ function clearSelection() {
 
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  localStorage.setItem("theme", theme);
+  setStoredTheme(theme);
   const isDark = theme === "dark";
   themeToggle.dataset.icon = isDark ? "sun" : "moon";
   themeToggle.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   themeToggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+}
+
+function getStoredTheme() {
+  try {
+    return typeof localStorage === "undefined" ? "" : localStorage.getItem("theme");
+  } catch {
+    return "";
+  }
+}
+
+function setStoredTheme(theme) {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("theme", theme);
+    }
+  } catch {
+    // Theme persistence is optional; the app should still run when storage is blocked.
+  }
 }
