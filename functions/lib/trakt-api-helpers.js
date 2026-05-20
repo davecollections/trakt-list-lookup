@@ -239,6 +239,7 @@ export function normalizeListItem(item) {
     type: item.type,
     title,
     year: media.year || item.show?.year || "",
+    rating: Number.isFinite(Number(media.rating)) ? Number(media.rating) : null,
     season: media.season ?? item.episode?.season ?? "",
     number: media.number ?? "",
     ids: {

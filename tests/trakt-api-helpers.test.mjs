@@ -131,6 +131,7 @@ const movieItem = normalizeListItem({
   movie: {
     title: "Demo Movie",
     year: 2024,
+    rating: 7.4,
     ids: {
       trakt: 10,
       tmdb: 20,
@@ -144,6 +145,7 @@ assert.deepEqual(movieItem, {
   type: "movie",
   title: "Demo Movie",
   year: 2024,
+  rating: 7.4,
   season: "",
   number: "",
   ids: {
@@ -169,6 +171,7 @@ const episodeItem = normalizeListItem({
   },
   episode: {
     title: "Pilot",
+    rating: 8.2,
     season: 1,
     number: 1,
     ids: {
@@ -178,6 +181,7 @@ const episodeItem = normalizeListItem({
   },
 });
 assert.equal(episodeItem.title, "Demo Show: Pilot");
+assert.equal(episodeItem.rating, 8.2);
 assert.equal(episodeItem.ids.show_tmdb, 999);
 assert.equal(episodeItem.ids.show_slug, "demo-show");
 assert.equal(episodeItem.season, 1);

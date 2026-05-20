@@ -136,118 +136,21 @@ function renderItems(container, items) {
       posterWrap.textContent = "No poster";
     }
 
-    posterWrap.append(renderSourceLinks(item));
+    const ratingBadge = renderRatingBadge(item);
+    if (ratingBadge) posterWrap.append(ratingBadge);
 
     card.append(posterWrap);
     container.append(card);
   });
 }
 
-function renderSourceLinks(item) {
-  const links = document.createElement("div");
-  links.className = "preview-source-links";
-  let linkCount = 0;
+function renderRatingBadge(item) {
+  const rating = Number(item.rating);
+  if (!Number.isFinite(rating) || rating <= 0) return null;
 
-  const traktUrl = getTraktItemUrl(item);
-  if (traktUrl) {
-    links.append(createSourceLink({
-      className: "trakt-source",
-      href: traktUrl,
-      iconSrc: "./assets/trakt.ico",
-      label: "Trakt",
-    }));
-    linkCount += 1;
-  }
-
-  const tmdbUrl = getTmdbItemUrl(item);
-  if (tmdbUrl) {
-    links.append(createSourceLink({
-      className: "tmdb-source",
-      href: tmdbUrl,
-      label: "TMDB",
-    }));
-    linkCount += 1;
-  }
-
-  const imdbUrl = getImdbItemUrl(item);
-  if (imdbUrl) {
-    links.append(createSourceLink({
-      className: "imdb-source",
-      href: imdbUrl,
-      label: "IMDb",
-    }));
-    linkCount += 1;
-  }
-
-  if (!links.children.length) {
-    const empty = document.createElement("span");
-    empty.className = "preview-source-empty";
-    empty.textContent = "No source IDs";
-    links.append(empty);
-  }
-
-  links.style.setProperty("--source-count", String(Math.max(linkCount, 1)));
-  return links;
-}
-
-function createSourceLink({ className, href, iconSrc = "", label }) {
-  const link = document.createElement("a");
-  link.className = `preview-source-link ${className}`;
-  link.href = href;
-  link.target = "_blank";
-  link.rel = "noreferrer";
-  link.title = `Open on ${label}`;
-  link.setAttribute("aria-label", `Open on ${label}`);
-
-  if (iconSrc) {
-    const icon = document.createElement("img");
-    icon.src = iconSrc;
-    icon.alt = "";
-    icon.loading = "lazy";
-    link.append(icon);
-  } else {
-    link.append(createSourceBadge(label));
-  }
-
-  return link;
-}
-
-function createSourceBadge(label) {
-  const icon = document.createElement("span");
-  icon.className = "preview-source-badge";
-  icon.textContent = label;
-  icon.setAttribute("aria-hidden", "true");
-  return icon;
-}
-
-function getTraktItemUrl(item) {
-  const slug = item.ids?.slug;
-  const showSlug = item.ids?.show_slug;
-  if (item.type === "movie" && slug) return `https://trakt.tv/movies/${encodeURIComponent(slug)}`;
-  if (item.type === "show" && slug) return `https://trakt.tv/shows/${encodeURIComponent(slug)}`;
-  if (item.type === "season" && showSlug && item.number) {
-    return `https://trakt.tv/shows/${encodeURIComponent(showSlug)}/seasons/${encodeURIComponent(item.number)}`;
-  }
-  if (item.type === "episode" && showSlug && item.season && item.number) {
-    return `https://trakt.tv/shows/${encodeURIComponent(showSlug)}/seasons/${encodeURIComponent(item.season)}/episodes/${encodeURIComponent(item.number)}`;
-  }
-  return item.ids?.trakt ? `https://trakt.tv/search/trakt/${encodeURIComponent(item.ids.trakt)}` : "";
-}
-
-function getTmdbItemUrl(item) {
-  const id = getTmdbIdForUrl(item);
-  if (!id) return "";
-  if (item.type === "movie") return `https://www.themoviedb.org/movie/${encodeURIComponent(id)}`;
-  if (item.type === "show" || item.type === "season" || item.type === "episode") return `https://www.themoviedb.org/tv/${encodeURIComponent(id)}`;
-  return `https://www.themoviedb.org/search?query=${encodeURIComponent(id)}`;
-}
-
-function getTmdbIdForUrl(item) {
-  if (item.type === "movie" || item.type === "show") return item.ids?.tmdb || "";
-  if (item.type === "season" || item.type === "episode") return item.ids?.show_tmdb || "";
-  return item.ids?.tmdb || "";
-}
-
-function getImdbItemUrl(item) {
-  return item.ids?.imdb ? `https://www.imdb.com/title/${encodeURIComponent(item.ids.imdb)}/` : "";
+  const badge = document.createElement("span");
+  badge.className = "preview-rating-badge";
+  badge.textContent = rating.toFixed(1);
+  badge.title = "Trakt rating";
+  return badge;
 }
