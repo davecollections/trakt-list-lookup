@@ -575,6 +575,10 @@ a:focus-visible {
   text-align: right;
 }
 
+.media-header {
+  display: none;
+}
+
 .results-header button {
   justify-self: start;
   min-height: 26px;
@@ -1127,6 +1131,56 @@ body.modal-open {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
+}
+
+@media (min-width: 1061px) {
+  .results-header,
+  .result-card {
+    grid-template-columns: 118px minmax(180px, 1.45fr) minmax(70px, 0.36fr) minmax(126px, 0.82fr) minmax(64px, 0.42fr) minmax(64px, 0.38fr) minmax(96px, 0.58fr) minmax(64px, auto) minmax(104px, auto);
+  }
+
+  .media-header {
+    display: inline;
+  }
+
+  .poster-samples {
+    grid-column: 1;
+  }
+
+  .result-main {
+    grid-column: 2;
+  }
+
+  .media-type-badge {
+    position: static;
+    grid-column: 3;
+    align-self: center;
+    justify-self: start;
+  }
+
+  .result-id {
+    grid-column: 4;
+  }
+
+  .result-counts {
+    grid-column: 5;
+  }
+
+  .result-likes {
+    grid-column: 6;
+  }
+
+  .updated-line {
+    grid-column: 7;
+  }
+
+  .open-link {
+    grid-column: 8;
+  }
+
+  .result-actions {
+    grid-column: 9;
+  }
 }
 
 @media (max-width: 720px) {
