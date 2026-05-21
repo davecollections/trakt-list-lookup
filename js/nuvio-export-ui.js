@@ -514,7 +514,9 @@ export function createNuvioExportUi({ selection }) {
         const result = missing[cursor];
         cursor += 1;
         try {
-          mediaTypeCache.set(getListSelectionKey(result), await fetchListMediaType(result));
+          mediaTypeCache.set(getListSelectionKey(result), await fetchListMediaType(result, {
+            maxPages: 2,
+          }));
         } catch {
           mediaTypeCache.set(getListSelectionKey(result), "MOVIE");
         }

@@ -14,7 +14,7 @@ export async function fetchTraktLists({ mode, query, page, limit, sort, sortDire
   return fetchTraktJson(params, "Trakt request failed.");
 }
 
-export async function fetchTraktListItems({ user, slug, limit, page = 1 }) {
+export async function fetchTraktListItems({ user, slug, limit, page = 1, posters = true }) {
   const params = new URLSearchParams({
     mode: "items",
     user,
@@ -22,6 +22,8 @@ export async function fetchTraktListItems({ user, slug, limit, page = 1 }) {
     page: String(page),
     limit: String(limit),
   });
+
+  if (!posters) params.set("posters", "0");
 
   return fetchTraktJson(params, "Item lookup failed.");
 }

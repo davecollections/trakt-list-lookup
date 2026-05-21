@@ -66,8 +66,8 @@ export async function fetchFirstPosterUrl(result, { maxPages = 3 } = {}) {
 }
 
 export async function fetchListMediaType(result, {
-  pageLimit = 50,
-  maxPages = 2,
+  pageLimit = DEFAULT_ITEM_PAGE_LIMIT,
+  maxPages = 1,
 } = {}) {
   if (!canFetchListItems(result)) return "MOVIE";
 
@@ -77,7 +77,7 @@ export async function fetchListMediaType(result, {
   let tvCount = 0;
 
   while (page <= pageCount && page <= maxPages) {
-    const payload = await fetchCachedListItemsPage(result, { page, limit: pageLimit });
+    const payload = await fetchCachedListItemsPage(result, { page, limit: pageLimit, posters: false });
     const items = payload.items || [];
     const pagination = payload.pagination || {};
 
@@ -98,9 +98,9 @@ export function clearListItemCache() {
   pageCache.clear();
 }
 
-async function fetchCachedListItemsPage(result, { page, limit }) {
+async function fetchCachedListItemsPage(result, { page, limit, posters = true }) {
   const key = getListSelectionKey(result);
-  const cacheKey = `${key}:${page}:${limit}`;
+  const cacheKey = `${key}:${page}:${limit}:${posters ? "posters" : "types"}`;
   if (pageCache.has(cacheKey)) return pageCache.get(cacheKey);
 
   const request = fetchTraktListItems({
@@ -108,6 +108,7 @@ async function fetchCachedListItemsPage(result, { page, limit }) {
     slug: result.ids.slug,
     limit,
     page,
+    posters,
   }).catch((error) => {
     pageCache.delete(cacheKey);
     throw error;

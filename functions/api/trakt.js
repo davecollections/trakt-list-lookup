@@ -55,7 +55,9 @@ export async function onRequestGet({ request, env }) {
       }
 
       const payload = await getListItems(username, slug, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
-      const items = await enrichItemsWithTmdbPosters(payload.data.map(normalizeListItem).filter(Boolean), env);
+      const items = shouldIncludePosters(url)
+        ? await enrichItemsWithTmdbPosters(payload.data.map(normalizeListItem).filter(Boolean), env)
+        : payload.data.map(normalizeListItem).filter(Boolean);
       return json({
         items,
         pagination: payload.pagination,
@@ -98,4 +100,8 @@ export async function onRequestGet({ request, env }) {
 
 function isGlobalListMode(mode) {
   return mode === "popular" || mode === "trending";
+}
+
+function shouldIncludePosters(url) {
+  return url.searchParams.get("posters") !== "0";
 }

@@ -9,6 +9,7 @@ try {
   await testUnsupportedMode();
   await testResolveListUrl();
   await testListItems();
+  await testListItemsWithoutPosters();
 } finally {
   globalThis.fetch = originalFetch;
 }
@@ -101,6 +102,40 @@ async function testListItems() {
   assert.equal(body.items[0].title, "Demo Movie");
   assert.equal(body.items[0].poster, undefined);
   assert.equal(body.pagination.limit, 15);
+}
+
+async function testListItemsWithoutPosters() {
+  const calls = mockFetch(({ url }) => {
+    assert.equal(url.pathname, "/users/snoak/lists/demo/items");
+    return jsonResponse([
+      {
+        rank: 1,
+        type: "show",
+        show: {
+          title: "Demo Show",
+          year: 2024,
+          ids: {
+            trakt: 11,
+            tmdb: 21,
+          },
+        },
+      },
+    ]);
+  });
+
+  const response = await callHandler(
+    "https://example.test/api/trakt?mode=items&user=snoak&slug=demo&posters=0",
+    {
+      ...env(),
+      TMDB_API_KEY: "test-tmdb-key",
+    },
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(body.items[0].type, "show");
+  assert.equal(body.items[0].poster, undefined);
 }
 
 function mockFetch(handler) {
