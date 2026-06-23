@@ -23,6 +23,13 @@ export function createResultsView({
   const lastPageButton = document.querySelector("#last-page");
   const pageLabel = document.querySelector("#page-label");
   const posterSamples = new Map();
+  const observedPosterCards = new Map();
+  const queuedPosterKeys = new Set();
+  const loadingPosterKeys = new Set();
+  let posterSampleObserver = null;
+  let posterSampleQueue = [];
+  let posterSampleActive = 0;
+  let posterSampleRenderId = 0;
 
   return {
     renderResults,
@@ -31,6 +38,7 @@ export function createResultsView({
   };
 
   function renderResults(results, { emptyMessage = "Results will appear here." } = {}) {
+    resetPosterSampleLoading();
     resultsEl.textContent = "";
     resultsEl.classList.toggle("empty-state", results.length === 0);
     resultsHeader.hidden = results.length === 0;
@@ -90,9 +98,9 @@ export function createResultsView({
       selectListButton.addEventListener("click", () => onToggleSelectedList(result));
 
       resultsEl.append(node);
+      renderPosterSamples(result);
+      schedulePosterSampleLoad(card, result);
     });
-
-    loadPosterSamplesForResults(results);
   }
 
   function createMediaBadge(result) {
@@ -147,29 +155,77 @@ export function createResultsView({
       .slice(0, 6);
   }
 
-  async function loadPosterSamplesForResults(results) {
-    const queue = results.filter((result) => {
-      const key = getPosterSampleKey(result);
-      return key && !posterSamples.has(key) && canFetchListItems(result);
-    });
+  function resetPosterSampleLoading() {
+    posterSampleRenderId += 1;
+    posterSampleQueue = [];
+    queuedPosterKeys.clear();
+    observedPosterCards.clear();
+    if (posterSampleObserver) {
+      posterSampleObserver.disconnect();
+      posterSampleObserver = null;
+    }
+  }
 
-    if (!queue.length) {
-      results.forEach((result) => renderPosterSamples(result));
+  function schedulePosterSampleLoad(card, result) {
+    const key = getPosterSampleKey(result);
+    if (!key || posterSamples.has(key) || !canFetchListItems(result)) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      enqueuePosterSampleLoad(result, posterSampleRenderId);
       return;
     }
 
-    let cursor = 0;
-    const workers = Array.from({ length: Math.min(posterSampleConcurrency, queue.length) }, async () => {
-      while (cursor < queue.length) {
-        const result = queue[cursor];
-        cursor += 1;
-        await loadPosterSamples(result);
-        renderPosterSamples(result);
-      }
+    observedPosterCards.set(card, result);
+    getPosterSampleObserver().observe(card);
+  }
+
+  function getPosterSampleObserver() {
+    if (posterSampleObserver) return posterSampleObserver;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+
+        const result = observedPosterCards.get(entry.target);
+        observedPosterCards.delete(entry.target);
+        observer.unobserve(entry.target);
+        if (result) enqueuePosterSampleLoad(result, posterSampleRenderId);
+      });
+    }, {
+      rootMargin: "420px 0px",
+      threshold: 0.01,
     });
 
-    await Promise.all(workers);
-    results.forEach((result) => renderPosterSamples(result));
+    posterSampleObserver = observer;
+    return posterSampleObserver;
+  }
+
+  function enqueuePosterSampleLoad(result, renderId) {
+    const key = getPosterSampleKey(result);
+    if (!key || posterSamples.has(key) || queuedPosterKeys.has(key) || loadingPosterKeys.has(key)) return;
+
+    queuedPosterKeys.add(key);
+    posterSampleQueue.push({ key, renderId, result });
+    processPosterSampleQueue();
+  }
+
+  function processPosterSampleQueue() {
+    while (posterSampleActive < posterSampleConcurrency && posterSampleQueue.length) {
+      const item = posterSampleQueue.shift();
+      queuedPosterKeys.delete(item.key);
+      if (item.renderId !== posterSampleRenderId) continue;
+
+      posterSampleActive += 1;
+      loadingPosterKeys.add(item.key);
+      setPosterSamplesLoading(item.result, true);
+
+      loadPosterSamples(item.result).finally(() => {
+        posterSampleActive -= 1;
+        loadingPosterKeys.delete(item.key);
+        renderPosterSamples(item.result);
+        processPosterSampleQueue();
+      });
+    }
   }
 
   async function loadPosterSamples(result) {
@@ -192,6 +248,7 @@ export function createResultsView({
     const sampleWrap = card.querySelector(".poster-samples");
     const posters = posterSamples.get(key) || [];
     sampleWrap.textContent = "";
+    sampleWrap.classList.toggle("loading", loadingPosterKeys.has(key));
 
     for (let index = 0; index < posterSampleLimit; index += 1) {
       const poster = document.createElement("div");
@@ -205,6 +262,15 @@ export function createResultsView({
       }
       sampleWrap.append(poster);
     }
+  }
+
+  function setPosterSamplesLoading(result, isLoading) {
+    const key = getPosterSampleKey(result);
+    if (!key) return;
+
+    const card = resultsEl.querySelector(`[data-sample-key="${CSS.escape(key)}"]`);
+    const sampleWrap = card?.querySelector(".poster-samples");
+    sampleWrap?.classList.toggle("loading", isLoading);
   }
 
   function getPosterSampleKey(result) {
