@@ -340,7 +340,7 @@ export function createNuvioExportUi({ selection }) {
     }
 
     if (isLoading) {
-      mediaTypeStatus.textContent = "Detecting movie/series...";
+      mediaTypeStatus.textContent = "Checking sampled titles for movie/series mix...";
       return;
     }
 
@@ -348,12 +348,17 @@ export function createNuvioExportUi({ selection }) {
       const type = getDetectedMediaType(result);
       summary[type] += 1;
       return summary;
-    }, { MOVIE: 0, TV: 0 });
+    }, { MOVIE: 0, TV: 0, MIXED: 0, UNKNOWN: 0 });
 
     const parts = [];
     if (counts.MOVIE) parts.push(`${formatNumber(counts.MOVIE)} movie`);
     if (counts.TV) parts.push(`${formatNumber(counts.TV)} series`);
-    mediaTypeStatus.textContent = `Source type: ${parts.join(", ")}.`;
+    if (counts.MIXED) parts.push(`${formatNumber(counts.MIXED)} mixed`);
+    if (counts.UNKNOWN) parts.push(`${formatNumber(counts.UNKNOWN)} unknown`);
+    mediaTypeStatus.textContent = `Sampled source type: ${parts.join(", ")}.`;
+    if (counts.MIXED || counts.UNKNOWN) {
+      mediaTypeStatus.textContent += " Mixed/unknown lists export as Movie by default; check those folders in Nuvio.";
+    }
   }
 
   function updateMergeControls() {
@@ -473,12 +478,32 @@ export function createNuvioExportUi({ selection }) {
   function getSelectedListsForExport() {
     return sortNuvioLists(selection.values().map((result) => ({
       ...result,
-      nuvioMediaType: getDetectedMediaType(result),
+      ...getDetectedMediaFields(result),
     })), sortModeSelect.value);
   }
 
   function getDetectedMediaType(result) {
-    return mediaTypeCache.get(getListSelectionKey(result)) || "MOVIE";
+    return getDetectedMediaMetadata(result).type;
+  }
+
+  function getDetectedMediaFields(result) {
+    const metadata = getDetectedMediaMetadata(result);
+    return {
+      nuvioMediaType: metadata.type,
+      mediaTypeDetection: metadata,
+      mediaTypeConfidence: metadata.confidence,
+      mediaTypeScanned: metadata.scanned,
+      mediaTypeTotal: metadata.total,
+      mediaTypeCounts: {
+        movie: metadata.movieCount,
+        tv: metadata.tvCount,
+        other: metadata.otherCount,
+      },
+    };
+  }
+
+  function getDetectedMediaMetadata(result) {
+    return normalizeMediaTypeMetadata(mediaTypeCache.get(getListSelectionKey(result)) || result.mediaTypeDetection || result.nuvioMediaType || result.mediaType);
   }
 
   function getCoverUrl() {
@@ -563,10 +588,10 @@ export function createNuvioExportUi({ selection }) {
         cursor += 1;
         try {
           mediaTypeCache.set(getListSelectionKey(result), await fetchListMediaType(result, {
-            maxPages: 2,
+            maxPages: 3,
           }));
         } catch {
-          mediaTypeCache.set(getListSelectionKey(result), "MOVIE");
+          mediaTypeCache.set(getListSelectionKey(result), getUnknownMediaTypeMetadata());
         }
       }
     });
@@ -625,6 +650,47 @@ export function createNuvioExportUi({ selection }) {
     link.click();
     URL.revokeObjectURL(link.href);
   }
+}
+
+function normalizeMediaTypeMetadata(value) {
+  if (!value) return getUnknownMediaTypeMetadata();
+  if (typeof value === "string") {
+    const type = normalizeMediaTypeValue(value);
+    return {
+      ...getUnknownMediaTypeMetadata(),
+      type,
+      confidence: type === "UNKNOWN" ? "unknown" : "sampled",
+    };
+  }
+
+  return {
+    type: normalizeMediaTypeValue(value.type),
+    confidence: value.confidence || "sampled",
+    scanned: Number(value.scanned || 0),
+    total: value.total === null || value.total === undefined ? null : Number(value.total),
+    movieCount: Number(value.movieCount || 0),
+    tvCount: Number(value.tvCount || 0),
+    otherCount: Number(value.otherCount || 0),
+  };
+}
+
+function normalizeMediaTypeValue(value) {
+  const type = String(value || "").toUpperCase();
+  if (type === "TV" || type === "SHOW" || type === "SERIES") return "TV";
+  if (type === "MOVIE" || type === "MIXED" || type === "UNKNOWN") return type;
+  return "UNKNOWN";
+}
+
+function getUnknownMediaTypeMetadata() {
+  return {
+    type: "UNKNOWN",
+    confidence: "unknown",
+    scanned: 0,
+    total: null,
+    movieCount: 0,
+    tvCount: 0,
+    otherCount: 0,
+  };
 }
 
 function flashButton(button) {

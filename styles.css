@@ -771,6 +771,17 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
+.media-type-badge[data-media-type="mixed"] {
+  border-color: color-mix(in srgb, var(--code) 24%, var(--border));
+  background: color-mix(in srgb, var(--code) 6%, var(--panel));
+}
+
+.media-type-badge[data-media-type="unknown"] {
+  border-color: var(--border);
+  background: var(--soft);
+  color: var(--muted);
+}
+
 .open-link {
   display: inline-grid;
   grid-template-columns: auto auto;

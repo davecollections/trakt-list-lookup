@@ -104,25 +104,26 @@ export function createResultsView({
   }
 
   function createMediaBadge(result) {
-    const mediaType = result.nuvioMediaType || result.mediaType;
+    const mediaType = getMediaTypeValue(result);
     if (!mediaType) return null;
 
     const badge = document.createElement("span");
     badge.className = "media-type-badge";
-    badge.textContent = mediaType === "TV" ? "Series" : "Movie";
+    badge.dataset.mediaType = mediaType.toLowerCase();
+    badge.textContent = getMediaTypeLabel(mediaType);
     return badge;
   }
 
-  function renderQuickUsers(results) {
+  function renderQuickUsers(results, serverQuickUsers = null) {
     quickUserButtons.textContent = "";
-    const users = getPopularUsersFromResults(results);
+    const users = normalizeQuickUsers(serverQuickUsers) || getPopularUsersFromResults(results);
     quickUsers.hidden = users.length === 0;
 
     users.forEach((user) => {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = `@${user.username}`;
-      button.title = `${formatNumber(user.lists)} list${user.lists === 1 ? "" : "s"} in results`;
+      button.title = getQuickUserTitle(user);
       button.addEventListener("click", () => onLoadUserLists(user.username));
       quickUserButtons.append(button);
     });
@@ -144,15 +145,36 @@ export function createResultsView({
     results.forEach((result) => {
       const username = result.user?.username;
       if (!username) return;
-      const existing = users.get(username) || { username, lists: 0, likes: 0 };
-      existing.lists += 1;
-      existing.likes += Number(result.like_count || 0);
+      const existing = users.get(username) || { username, listCount: 0, likeCount: 0 };
+      existing.listCount += 1;
+      existing.likeCount += Number(result.like_count || 0);
       users.set(username, existing);
     });
 
     return [...users.values()]
-      .sort((a, b) => compareNumber(b.likes, a.likes) || compareNumber(b.lists, a.lists) || compareText(a.username, b.username))
+      .sort((a, b) => compareNumber(b.likeCount, a.likeCount) || compareNumber(b.listCount, a.listCount) || compareText(a.username, b.username))
       .slice(0, 6);
+  }
+
+  function normalizeQuickUsers(value) {
+    if (!Array.isArray(value)) return null;
+    return value
+      .filter((user) => user?.username)
+      .map((user) => ({
+        username: user.username,
+        name: user.name || "",
+        listCount: Number(user.listCount || 0),
+        likeCount: Number(user.likeCount || 0),
+        itemCount: Number(user.itemCount || 0),
+        topListName: user.topListName || "",
+      }));
+  }
+
+  function getQuickUserTitle(user) {
+    const listText = `${formatNumber(user.listCount)} list${user.listCount === 1 ? "" : "s"} in sampled matching results`;
+    const likeText = user.likeCount ? `${formatNumber(user.likeCount)} likes` : "";
+    const topListText = user.topListName ? `Top list: ${user.topListName}` : "";
+    return [user.name || "", listText, likeText, topListText].filter(Boolean).join(" | ");
   }
 
   function resetPosterSampleLoading() {
@@ -296,4 +318,18 @@ function flashButton(button) {
   window.setTimeout(() => {
     button.textContent = original;
   }, 900);
+}
+
+function getMediaTypeValue(result) {
+  const value = String(result?.mediaTypeDetection?.type || result?.nuvioMediaType || result?.mediaType || "").toUpperCase();
+  if (value === "TV" || value === "SHOW" || value === "SERIES") return "TV";
+  if (value === "MOVIE" || value === "MIXED" || value === "UNKNOWN") return value;
+  return "";
+}
+
+function getMediaTypeLabel(value) {
+  if (value === "TV") return "Series";
+  if (value === "MIXED") return "Mixed";
+  if (value === "UNKNOWN") return "Unknown";
+  return "Movie";
 }

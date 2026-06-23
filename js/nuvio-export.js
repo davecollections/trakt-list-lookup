@@ -245,6 +245,7 @@ function getNuvioSourceSignature(source) {
 function getNuvioMediaType(result) {
   const value = String(result?.nuvioMediaType || result?.mediaType || "").toUpperCase();
   if (value === "TV" || value === "SHOW" || value === "SERIES") return "TV";
+  if (value === "MIXED" || value === "UNKNOWN") return "MOVIE";
   return "MOVIE";
 }
 

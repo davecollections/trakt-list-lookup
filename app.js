@@ -201,7 +201,7 @@ async function runSearch(page) {
     state.pagination = payload.pagination || null;
     applyCachedMediaTypes(results);
     renderCurrentResults();
-    resultsView.renderQuickUsers(results);
+    resultsView.renderQuickUsers(results, payload.quickUsers);
     resultsView.renderPagination(state.pagination, state.page);
     if (state.mediaTypeFilter === "all") {
       updateMediaFilterStatus();
@@ -264,6 +264,7 @@ function setStatus(message, isError = false) {
 async function detectMediaTypesForResults(results) {
   const requestId = ++mediaTypeRequestId;
   applyCachedMediaTypes(results);
+  applyUnsampledMediaTypes(results);
 
   const missing = results.filter((result) => {
     const key = getMediaTypeCacheKey(result);
@@ -290,7 +291,7 @@ async function detectMediaTypesForResults(results) {
       try {
         mediaTypeCache.set(key, await fetchListMediaType(result));
       } catch {
-        mediaTypeCache.set(key, "MOVIE");
+        mediaTypeCache.set(key, getUnknownMediaTypeMetadata());
       }
     }
   });
@@ -307,8 +308,21 @@ async function detectMediaTypesForResults(results) {
 function applyCachedMediaTypes(results) {
   results.forEach((result) => {
     const key = getMediaTypeCacheKey(result);
-    const mediaType = mediaTypeCache.get(key);
-    if (mediaType) result.nuvioMediaType = mediaType;
+    const metadata = normalizeMediaTypeMetadata(mediaTypeCache.get(key));
+    if (metadata) applyMediaTypeMetadata(result, metadata);
+  });
+}
+
+function applyUnsampledMediaTypes(results) {
+  results.forEach((result) => {
+    if (result.mediaTypeDetection || result.nuvioMediaType || result.mediaType) return;
+
+    const key = getMediaTypeCacheKey(result);
+    if (key && canFetchListItems(result)) return;
+
+    const metadata = getUnknownMediaTypeMetadata();
+    if (key) mediaTypeCache.set(key, metadata);
+    applyMediaTypeMetadata(result, metadata);
   });
 }
 
@@ -316,16 +330,81 @@ function getMediaTypeCacheKey(result) {
   return result?.ids?.trakt ? String(result.ids.trakt) : result?.url || "";
 }
 
+function normalizeMediaTypeMetadata(value) {
+  if (!value) return null;
+  if (typeof value === "string") {
+    return {
+      ...getUnknownMediaTypeMetadata(),
+      type: normalizeMediaTypeValue(value),
+      confidence: value === "UNKNOWN" ? "unknown" : "sampled",
+    };
+  }
+
+  return {
+    type: normalizeMediaTypeValue(value.type),
+    confidence: value.confidence || "sampled",
+    scanned: Number(value.scanned || 0),
+    total: value.total === null || value.total === undefined ? null : Number(value.total),
+    movieCount: Number(value.movieCount || 0),
+    tvCount: Number(value.tvCount || 0),
+    otherCount: Number(value.otherCount || 0),
+  };
+}
+
+function applyMediaTypeMetadata(result, metadata) {
+  result.nuvioMediaType = metadata.type;
+  result.mediaTypeDetection = metadata;
+  result.mediaTypeConfidence = metadata.confidence;
+  result.mediaTypeScanned = metadata.scanned;
+  result.mediaTypeTotal = metadata.total;
+  result.mediaTypeCounts = {
+    movie: metadata.movieCount,
+    tv: metadata.tvCount,
+    other: metadata.otherCount,
+  };
+}
+
+function getResultMediaType(result) {
+  return normalizeMediaTypeValue(result?.mediaTypeDetection?.type || result?.nuvioMediaType || result?.mediaType || "UNKNOWN");
+}
+
+function getFilterMediaType(value) {
+  if (value === "tv") return "TV";
+  if (value === "mixed") return "MIXED";
+  return "MOVIE";
+}
+
+function normalizeMediaTypeValue(value) {
+  const type = String(value || "").toUpperCase();
+  if (type === "TV" || type === "SHOW" || type === "SERIES") return "TV";
+  if (type === "MIXED") return "MIXED";
+  if (type === "MOVIE") return "MOVIE";
+  return "UNKNOWN";
+}
+
+function getUnknownMediaTypeMetadata() {
+  return {
+    type: "UNKNOWN",
+    confidence: "unknown",
+    scanned: 0,
+    total: null,
+    movieCount: 0,
+    tvCount: 0,
+    otherCount: 0,
+  };
+}
+
 function getMediaFilteredResults() {
   if (state.mediaTypeFilter === "all") return state.results;
-  const target = state.mediaTypeFilter === "tv" ? "TV" : "MOVIE";
-  return state.results.filter((result) => result.nuvioMediaType === target);
+  const target = getFilterMediaType(state.mediaTypeFilter);
+  return state.results.filter((result) => getResultMediaType(result) === target);
 }
 
 function getResultsEmptyMessage() {
   if (!state.results.length) return "Results will appear here.";
-  if (state.mediaTypeFilter === "movie") return state.mediaTypeLoading ? "Detecting movie lists on this page..." : "No movie lists detected on this page.";
-  if (state.mediaTypeFilter === "tv") return state.mediaTypeLoading ? "Detecting series lists on this page..." : "No series lists detected on this page.";
+  if (state.mediaTypeFilter === "movie") return state.mediaTypeLoading ? "Checking sampled titles..." : "No movie lists detected from the sampled titles on this page.";
+  if (state.mediaTypeFilter === "tv") return state.mediaTypeLoading ? "Checking sampled titles..." : "No series lists detected from the sampled titles on this page.";
+  if (state.mediaTypeFilter === "mixed") return state.mediaTypeLoading ? "Checking sampled titles..." : "No mixed lists detected from the sampled titles on this page.";
   return "No matching public lists found.";
 }
 
@@ -335,10 +414,11 @@ function updateMediaFilterStatus() {
     return;
   }
 
-  const detected = state.results.filter((result) => result.nuvioMediaType).length;
-  const movieCount = state.results.filter((result) => result.nuvioMediaType === "MOVIE").length;
-  const tvCount = state.results.filter((result) => result.nuvioMediaType === "TV").length;
-  const unknownCount = Math.max(state.results.length - detected, 0);
+  const detected = state.results.filter((result) => result.mediaTypeDetection).length;
+  const movieCount = state.results.filter((result) => getResultMediaType(result) === "MOVIE").length;
+  const tvCount = state.results.filter((result) => getResultMediaType(result) === "TV").length;
+  const mixedCount = state.results.filter((result) => getResultMediaType(result) === "MIXED").length;
+  const unknownCount = state.results.filter((result) => getResultMediaType(result) === "UNKNOWN").length;
   const visibleCount = getMediaFilteredResults().length;
 
   if (state.mediaTypeFilter === "all" && !detected) {
@@ -347,17 +427,18 @@ function updateMediaFilterStatus() {
   }
 
   if (state.mediaTypeLoading) {
-    mediaFilterStatus.textContent = `Detecting page media: ${formatNumber(detected)}/${formatNumber(state.results.length)}`;
+    mediaFilterStatus.textContent = `Checking sampled titles: ${formatNumber(detected)}/${formatNumber(state.results.length)} lists`;
     return;
   }
 
   const countText = [
     `${formatNumber(movieCount)} movie`,
     `${formatNumber(tvCount)} series`,
-    unknownCount ? `${formatNumber(unknownCount)} unknown` : "",
+    `${formatNumber(mixedCount)} mixed`,
+    `${formatNumber(unknownCount)} unknown`,
   ].filter(Boolean).join(", ");
   mediaFilterStatus.textContent = state.mediaTypeFilter === "all"
-    ? `This page: ${countText}`
+    ? `Detected from sampled titles on this page: ${countText}`
     : `Showing ${formatNumber(visibleCount)} of ${formatNumber(state.results.length)} on this page`;
 }
 

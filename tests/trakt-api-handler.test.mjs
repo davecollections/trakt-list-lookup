@@ -11,6 +11,8 @@ try {
   await testRateLimit();
   await testSortedRequestsAreWeighted();
   await testPopularPaginationAllowsPosterSamples();
+  await testQuickUsersFromSampledPages();
+  await testQuickUsersFailureStillReturnsResults();
   await testUpstreamNonJsonIsGeneric();
   await testUpstreamForbiddenDoesNotExposeBody();
   await testSearchIncludesCuratedOwnerFallback();
@@ -136,6 +138,57 @@ async function testPopularPaginationAllowsPosterSamples() {
   assert.equal(response.status, 200);
 }
 
+async function testQuickUsersFromSampledPages() {
+  mockFetch(({ url }) => {
+    if (url.pathname !== "/lists/popular") throw new Error(`Unexpected path ${url.pathname}`);
+
+    const limit = url.searchParams.get("limit");
+    const page = url.searchParams.get("page");
+    if (limit === "30") return jsonResponse([list({ username: "visible", likes: 1 })], paginationHeaders(75, 3, 30));
+    if (limit === "50" && page === "1") {
+      return jsonResponse([
+        list({ name: "A One", username: "creator-a", trakt: 201, likes: 10, items: 4 }),
+        list({ name: "B One", username: "creator-b", trakt: 202, likes: 5, items: 8 }),
+      ], paginationHeaders(75, 2, 50));
+    }
+    if (limit === "50" && page === "2") {
+      return jsonResponse([
+        list({ name: "A Two", username: "creator-a", trakt: 203, likes: 7, items: 6 }),
+        list({ name: "C One", username: "creator-c", trakt: 204, likes: 30, items: 10 }),
+      ], paginationHeaders(75, 2, 50));
+    }
+    throw new Error(`Unexpected popular request ${url.search}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.quickUsers.map((user) => user.username), ["creator-c", "creator-a", "creator-b"]);
+  assert.equal(body.quickUsers[0].likeCount, 30);
+  assert.equal(body.quickUsers[1].listCount, 2);
+  assert.equal(body.quickUsers[1].itemCount, 10);
+  assert.equal(body.quickUsers[1].topListName, "A One");
+  assert.equal(body.quickUsers[1].topListId, 201);
+}
+
+async function testQuickUsersFailureStillReturnsResults() {
+  const response = await withMutedConsole(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname !== "/lists/trending") throw new Error(`Unexpected path ${url.pathname}`);
+      if (url.searchParams.get("limit") === "50") throw new Error("Summary failed");
+      return jsonResponse([list({ name: "Trending", username: "demo", trakt: 222 })], paginationHeaders(1, 1));
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=trending", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results.length, 1);
+  assert.equal(body.quickUsers, undefined);
+}
+
 async function testUpstreamNonJsonIsGeneric() {
   const response = await withMutedConsoleError(async () => {
     mockFetch(() => new Response("<html>Temporarily unavailable</html>", {
@@ -247,6 +300,8 @@ async function testResolveListUrl() {
     page_count: 1,
     item_count: 1,
   });
+  assert.deepEqual(body.quickUsers.map((user) => user.username), ["snoak"]);
+  assert.equal(body.quickUsers[0].topListName, "Demo");
 }
 
 async function testListItems() {
@@ -344,11 +399,11 @@ function jsonResponse(payload, headers = {}) {
   });
 }
 
-function paginationHeaders(itemCount) {
+function paginationHeaders(itemCount, pageCount = itemCount ? 1 : 0, limit = 30) {
   return {
     "x-pagination-page": "1",
-    "x-pagination-limit": "30",
-    "x-pagination-page-count": itemCount ? "1" : "0",
+    "x-pagination-limit": String(limit),
+    "x-pagination-page-count": String(pageCount),
     "x-pagination-item-count": String(itemCount),
   };
 }
@@ -376,17 +431,31 @@ async function withMutedConsoleError(callback) {
   }
 }
 
+async function withMutedConsole(callback) {
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  console.error = () => {};
+  console.warn = () => {};
+  try {
+    return await callback();
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+}
+
 function list({
   name = "Demo List",
   slug = "demo-list",
   username = "snoak",
   trakt = 100,
   likes = 0,
+  items = 3,
 } = {}) {
   return {
     name,
     description: "",
-    item_count: 3,
+    item_count: items,
     like_count: likes,
     updated_at: "2024-01-01T00:00:00.000Z",
     ids: {

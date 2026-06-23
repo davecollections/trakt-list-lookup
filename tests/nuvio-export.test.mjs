@@ -47,6 +47,22 @@ const seriesExport = buildNuvioExport({
 assert.equal(seriesExport[0].folders[0].sources[0].mediaType, "TV");
 
 nextId = 0;
+const uncertainMediaExport = buildNuvioExport({
+  lists: [
+    {
+      ...list("Mixed Shelf", 106),
+      nuvioMediaType: "MIXED",
+    },
+    {
+      ...list("Unknown Shelf", 107),
+      nuvioMediaType: "UNKNOWN",
+    },
+  ],
+  createId,
+});
+assert.deepEqual(uncertainMediaExport[0].folders.map((folder) => folder.sources[0].mediaType), ["MOVIE", "MOVIE"]);
+
+nextId = 0;
 const imageExport = buildNuvioExport({
   lists,
   collectionName: "Image Picks",

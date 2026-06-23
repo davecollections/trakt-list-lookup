@@ -22,6 +22,9 @@ const MAX_PAGE = 25;
 const USER_FILTER_LIMIT = 100;
 const SORT_FETCH_LIMIT = 50;
 const SORT_MAX_ITEMS = 250;
+const QUICK_USER_SAMPLE_LIMIT = 250;
+const QUICK_USER_FETCH_LIMIT = 50;
+const QUICK_USER_LIMIT = 6;
 const CURATED_USER_FALLBACKS = ["snoak", "extreme_one"];
 
 export async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
@@ -42,6 +45,7 @@ export async function getSortedLists(mode, query, page, limit, sort, order, clie
   const data = lists.slice(start, start + limit);
   return {
     data,
+    quickUserLists: lists,
     pagination: {
       page,
       limit,
@@ -125,6 +129,7 @@ export async function resolveListUrl(value, clientId) {
     const payload = await traktFetch(`/users/${username}/lists/${slug}?extended=full`, clientId);
     return {
       data: [payload.data],
+      quickUserLists: [payload.data],
       pagination: singleResultPagination(),
     };
   }
@@ -133,11 +138,116 @@ export async function resolveListUrl(value, clientId) {
     const payload = await traktFetch(`/lists/${encodeURIComponent(parsed.id)}?extended=full`, clientId);
     return {
       data: [payload.data],
+      quickUserLists: [payload.data],
       pagination: singleResultPagination(),
     };
   }
 
   throw httpError("Unsupported Trakt list URL.", 400);
+}
+
+export async function getQuickUsersForPayload(mode, query, payload, clientId) {
+  const lists = payload.quickUserLists || await getQuickUserSampleLists(mode, query, clientId);
+  return buildQuickUsers(lists);
+}
+
+async function getQuickUserSampleLists(mode, query, clientId) {
+  if (mode === "url") return [];
+
+  const firstPage = await getListPayload(mode, query, 1, QUICK_USER_FETCH_LIMIT, clientId);
+  const pageCount = Math.min(
+    firstPage.pagination?.page_count || 1,
+    Math.ceil(QUICK_USER_SAMPLE_LIMIT / QUICK_USER_FETCH_LIMIT),
+    MAX_PAGE,
+  );
+  const pages = [firstPage];
+
+  for (let nextPage = 2; nextPage <= pageCount; nextPage += 1) {
+    pages.push(await getListPayload(mode, query, nextPage, QUICK_USER_FETCH_LIMIT, clientId));
+  }
+
+  return dedupeLists(pages.flatMap((page) => page.data)).slice(0, QUICK_USER_SAMPLE_LIMIT);
+}
+
+function buildQuickUsers(lists) {
+  const users = new Map();
+
+  (lists || []).forEach((list) => {
+    const normalized = list ? {
+      ...list,
+      user: list.user || {},
+      ids: list.ids || {},
+    } : null;
+    const username = normalized?.user?.username || normalized?.user?.ids?.slug || "";
+    if (!username) return;
+
+    const key = username.toLowerCase();
+    const existing = users.get(key) || {
+      username,
+      name: normalized.user.name || "",
+      listCount: 0,
+      likeCount: 0,
+      itemCount: 0,
+      topList: null,
+    };
+
+    const likeCount = normalizeCount(normalized.like_count);
+    const itemCount = normalizeCount(normalized.item_count);
+    existing.listCount += 1;
+    existing.likeCount += likeCount;
+    existing.itemCount += itemCount;
+    if (!existing.name && normalized.user.name) existing.name = normalized.user.name;
+
+    if (isBetterTopList(normalized, existing.topList)) {
+      existing.topList = normalized;
+    }
+
+    users.set(key, existing);
+  });
+
+  return [...users.values()]
+    .sort((a, b) => compareQuickUsers(a, b))
+    .slice(0, QUICK_USER_LIMIT)
+    .map((user) => {
+      const topList = user.topList || {};
+      return {
+        username: user.username,
+        name: user.name,
+        listCount: user.listCount,
+        likeCount: user.likeCount,
+        itemCount: user.itemCount,
+        topListName: topList.name || "",
+        topListId: topList.ids?.trakt || null,
+        topListUrl: getListUrl(topList),
+      };
+    });
+}
+
+function compareQuickUsers(a, b) {
+  return normalizeCount(b.likeCount) - normalizeCount(a.likeCount)
+    || normalizeCount(b.listCount) - normalizeCount(a.listCount)
+    || String(a.username).localeCompare(String(b.username), undefined, { sensitivity: "base" });
+}
+
+function isBetterTopList(candidate, current) {
+  if (!current) return true;
+  return normalizeCount(candidate.like_count) > normalizeCount(current.like_count)
+    || (
+      normalizeCount(candidate.like_count) === normalizeCount(current.like_count)
+      && normalizeCount(candidate.item_count) > normalizeCount(current.item_count)
+    );
+}
+
+function getListUrl(list) {
+  const username = list?.user?.username || list?.user?.ids?.slug || "";
+  const slug = list?.ids?.slug || "";
+  if (username && slug) return `https://trakt.tv/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}`;
+  return list?.ids?.trakt ? `https://trakt.tv/lists/${list.ids.trakt}` : "";
+}
+
+function normalizeCount(value) {
+  const number = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
 async function getCuratedUserSearchMatches(query, existingResults, clientId) {

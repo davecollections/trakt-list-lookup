@@ -12,6 +12,7 @@ import { checkRateLimit } from "../lib/rate-limit.js";
 import { enrichItemsWithTmdbPosters } from "../lib/tmdb-client.js";
 import {
   getGlobalLists,
+  getQuickUsersForPayload,
   getSortedLists,
   getUserLists,
   resolveListUrl,
@@ -94,11 +95,15 @@ export async function onRequestGet({ request, env }) {
     }
 
     const lists = await enrichListsWithLikeCounts(payload.data, clientId);
+    const quickUsers = await getQuickUsers(mode, query, payload, clientId);
 
-    return json({
+    const responsePayload = {
       results: lists.map(normalizeList).filter(Boolean),
       pagination: payload.pagination,
-    }, 200, true);
+    };
+    if (quickUsers) responsePayload.quickUsers = quickUsers;
+
+    return json(responsePayload, 200, true);
   } catch (error) {
     const status = error.status || 502;
     return json({ error: getPublicErrorMessage(error, status) }, status);
@@ -116,4 +121,16 @@ function shouldIncludePosters(url) {
 function getRequestRateLimitCost(mode, sort) {
   if (sort && mode !== "url") return SORT_REQUEST_COST;
   return 1;
+}
+
+async function getQuickUsers(mode, query, payload, clientId) {
+  try {
+    return await getQuickUsersForPayload(mode, query, payload, clientId);
+  } catch (error) {
+    console.warn("Could not build quick user summary", {
+      mode,
+      message: error.message,
+    });
+    return null;
+  }
 }
