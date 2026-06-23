@@ -8,6 +8,7 @@ import {
   normalizeSortOrder,
 } from "../lib/trakt-api-helpers.js";
 import { getPublicErrorMessage, json } from "../lib/http-response.js";
+import { checkRateLimit } from "../lib/rate-limit.js";
 import { enrichItemsWithTmdbPosters } from "../lib/tmdb-client.js";
 import {
   getGlobalLists,
@@ -29,6 +30,11 @@ const MAX_ITEM_LIMIT = 15;
 const MAX_QUERY_LENGTH = 220;
 
 export async function onRequestGet({ request, env }) {
+  const rateLimit = checkRateLimit(request, env);
+  if (!rateLimit.allowed) {
+    return json({ error: "Too many requests. Try again shortly." }, 429, false, rateLimit.headers);
+  }
+
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode") || "search";
   const query = (url.searchParams.get("q") || "").trim();

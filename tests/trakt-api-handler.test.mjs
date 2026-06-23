@@ -7,6 +7,7 @@ try {
   await testMissingClientId();
   await testMissingQuery();
   await testUnsupportedMode();
+  await testRateLimit();
   await testResolveListUrl();
   await testListItems();
   await testListItemsWithoutPosters();
@@ -36,6 +37,27 @@ async function testUnsupportedMode() {
 
   assert.equal(response.status, 400);
   assert.equal(body.error, "Unsupported search mode.");
+}
+
+async function testRateLimit() {
+  const testEnv = {
+    ...env(),
+    API_RATE_LIMIT_PER_MINUTE: "2",
+  };
+  const headers = {
+    "CF-Connecting-IP": "203.0.113.10",
+  };
+
+  await callHandler("https://example.test/api/trakt?mode=search", testEnv, headers);
+  await callHandler("https://example.test/api/trakt?mode=search", testEnv, headers);
+  const response = await callHandler("https://example.test/api/trakt?mode=search", testEnv, headers);
+  const body = await response.json();
+
+  assert.equal(response.status, 429);
+  assert.equal(body.error, "Too many requests. Try again shortly.");
+  assert.equal(response.headers.get("X-RateLimit-Limit"), "2");
+  assert.equal(response.headers.get("X-RateLimit-Remaining"), "0");
+  assert.ok(Number(response.headers.get("Retry-After")) > 0);
 }
 
 async function testResolveListUrl() {
@@ -156,9 +178,9 @@ function jsonResponse(payload, headers = {}) {
   });
 }
 
-function callHandler(url, testEnv) {
+function callHandler(url, testEnv, headers = {}) {
   return onRequestGet({
-    request: new Request(url),
+    request: new Request(url, { headers }),
     env: testEnv,
   });
 }

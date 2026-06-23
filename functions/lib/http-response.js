@@ -5,7 +5,7 @@ export function getPublicErrorMessage(error, status) {
   return error.message || "Trakt request failed.";
 }
 
-export function json(payload, status = 200, cacheable = false) {
+export function json(payload, status = 200, cacheable = false, headers = {}) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
@@ -13,6 +13,7 @@ export function json(payload, status = 200, cacheable = false) {
       "Cache-Control": cacheable
         ? `public, max-age=${SUCCESS_CACHE_SECONDS}, s-maxage=${SUCCESS_CACHE_SECONDS}`
         : "no-store",
+      ...headers,
     },
   });
 }

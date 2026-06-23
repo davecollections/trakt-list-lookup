@@ -36,6 +36,7 @@ export function openModal(modal, { focusTarget = null, onClose = null } = {}) {
   if (!modalStack.includes(modal)) {
     modalStack.push(modal);
   }
+  syncModalStack();
 
   if (onClose) {
     modalCloseHandlers.set(modal, onClose);
@@ -58,6 +59,8 @@ export function closeModal(modal) {
   if (stackIndex !== -1) {
     modalStack.splice(stackIndex, 1);
   }
+  resetModalAccessibility(modal);
+  syncModalStack();
 
   const returnTarget = modalReturnFocus.get(modal);
   modalReturnFocus.delete(modal);
@@ -99,6 +102,29 @@ function getTopModal() {
     if (modal && !modal.hidden) return modal;
   }
   return null;
+}
+
+function syncModalStack() {
+  const topModal = getTopModal();
+
+  modalStack.forEach((modal) => {
+    const isTop = modal === topModal && !modal.hidden;
+    const dialog = modal.querySelector('[role="dialog"]');
+    modal.inert = !isTop;
+    if (!dialog) return;
+
+    dialog.setAttribute("aria-modal", isTop ? "true" : "false");
+    dialog.toggleAttribute("aria-hidden", !isTop);
+  });
+}
+
+function resetModalAccessibility(modal) {
+  modal.inert = false;
+  const dialog = modal.querySelector('[role="dialog"]');
+  if (!dialog) return;
+
+  dialog.setAttribute("aria-modal", "true");
+  dialog.removeAttribute("aria-hidden");
 }
 
 function getFocusTarget(target) {
