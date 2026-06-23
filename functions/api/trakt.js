@@ -29,13 +29,12 @@ const MAX_PAGE = 25;
 const MAX_ITEM_LIMIT = 15;
 const MAX_QUERY_LENGTH = 220;
 const SORT_REQUEST_COST = 8;
-const POSTER_ITEM_REQUEST_COST = 2;
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode") || "search";
   const sort = normalizeSort(url.searchParams.get("sort"));
-  const rateLimit = checkRateLimit(request, env, getRequestRateLimitCost(url, mode, sort));
+  const rateLimit = checkRateLimit(request, env, getRequestRateLimitCost(mode, sort));
   if (!rateLimit.allowed) {
     return json({ error: "Too many requests. Try again shortly." }, 429, false, rateLimit.headers);
   }
@@ -114,8 +113,7 @@ function shouldIncludePosters(url) {
   return url.searchParams.get("posters") !== "0";
 }
 
-function getRequestRateLimitCost(url, mode, sort) {
+function getRequestRateLimitCost(mode, sort) {
   if (sort && mode !== "url") return SORT_REQUEST_COST;
-  if (mode === "items" && shouldIncludePosters(url)) return POSTER_ITEM_REQUEST_COST;
   return 1;
 }

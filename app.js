@@ -103,6 +103,13 @@ document.querySelectorAll("input[name='mode']").forEach((radio) => {
 document.querySelectorAll("input[name='media-type']").forEach((radio) => {
   radio.addEventListener("change", () => {
     state.mediaTypeFilter = getMediaTypeFilter();
+    if (state.mediaTypeFilter !== "all") {
+      detectMediaTypesForResults(state.results);
+      return;
+    }
+
+    state.mediaTypeLoading = false;
+    mediaTypeRequestId += 1;
     renderCurrentResults();
     updateMediaFilterStatus();
   });
@@ -192,10 +199,15 @@ async function runSearch(page) {
     const results = payload.results || [];
     state.results = results;
     state.pagination = payload.pagination || null;
+    applyCachedMediaTypes(results);
     renderCurrentResults();
     resultsView.renderQuickUsers(results);
     resultsView.renderPagination(state.pagination, state.page);
-    detectMediaTypesForResults(results);
+    if (state.mediaTypeFilter === "all") {
+      updateMediaFilterStatus();
+    } else {
+      detectMediaTypesForResults(results);
+    }
 
     const total = state.pagination?.item_count;
     const countText = total ? `${formatNumber(total)} total` : `${results.length} on this page`;
@@ -266,6 +278,7 @@ async function detectMediaTypesForResults(results) {
   }
 
   state.mediaTypeLoading = true;
+  renderCurrentResults();
   updateMediaFilterStatus();
 
   let cursor = 0;
@@ -327,6 +340,11 @@ function updateMediaFilterStatus() {
   const tvCount = state.results.filter((result) => result.nuvioMediaType === "TV").length;
   const unknownCount = Math.max(state.results.length - detected, 0);
   const visibleCount = getMediaFilteredResults().length;
+
+  if (state.mediaTypeFilter === "all" && !detected) {
+    mediaFilterStatus.textContent = "";
+    return;
+  }
 
   if (state.mediaTypeLoading) {
     mediaFilterStatus.textContent = `Detecting page media: ${formatNumber(detected)}/${formatNumber(state.results.length)}`;

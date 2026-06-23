@@ -47,6 +47,7 @@ export async function fetchPosterPreviewItems(result, {
 
 export async function fetchPosterSampleUrls(result, { targetCount = 3 } = {}) {
   const preview = await fetchPosterPreviewItems(result, {
+    pageLimit: Math.max(targetCount * 2, targetCount),
     targetCount,
     maxPages: 1,
   });

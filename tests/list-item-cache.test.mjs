@@ -49,7 +49,7 @@ try {
 
   const samples = await fetchPosterSampleUrls(list(), { targetCount: 1 });
   assert.deepEqual(samples, ["https://image.test/one.jpg"]);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
 } finally {
   globalThis.fetch = originalFetch;
   clearListItemCache();

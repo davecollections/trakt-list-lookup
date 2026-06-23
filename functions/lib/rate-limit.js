@@ -1,6 +1,6 @@
 const WINDOW_MS = 60 * 1000;
 const CLEANUP_INTERVAL_MS = 60 * 1000;
-const DEFAULT_LIMIT = 80;
+const DEFAULT_LIMIT = 180;
 const MAX_LIMIT = 600;
 
 const buckets = new Map();

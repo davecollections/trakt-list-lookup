@@ -10,6 +10,7 @@ try {
   await testUnsupportedMode();
   await testRateLimit();
   await testSortedRequestsAreWeighted();
+  await testPopularPaginationAllowsPosterSamples();
   await testUpstreamNonJsonIsGeneric();
   await testUpstreamForbiddenDoesNotExposeBody();
   await testSearchIncludesCuratedOwnerFallback();
@@ -94,6 +95,45 @@ async function testSortedRequestsAreWeighted() {
   assert.equal(secondResponse.status, 429);
   assert.equal(secondBody.error, "Too many requests. Try again shortly.");
   assert.equal(calls.length, 1);
+}
+
+async function testPopularPaginationAllowsPosterSamples() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") return jsonResponse([]);
+    if (url.pathname.includes("/items")) {
+      return jsonResponse([
+        {
+          rank: 1,
+          type: "movie",
+          movie: {
+            title: "Sample",
+            year: 2024,
+            ids: {
+              trakt: 1,
+            },
+          },
+        },
+      ]);
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const testEnv = {
+    ...env(),
+    API_RATE_LIMIT_PER_MINUTE: "40",
+  };
+  const headers = {
+    "CF-Connecting-IP": "203.0.113.30",
+  };
+
+  await callHandler("https://example.test/api/trakt?mode=popular&page=1", testEnv, headers);
+  for (let index = 0; index < 30; index += 1) {
+    const response = await callHandler(`https://example.test/api/trakt?mode=items&user=user${index}&slug=list-${index}`, testEnv, headers);
+    assert.equal(response.status, 200);
+  }
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular&page=2", testEnv, headers);
+  assert.equal(response.status, 200);
 }
 
 async function testUpstreamNonJsonIsGeneric() {
