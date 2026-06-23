@@ -123,6 +123,54 @@ assert.equal(mappedExport.length, 2);
 assert.equal(mappedExport[0].folders.length, 2);
 assert.equal(mappedExport[1].folders.length, 1);
 
+nextId = 0;
+const existingWithDuplicate = [
+  {
+    id: "collection-a",
+    title: "A",
+    folders: [
+      {
+        id: "existing-folder",
+        title: "Already Added",
+        sources: [
+          {
+            provider: "trakt",
+            mediaType: "MOVIE",
+            traktListId: 101,
+          },
+        ],
+      },
+    ],
+  },
+];
+const duplicateSafeExport = buildNuvioExport({
+  lists: [list("Comedy Nights", 101), list("Horror Finds", 102)],
+  existing: existingWithDuplicate,
+  mode: "existing",
+  targetCollectionKey: "collection-a",
+  createId,
+});
+assert.equal(duplicateSafeExport[0].folders.length, 2);
+assert.deepEqual(duplicateSafeExport[0].folders.map((folder) => folder.title), ["Already Added", "Horror Finds"]);
+
+nextId = 0;
+const duplicateSafeMappedExport = buildNuvioExport({
+  lists,
+  existing: [
+    existingWithDuplicate[0],
+    { id: "collection-b", title: "B", folders: [] },
+  ],
+  mode: "mapped",
+  mappedAssignments: {
+    101: "collection-a",
+    102: "collection-b",
+    103: "collection-a",
+  },
+  createId,
+});
+assert.deepEqual(duplicateSafeMappedExport[0].folders.map((folder) => folder.title), ["Already Added", "More Comedy"]);
+assert.deepEqual(duplicateSafeMappedExport[1].folders.map((folder) => folder.title), ["Horror Finds"]);
+
 function list(name, traktId) {
   return {
     name,

@@ -131,7 +131,7 @@ function mergeFoldersIntoExistingCollection(existing, foldersToAdd, targetCollec
     matched = true;
     return {
       ...collection,
-      folders: [...(collection.folders || []), ...foldersToAdd],
+      folders: appendUniqueNuvioFolders(collection.folders || [], foldersToAdd),
     };
   });
 
@@ -157,7 +157,7 @@ function mergeFoldersByListMapping(existing, lists, mappedAssignments, targetCol
     if (!folders?.length) return collection;
     return {
       ...collection,
-      folders: [...(collection.folders || []), ...folders],
+      folders: appendUniqueNuvioFolders(collection.folders || [], folders),
     };
   });
 }
@@ -197,6 +197,49 @@ function createNuvioTraktSource(result) {
     mediaType: getNuvioMediaType(result),
     traktListId: Number(result.ids?.trakt || 0) || null,
   };
+}
+
+function appendUniqueNuvioFolders(existingFolders, foldersToAdd) {
+  const signatures = new Set(existingFolders.map(getNuvioFolderSignature).filter(Boolean));
+  const uniqueFolders = [];
+
+  for (const folder of foldersToAdd) {
+    const signature = getNuvioFolderSignature(folder);
+    if (signature && signatures.has(signature)) continue;
+    if (signature) signatures.add(signature);
+    uniqueFolders.push(folder);
+  }
+
+  return [...existingFolders, ...uniqueFolders];
+}
+
+function getNuvioFolderSignature(folder) {
+  const sourceSignatures = (folder?.sources || [])
+    .map(getNuvioSourceSignature)
+    .filter(Boolean);
+
+  return sourceSignatures.length ? sourceSignatures.join(";") : folder?.id || folder?.title || "";
+}
+
+function getNuvioSourceSignature(source) {
+  if (!source) return "";
+
+  if (source.provider === "trakt" && source.traktListId) {
+    return JSON.stringify({
+      mediaType: source.mediaType || "",
+      provider: "trakt",
+      traktListId: Number(source.traktListId),
+    });
+  }
+
+  return JSON.stringify({
+    mediaType: source.mediaType || "",
+    provider: source.provider || "",
+    sortBy: source.sortBy || "",
+    sortHow: source.sortHow || "",
+    title: source.title || "",
+    traktListId: source.traktListId || "",
+  });
 }
 
 function getNuvioMediaType(result) {

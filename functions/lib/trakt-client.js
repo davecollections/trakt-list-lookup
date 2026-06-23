@@ -12,27 +12,36 @@ export function getTraktClientId(env) {
 }
 
 export async function traktFetch(path, clientId) {
-  const response = await fetch(`${TRAKT_API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": "trakt-list-lookup/0.1 (+https://trakt-list-lookup.pages.dev)",
-      "trakt-api-version": "2",
-      "trakt-api-key": clientId,
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${TRAKT_API_BASE}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "trakt-list-lookup/0.1 (+https://trakt-list-lookup.pages.dev)",
+        "trakt-api-version": "2",
+        "trakt-api-key": clientId,
+      },
+    });
+  } catch (error) {
+    console.error("Trakt API request failed", {
+      path,
+      message: error.message,
+    });
+    throw httpError("Trakt request failed.", 502);
+  }
 
   if (!response.ok) {
-    const body = await response.text();
+    const body = await safeReadText(response);
     console.error("Trakt API error", {
       status: response.status,
       path,
       body: body.slice(0, 500),
     });
-    throw httpError(getTraktErrorMessage(response.status, body), response.status);
+    throw httpError(getTraktErrorMessage(response.status), response.status);
   }
 
   return {
-    data: await response.json(),
+    data: await parseJsonResponse(response, path),
     pagination: getPagination(response),
   };
 }
@@ -79,13 +88,48 @@ async function getListLikeCount(list, clientId) {
   }
 }
 
-function getTraktErrorMessage(status, body = "") {
-  const detail = body ? ` Trakt response: ${body.slice(0, 240)}` : "";
+async function parseJsonResponse(response, path) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!isJsonContentType(contentType)) {
+    console.error("Trakt API returned a non-JSON response", {
+      status: response.status,
+      path,
+      contentType,
+    });
+    throw httpError("Trakt returned an invalid response.", 502);
+  }
+
+  try {
+    return await response.json();
+  } catch (error) {
+    console.error("Could not parse Trakt API JSON", {
+      status: response.status,
+      path,
+      message: error.message,
+    });
+    throw httpError("Trakt returned an invalid response.", 502);
+  }
+}
+
+async function safeReadText(response) {
+  try {
+    return await response.text();
+  } catch {
+    return "";
+  }
+}
+
+function isJsonContentType(value) {
+  const contentType = value.toLowerCase();
+  return contentType.includes("application/json") || contentType.includes("+json");
+}
+
+function getTraktErrorMessage(status) {
   if (status === 401) return "Trakt requires OAuth for that request.";
-  if (status === 403) return `Trakt rejected the API key or the app is not approved.${detail}`;
+  if (status === 403) return "Trakt rejected the API key or the app is not approved.";
   if (status === 404) return "No matching Trakt list was found.";
   if (status === 429) return "Trakt rate limit exceeded. Try again shortly.";
-  return `Trakt returned HTTP ${status}.${detail}`;
+  return `Trakt returned HTTP ${status}.`;
 }
 
 function httpError(message, status) {

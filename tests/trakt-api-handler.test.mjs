@@ -6,8 +6,14 @@ const originalFetch = globalThis.fetch;
 try {
   await testMissingClientId();
   await testMissingQuery();
+  await testApiSecurityHeaders();
   await testUnsupportedMode();
   await testRateLimit();
+  await testSortedRequestsAreWeighted();
+  await testUpstreamNonJsonIsGeneric();
+  await testUpstreamForbiddenDoesNotExposeBody();
+  await testSearchIncludesCuratedOwnerFallback();
+  await testSearchUsesExplicitOwnerHint();
   await testResolveListUrl();
   await testListItems();
   await testListItemsWithoutPosters();
@@ -29,6 +35,16 @@ async function testMissingQuery() {
 
   assert.equal(response.status, 400);
   assert.equal(body.error, "Missing search query.");
+}
+
+async function testApiSecurityHeaders() {
+  const response = await callHandler("https://example.test/api/trakt?mode=search", env());
+
+  assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
+  assert.equal(response.headers.get("X-Frame-Options"), "DENY");
+  assert.equal(response.headers.get("Referrer-Policy"), "no-referrer");
+  assert.match(response.headers.get("Content-Security-Policy"), /default-src 'none'/);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
 }
 
 async function testUnsupportedMode() {
@@ -58,6 +74,113 @@ async function testRateLimit() {
   assert.equal(response.headers.get("X-RateLimit-Limit"), "2");
   assert.equal(response.headers.get("X-RateLimit-Remaining"), "0");
   assert.ok(Number(response.headers.get("Retry-After")) > 0);
+}
+
+async function testSortedRequestsAreWeighted() {
+  const calls = mockFetch(() => jsonResponse([]));
+  const testEnv = {
+    ...env(),
+    API_RATE_LIMIT_PER_MINUTE: "10",
+  };
+  const headers = {
+    "CF-Connecting-IP": "203.0.113.20",
+  };
+
+  const firstResponse = await callHandler("https://example.test/api/trakt?mode=popular&sort=likes", testEnv, headers);
+  const secondResponse = await callHandler("https://example.test/api/trakt?mode=popular&sort=likes", testEnv, headers);
+  const secondBody = await secondResponse.json();
+
+  assert.equal(firstResponse.status, 200);
+  assert.equal(secondResponse.status, 429);
+  assert.equal(secondBody.error, "Too many requests. Try again shortly.");
+  assert.equal(calls.length, 1);
+}
+
+async function testUpstreamNonJsonIsGeneric() {
+  const response = await withMutedConsoleError(async () => {
+    mockFetch(() => new Response("<html>Temporarily unavailable</html>", {
+      status: 200,
+      headers: {
+        "content-type": "text/html",
+      },
+    }));
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 502);
+  assert.equal(body.error, "Trakt request failed. Try again shortly.");
+}
+
+async function testUpstreamForbiddenDoesNotExposeBody() {
+  const response = await withMutedConsoleError(async () => {
+    mockFetch(() => new Response("secret upstream detail", {
+      status: 403,
+      headers: {
+        "content-type": "text/plain",
+      },
+    }));
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(body.error, "Trakt rejected the API key or the app is not approved.");
+  assert.ok(!body.error.includes("secret upstream detail"));
+}
+
+async function testSearchIncludesCuratedOwnerFallback() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/search/list") return jsonResponse([], paginationHeaders(0));
+    if (url.pathname === "/users/snoak/lists") return jsonResponse([]);
+    if (url.pathname === "/users/extreme_one/lists") {
+      return jsonResponse([
+        list({
+          name: "It's Aliens",
+          slug: "it-s-aliens",
+          username: "Extreme_One",
+          trakt: 33753562,
+        }),
+      ]);
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=search&q=its%20aliens", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results.length, 1);
+  assert.equal(body.results[0].name, "It's Aliens");
+  assert.equal(body.results[0].user.username, "Extreme_One");
+}
+
+async function testSearchUsesExplicitOwnerHint() {
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/search/list") return jsonResponse([], paginationHeaders(0));
+    if (url.pathname === "/users/demo_user/lists") {
+      return jsonResponse([
+        list({
+          name: "Aliens Finds",
+          slug: "aliens-finds",
+          username: "demo_user",
+          trakt: 555,
+        }),
+      ]);
+    }
+    if (url.pathname === "/users/snoak/lists" || url.pathname === "/users/extreme_one/lists") return jsonResponse([]);
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=search&q=%40demo_user%20aliens", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results.length, 1);
+  assert.equal(body.results[0].user.username, "demo_user");
+  assert.ok(calls.some((call) => call.url.pathname === "/users/demo_user/lists"));
 }
 
 async function testResolveListUrl() {
@@ -174,8 +297,20 @@ function mockFetch(handler) {
 function jsonResponse(payload, headers = {}) {
   return new Response(JSON.stringify(payload), {
     status: 200,
-    headers,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...headers,
+    },
   });
+}
+
+function paginationHeaders(itemCount) {
+  return {
+    "x-pagination-page": "1",
+    "x-pagination-limit": "30",
+    "x-pagination-page-count": itemCount ? "1" : "0",
+    "x-pagination-item-count": String(itemCount),
+  };
 }
 
 function callHandler(url, testEnv, headers = {}) {
@@ -189,6 +324,16 @@ function env() {
   return {
     TRAKT_CLIENT_ID: "test-client-id",
   };
+}
+
+async function withMutedConsoleError(callback) {
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    return await callback();
+  } finally {
+    console.error = originalError;
+  }
 }
 
 function list({

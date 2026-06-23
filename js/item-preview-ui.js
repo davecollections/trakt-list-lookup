@@ -51,7 +51,7 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
       const posterItems = preview.items;
       renderItems(modalItemList, posterItems);
       previewStatus.textContent = posterItems.length
-        ? `Preview only: showing ${formatNumber(posterItems.length)}/${formatNumber(itemPreviewLimit)} poster previews.`
+        ? `Showing a sample of ${formatNumber(posterItems.length)} titles from this list.`
         : preview.total
           ? `No poster previews available in the first ${formatNumber(preview.scanned)} of ${formatNumber(preview.total)}.`
           : "No items found.";

@@ -6,6 +6,7 @@ import { buildNuvioExport, getListSelectionKey, getSafeHttpsUrl, sortNuvioLists 
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
 const MEDIA_TYPE_CONCURRENCY = 3;
+const MAX_EXISTING_JSON_BYTES = 2 * 1024 * 1024;
 
 export function createNuvioExportUi({ selection }) {
   const modal = document.querySelector("#nuvio-modal");
@@ -37,6 +38,9 @@ export function createNuvioExportUi({ selection }) {
   const jsonPreviewOutput = document.querySelector("#json-preview-output");
   const jsonPreviewClose = document.querySelector("#json-preview-close");
   const jsonPreviewCopy = document.querySelector("#copy-json-preview");
+  const importHelpModal = document.querySelector("#nuvio-import-help-modal");
+  const importHelpOpen = document.querySelector("#open-nuvio-import-help");
+  const importHelpClose = document.querySelector("#nuvio-import-help-close");
   const folderImageCache = new Map();
   const mediaTypeCache = new Map();
   let folderImageRequestId = 0;
@@ -49,6 +53,8 @@ export function createNuvioExportUi({ selection }) {
   downloadButton.addEventListener("click", downloadJson);
   jsonPreviewClose.addEventListener("click", closeJsonPreview);
   jsonPreviewCopy.addEventListener("click", copyJsonPreview);
+  importHelpOpen.addEventListener("click", openImportHelp);
+  importHelpClose.addEventListener("click", closeImportHelp);
   collectionNameInput.addEventListener("input", update);
   coverUrlInput.addEventListener("input", update);
   sortModeSelect.addEventListener("change", update);
@@ -56,7 +62,11 @@ export function createNuvioExportUi({ selection }) {
     update();
     refreshFolderImages();
   });
-  existingJsonInput.addEventListener("input", update);
+  existingJsonInput.addEventListener("input", () => {
+    existingFileStatus.classList.remove("invalid");
+    if (!existingFileInput.files?.length) existingFileStatus.textContent = "No file selected";
+    update();
+  });
   existingFileInput.addEventListener("change", loadExistingFile);
   targetCollectionSelect.addEventListener("change", refreshGeneratedOutput);
   splitMapping.addEventListener("input", (event) => {
@@ -83,12 +93,15 @@ export function createNuvioExportUi({ selection }) {
   jsonPreviewModal.addEventListener("click", (event) => {
     if (event.target.matches("[data-close-json-preview]")) closeJsonPreview();
   });
+  importHelpModal.addEventListener("click", (event) => {
+    if (event.target.matches("[data-close-nuvio-import-help]")) closeImportHelp();
+  });
 
   return {
     open,
     close,
     update,
-    isOpen: () => isModalOpen(modal) || isModalOpen(jsonPreviewModal),
+    isOpen: () => isModalOpen(modal) || isModalOpen(jsonPreviewModal) || isModalOpen(importHelpModal),
   };
 
   function open() {
@@ -105,15 +118,33 @@ export function createNuvioExportUi({ selection }) {
 
   function close() {
     closeJsonPreview();
+    closeImportHelp();
     closeModal(modal);
   }
 
   async function loadExistingFile() {
     const file = existingFileInput.files?.[0];
     if (!file) return;
-    existingJsonInput.value = await file.text();
-    existingFileStatus.textContent = file.name;
-    update();
+
+    if (file.size > MAX_EXISTING_JSON_BYTES) {
+      existingJsonInput.value = "";
+      existingFileStatus.textContent = "File is too large. Keep JSON under 2 MB.";
+      existingFileStatus.classList.add("invalid");
+      update();
+      return;
+    }
+
+    try {
+      existingJsonInput.value = await file.text();
+      existingFileStatus.textContent = file.name;
+      existingFileStatus.classList.remove("invalid");
+      update();
+    } catch {
+      existingJsonInput.value = "";
+      existingFileStatus.textContent = "Could not read that file.";
+      existingFileStatus.classList.add("invalid");
+      update();
+    }
   }
 
   function update() {
@@ -163,11 +194,9 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function parseExistingJson() {
-    const text = existingJsonInput.value.trim();
-    if (!text) return null;
-    const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) throw new Error("Existing Nuvio JSON must be an array.");
-    return parsed;
+    const state = getExistingJsonState();
+    if (state.error) throw new Error(state.error);
+    return state.collections.length ? state.collections : null;
   }
 
   function getExistingCollections() {
@@ -236,13 +265,22 @@ export function createNuvioExportUi({ selection }) {
       };
     }
 
+    if (text.length > MAX_EXISTING_JSON_BYTES) {
+      return {
+        collections: [],
+        error: "Existing Nuvio JSON is too large.",
+        message: "Existing Nuvio JSON is too large. Keep it under 2 MB.",
+      };
+    }
+
     try {
       const parsed = JSON.parse(text);
-      if (!Array.isArray(parsed)) {
+      const validationError = getExistingJsonValidationError(parsed);
+      if (validationError) {
         return {
           collections: [],
-          error: "Existing Nuvio JSON must be an array.",
-          message: "Existing Nuvio JSON must be an array.",
+          error: validationError,
+          message: validationError,
         };
       }
 
@@ -259,6 +297,16 @@ export function createNuvioExportUi({ selection }) {
         message: "Could not read that as JSON.",
       };
     }
+  }
+
+  function getExistingJsonValidationError(value) {
+    if (!Array.isArray(value)) return "Existing Nuvio JSON must be an array.";
+    if (!value.length) return "Existing Nuvio JSON must include at least one collection.";
+
+    const invalidIndex = value.findIndex((collection) => !collection || typeof collection !== "object" || !Array.isArray(collection.folders));
+    if (invalidIndex !== -1) return `Collection ${formatNumber(invalidIndex + 1)} is missing a folders array.`;
+
+    return "";
   }
 
   function updateFolderImageStatus(isLoading = false) {
@@ -551,6 +599,17 @@ export function createNuvioExportUi({ selection }) {
 
   function closeJsonPreview() {
     closeModal(jsonPreviewModal);
+  }
+
+  function openImportHelp() {
+    openModal(importHelpModal, {
+      focusTarget: importHelpClose,
+      onClose: closeImportHelp,
+    });
+  }
+
+  function closeImportHelp() {
+    closeModal(importHelpModal);
   }
 
   async function copyJsonPreview() {

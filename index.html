@@ -141,10 +141,10 @@
           <p>Poster previews use TMDB metadata where available. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
         </div>
         <nav aria-label="Footer links">
-          <a href="https://trakt.tv" target="_blank" rel="noreferrer">Trakt</a>
-          <a href="https://trakt.docs.apiary.io/" target="_blank" rel="noreferrer">API docs</a>
-          <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">TMDB</a>
-          <a href="https://github.com/davecollections/trakt-list-lookup" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://trakt.tv" target="_blank" rel="noopener noreferrer">Trakt</a>
+          <a href="https://trakt.docs.apiary.io/" target="_blank" rel="noopener noreferrer">API docs</a>
+          <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>
+          <a href="https://github.com/davecollections/trakt-list-lookup" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
       </footer>
     </main>
@@ -182,7 +182,7 @@
 
         <p class="updated-line"><span class="updated"></span></p>
 
-        <a class="open-link" target="_blank" rel="noreferrer" aria-label="Open on Trakt">
+        <a class="open-link" target="_blank" rel="noopener noreferrer" aria-label="Open on Trakt">
           <img class="trakt-symbol-img" src="./assets/trakt.ico" alt="" loading="lazy">
           <span class="open-link-text">Open</span>
         </a>
@@ -261,7 +261,10 @@
           <button id="nuvio-close" type="button" class="ghost-button">Close</button>
         </div>
 
-        <p class="nuvio-warning">Draft export. Direct Trakt source imports still need validation in Nuvio.</p>
+        <div class="nuvio-warning-row">
+          <p class="nuvio-warning">Draft export. Direct Trakt source imports still need validation in Nuvio.</p>
+          <button id="open-nuvio-import-help" type="button" class="ghost-button">Import help</button>
+        </div>
 
         <div class="nuvio-grid">
           <section class="nuvio-panel nuvio-wide">
@@ -401,6 +404,44 @@
         <textarea id="json-preview-output" rows="18" readonly></textarea>
         <div class="modal-actions">
           <button id="copy-json-preview" type="button">Copy JSON</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="nuvio-import-help-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-nuvio-import-help></div>
+      <section class="modal-dialog nuvio-help-dialog" role="dialog" aria-modal="true" aria-labelledby="nuvio-import-help-title">
+        <div class="modal-header">
+          <div>
+            <p class="result-owner">Nuvio import</p>
+            <h2 id="nuvio-import-help-title">Import Nuvio JSON</h2>
+          </div>
+          <button id="nuvio-import-help-close" type="button" class="ghost-button">Close</button>
+        </div>
+        <div class="nuvio-import-help">
+          <p>Nuvio import flows may change while direct Trakt source support is being validated.</p>
+          <div class="nuvio-import-help-grid">
+            <section>
+              <h3>Web</h3>
+              <ol>
+                <li>Log in to Nuvio and select the right profile.</li>
+                <li>Open Collections, then Import.</li>
+                <li>Select the downloaded JSON file.</li>
+                <li>Choose Add as new, Merge, or Overwrite.</li>
+                <li>Confirm Add collections.</li>
+              </ol>
+            </section>
+            <section>
+              <h3>TV app</h3>
+              <ol>
+                <li>Open Nuvio and choose a profile.</li>
+                <li>Open Addons, then Collections.</li>
+                <li>Select Import.</li>
+                <li>Choose From File or From URL.</li>
+                <li>Load the JSON and confirm import.</li>
+              </ol>
+            </section>
+          </div>
         </div>
       </section>
     </div>

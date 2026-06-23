@@ -6,8 +6,9 @@ const MAX_LIMIT = 600;
 const buckets = new Map();
 let lastCleanup = 0;
 
-export function checkRateLimit(request, env = {}) {
+export function checkRateLimit(request, env = {}, cost = 1) {
   const limit = getRateLimit(env.API_RATE_LIMIT_PER_MINUTE);
+  const requestCost = getRequestCost(cost, limit);
   const now = Date.now();
   cleanupExpiredBuckets(now);
 
@@ -16,20 +17,20 @@ export function checkRateLimit(request, env = {}) {
 
   if (!bucket || bucket.resetAt <= now) {
     buckets.set(key, {
-      count: 1,
+      count: requestCost,
       resetAt: now + WINDOW_MS,
     });
     return { allowed: true };
   }
 
-  if (bucket.count >= limit) {
+  if (bucket.count + requestCost > limit) {
     return {
       allowed: false,
       headers: getRateLimitHeaders(limit, 0, bucket.resetAt, now),
     };
   }
 
-  bucket.count += 1;
+  bucket.count += requestCost;
   return { allowed: true };
 }
 
@@ -40,16 +41,13 @@ function getRateLimit(value) {
 }
 
 function getClientKey(request) {
-  return [
-    request.headers.get("CF-Connecting-IP"),
-    request.headers.get("True-Client-IP"),
-    getForwardedForClient(request.headers.get("X-Forwarded-For")),
-    "unknown",
-  ].find(Boolean);
+  return request.headers.get("CF-Connecting-IP") || "unknown";
 }
 
-function getForwardedForClient(value) {
-  return String(value || "").split(",")[0].trim();
+function getRequestCost(value, limit) {
+  const cost = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(cost) || cost <= 1) return 1;
+  return Math.min(cost, limit);
 }
 
 function getRateLimitHeaders(limit, remaining, resetAt, now) {

@@ -22,7 +22,7 @@ const MAX_PAGE = 25;
 const USER_FILTER_LIMIT = 100;
 const SORT_FETCH_LIMIT = 50;
 const SORT_MAX_ITEMS = 250;
-const CURATED_USER_FALLBACKS = ["snoak"];
+const CURATED_USER_FALLBACKS = ["snoak", "extreme_one"];
 
 export async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
   const fetchLimit = SORT_FETCH_LIMIT;
@@ -147,9 +147,9 @@ async function getCuratedUserSearchMatches(query, existingResults, clientId) {
   const existingKeys = new Set(existingResults.map(getListKey).filter(Boolean));
   const matches = [];
 
-  for (const username of CURATED_USER_FALLBACKS) {
+  for (const fallback of getSearchFallbackUsers(query)) {
     try {
-      const payload = await getFilteredUserLists(username, query, clientId);
+      const payload = await getFilteredUserLists(fallback.username, fallback.filter, clientId);
       payload.data.forEach((list) => {
         const key = getListKey(list);
         if (!key || existingKeys.has(key)) return;
@@ -158,13 +158,49 @@ async function getCuratedUserSearchMatches(query, existingResults, clientId) {
       });
     } catch (error) {
       console.warn("Curated user fallback failed", {
-        username,
+        username: fallback.username,
         message: error.message,
       });
     }
   }
 
   return rankFallbackLists(matches, terms);
+}
+
+function getSearchFallbackUsers(query) {
+  const seen = new Set();
+  const fallbacks = [
+    ...getExplicitUserHints(query),
+    ...CURATED_USER_FALLBACKS.map((username) => ({ username, filter: query })),
+  ];
+
+  return fallbacks.filter((fallback) => {
+    const key = fallback.username.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getExplicitUserHints(query) {
+  const tokens = String(query || "").trim().split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) return [];
+
+  return tokens
+    .map((token, index) => getExplicitUserHint(token, tokens, index))
+    .filter(Boolean);
+}
+
+function getExplicitUserHint(token, tokens, index) {
+  const explicit = token.startsWith("@");
+  const username = token
+    .replace(/^@/, "")
+    .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9_.-]+$/g, "");
+  const filter = tokens.filter((_, tokenIndex) => tokenIndex !== index).join(" ");
+
+  if (!username) return "";
+  if (!explicit && !/[_.]/.test(username)) return "";
+  return isSafePathSegment(username) && filter ? { username, filter } : "";
 }
 
 function rankFallbackLists(lists, terms) {

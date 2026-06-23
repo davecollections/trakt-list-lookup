@@ -54,7 +54,8 @@ export function listMatchesTerms(list, terms) {
     list.ids?.slug,
     list.description,
   ].filter(Boolean).join(" "));
-  return terms.every((term) => haystack.includes(term));
+  const compactHaystack = haystack.replace(/\s+/g, "");
+  return terms.every((term) => normalizedTextIncludesTerm(haystack, compactHaystack, term));
 }
 
 export function rankSearchResults(items, query) {
@@ -76,6 +77,8 @@ export function scoreListSearchMatch(list, terms, traktScore = 0) {
   const description = normalizeSearchText(list.description);
   const name = nameTokens.join(" ");
   const slug = slugTokens.join(" ");
+  const compactName = name.replace(/\s+/g, "");
+  const compactSlug = slug.replace(/\s+/g, "");
   let score = Number(traktScore || 0);
 
   for (const term of terms) {
@@ -83,6 +86,7 @@ export function scoreListSearchMatch(list, terms, traktScore = 0) {
     if (nameTokens.includes(term)) score += 90;
     if (slugTokens.includes(term)) score += 75;
     if (name.startsWith(term) || slug.startsWith(term)) score += 45;
+    if (term.length >= 3 && (compactName.includes(term) || compactSlug.includes(term))) score += 35;
     if (name.includes(term) || slug.includes(term)) score += 20;
     if (description.includes(term)) score += 8;
   }
@@ -251,6 +255,11 @@ export function normalizeListItem(item) {
       show_slug: item.show?.ids?.slug,
     },
   };
+}
+
+function normalizedTextIncludesTerm(haystack, compactHaystack, term) {
+  if (haystack.includes(term)) return true;
+  return term.length >= 3 && compactHaystack.includes(term);
 }
 
 export async function mapWithConcurrency(items, concurrency, mapper) {

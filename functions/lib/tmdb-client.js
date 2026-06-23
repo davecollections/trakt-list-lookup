@@ -58,11 +58,17 @@ async function tmdbFetch(path, env) {
     url.searchParams.set("api_key", getTmdbApiKey(env));
   }
 
-  const response = await fetch(url.toString(), { headers });
+  let response;
+  try {
+    response = await fetch(url.toString(), { headers });
+  } catch (error) {
+    throw httpError(`TMDB request failed: ${error.message}`, 502);
+  }
+
   if (!response.ok) {
     throw httpError(`TMDB returned HTTP ${response.status}.`, response.status);
   }
-  return response.json();
+  return parseJsonResponse(response, path);
 }
 
 function getTmdbApiKey(env) {
@@ -75,6 +81,24 @@ function getTmdbBearerToken(env) {
 
 function hasTmdbAuth(env) {
   return Boolean(getTmdbApiKey(env) || getTmdbBearerToken(env));
+}
+
+async function parseJsonResponse(response, path) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!isJsonContentType(contentType)) {
+    throw httpError(`TMDB returned a non-JSON response for ${path}.`, 502);
+  }
+
+  try {
+    return await response.json();
+  } catch (error) {
+    throw httpError(`Could not parse TMDB JSON for ${path}: ${error.message}`, 502);
+  }
+}
+
+function isJsonContentType(value) {
+  const contentType = value.toLowerCase();
+  return contentType.includes("application/json") || contentType.includes("+json");
 }
 
 function httpError(message, status) {

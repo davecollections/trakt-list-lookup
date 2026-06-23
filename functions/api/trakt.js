@@ -28,19 +28,21 @@ const ITEM_LIMIT = 15;
 const MAX_PAGE = 25;
 const MAX_ITEM_LIMIT = 15;
 const MAX_QUERY_LENGTH = 220;
+const SORT_REQUEST_COST = 8;
+const POSTER_ITEM_REQUEST_COST = 2;
 
 export async function onRequestGet({ request, env }) {
-  const rateLimit = checkRateLimit(request, env);
+  const url = new URL(request.url);
+  const mode = url.searchParams.get("mode") || "search";
+  const sort = normalizeSort(url.searchParams.get("sort"));
+  const rateLimit = checkRateLimit(request, env, getRequestRateLimitCost(url, mode, sort));
   if (!rateLimit.allowed) {
     return json({ error: "Too many requests. Try again shortly." }, 429, false, rateLimit.headers);
   }
 
-  const url = new URL(request.url);
-  const mode = url.searchParams.get("mode") || "search";
   const query = (url.searchParams.get("q") || "").trim();
   const page = clampPositiveInteger(url.searchParams.get("page"), 1, MAX_PAGE);
   const resultLimit = clampPositiveInteger(url.searchParams.get("limit"), RESULT_LIMIT, MAX_RESULT_LIMIT);
-  const sort = normalizeSort(url.searchParams.get("sort"));
   const order = normalizeSortOrder(url.searchParams.get("order"));
   const clientId = getTraktClientId(env);
 
@@ -110,4 +112,10 @@ function isGlobalListMode(mode) {
 
 function shouldIncludePosters(url) {
   return url.searchParams.get("posters") !== "0";
+}
+
+function getRequestRateLimitCost(url, mode, sort) {
+  if (sort && mode !== "url") return SORT_REQUEST_COST;
+  if (mode === "items" && shouldIncludePosters(url)) return POSTER_ITEM_REQUEST_COST;
+  return 1;
 }

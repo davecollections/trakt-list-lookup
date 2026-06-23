@@ -58,6 +58,7 @@ assert.equal(normalizeSortOrder("sideways"), "desc");
 assert.equal(normalizeSearchText(" Horror: Films / 2024! "), "horror films 2024");
 assert.equal(listMatchesTerms(list({ name: "Best Horror", description: "Slashers and ghosts" }), ["horror"]), true);
 assert.equal(listMatchesTerms(list({ name: "Best Horror", description: "Slashers and ghosts" }), ["comedy"]), false);
+assert.equal(listMatchesTerms(list({ name: "It's Aliens", slug: "it-s-aliens" }), normalizeSearchText("its aliens").split(" ")), true);
 
 const ranked = rankSearchResults([
   { score: 1, list: list({ name: "General Picks", slug: "general-picks" }) },

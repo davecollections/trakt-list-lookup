@@ -6,8 +6,20 @@
   width: min(940px, 100%);
 }
 
-.nuvio-warning {
+.nuvio-help-dialog {
+  width: min(760px, 100%);
+}
+
+.nuvio-warning-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
   margin-bottom: 10px;
+}
+
+.nuvio-warning {
+  flex: 1;
+  margin: 0;
   padding: 7px 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
   border-radius: 8px;
@@ -15,6 +27,11 @@
   color: var(--text);
   font-size: 0.82rem;
   line-height: 1.35;
+}
+
+.nuvio-warning-row .ghost-button {
+  min-height: 34px;
+  white-space: nowrap;
 }
 
 .nuvio-grid {
@@ -347,7 +364,51 @@
   resize: vertical;
 }
 
+.nuvio-import-help {
+  display: grid;
+  gap: 12px;
+  color: var(--text);
+}
+
+.nuvio-import-help p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.nuvio-import-help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nuvio-import-help h3 {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+}
+
+.nuvio-import-help ol {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.nuvio-import-help li + li {
+  margin-top: 5px;
+}
+
 @media (max-width: 720px) {
+  .nuvio-warning-row,
+  .nuvio-import-help-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nuvio-warning-row {
+    display: grid;
+  }
+
   .nuvio-grid {
     grid-template-columns: 1fr;
   }
