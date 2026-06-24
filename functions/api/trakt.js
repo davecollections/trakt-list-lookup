@@ -94,8 +94,13 @@ export async function onRequestGet({ request, env }) {
       return json({ error: "Unsupported search mode." }, 400);
     }
 
-    const lists = await enrichListsWithLikeCounts(payload.data, clientId);
-    const quickUsers = await getQuickUsers(mode, query, payload, clientId);
+    const lists = sort && mode !== "url"
+      ? payload.data
+      : await enrichListsWithLikeCounts(payload.data, clientId);
+    const quickUsersPayload = mode === "url"
+      ? { ...payload, quickUserLists: lists }
+      : payload;
+    const quickUsers = await getQuickUsers(mode, query, quickUsersPayload, clientId);
 
     const responsePayload = {
       results: lists.map(normalizeList).filter(Boolean),

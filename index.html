@@ -12,8 +12,8 @@
       <section class="search-panel" aria-labelledby="page-title">
         <div class="title-row">
           <div>
-            <p class="eyebrow">Trakt list search</p>
-            <h1 id="page-title">Find Trakt list IDs and links</h1>
+            <p class="eyebrow">Trakt list lookup</p>
+            <h1 id="page-title">Search public Trakt lists</h1>
           </div>
           <div class="top-actions">
             <button id="theme-toggle" type="button" class="theme-toggle" aria-label="Switch to dark mode"></button>
@@ -48,28 +48,6 @@
               </div>
             </div>
 
-            <div class="control-group media-filter-group">
-              <span class="control-label">Media</span>
-              <div class="media-filter-tabs" role="tablist" aria-label="Media type">
-                <label>
-                  <input type="radio" name="media-type" value="all" checked>
-                  <span class="media-filter-label">All</span>
-                </label>
-                <label>
-                  <input type="radio" name="media-type" value="movie">
-                  <span class="media-filter-label">Movies</span>
-                </label>
-                <label>
-                  <input type="radio" name="media-type" value="tv">
-                  <span class="media-filter-label">Series</span>
-                </label>
-                <label>
-                  <input type="radio" name="media-type" value="mixed">
-                  <span class="media-filter-label">Mixed</span>
-                </label>
-              </div>
-              <small id="media-filter-status" class="media-filter-status"></small>
-            </div>
           </div>
 
           <div class="query-row">
@@ -126,7 +104,6 @@
         <div class="results-header" hidden>
           <span>Preview</span>
           <button type="button" data-sort="title">List</button>
-          <span class="media-header">Type</span>
           <span>Trakt ID <small>click to copy</small></span>
           <button type="button" data-sort="items">Items</button>
           <button type="button" data-sort="likes">Likes</button>
@@ -306,10 +283,6 @@
                 </select>
                 <small id="nuvio-folder-image-status" class="field-status"></small>
               </label>
-              <div class="nuvio-status-field">
-                <span>Media type</span>
-                <small id="nuvio-media-type-status" class="field-status"></small>
-              </div>
             </div>
           </section>
 

@@ -70,14 +70,12 @@ export async function enrichListsWithLikeCounts(lists, clientId) {
 
 async function getListLikeCount(list, clientId) {
   const existingCount = normalizeOptionalCount(list?.like_count);
-  if (existingCount !== null) return existingCount;
-
   const id = list?.ids?.trakt;
-  if (!id) return null;
+  if (!id) return existingCount;
 
   try {
     const payload = await traktFetch(`/lists/${encodeURIComponent(id)}/likes?page=1&limit=1`, clientId);
-    return normalizeOptionalCount(payload.pagination?.item_count);
+    return normalizeOptionalCount(payload.pagination?.item_count) ?? existingCount;
   } catch (error) {
     console.warn("Could not fetch Trakt list likes", {
       id,

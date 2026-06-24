@@ -1,11 +1,10 @@
 import { formatNumber, slugifyFilename } from "./formatting.js";
-import { canFetchListItems, fetchFirstPosterUrl, fetchListMediaType } from "./list-item-cache.js";
+import { canFetchListItems, fetchFirstPosterUrl } from "./list-item-cache.js";
 import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
 import { buildNuvioExport, getListSelectionKey, getSafeHttpsUrl, sortNuvioLists } from "./nuvio-export.js";
 
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
-const MEDIA_TYPE_CONCURRENCY = 3;
 const MAX_EXISTING_JSON_BYTES = 2 * 1024 * 1024;
 
 export function createNuvioExportUi({ selection }) {
@@ -19,7 +18,6 @@ export function createNuvioExportUi({ selection }) {
   const sortModeSelect = document.querySelector("#nuvio-sort-mode");
   const folderImageModeSelect = document.querySelector("#nuvio-folder-image-mode");
   const folderImageStatus = document.querySelector("#nuvio-folder-image-status");
-  const mediaTypeStatus = document.querySelector("#nuvio-media-type-status");
   const existingJsonInput = document.querySelector("#nuvio-existing-json");
   const existingFileInput = document.querySelector("#nuvio-existing-file");
   const existingFileStatus = document.querySelector("#nuvio-file-status");
@@ -42,10 +40,7 @@ export function createNuvioExportUi({ selection }) {
   const importHelpOpen = document.querySelector("#open-nuvio-import-help");
   const importHelpClose = document.querySelector("#nuvio-import-help-close");
   const folderImageCache = new Map();
-  const mediaTypeCache = new Map();
   let folderImageRequestId = 0;
-  let mediaTypeRequestId = 0;
-  let mediaTypeLoading = false;
 
   closeButton.addEventListener("click", close);
   previewJsonButton.addEventListener("click", openJsonPreview);
@@ -109,7 +104,6 @@ export function createNuvioExportUi({ selection }) {
     count.textContent = `${formatNumber(selection.size)} selected`;
     update();
     refreshFolderImages();
-    refreshMediaTypes();
     openModal(modal, {
       focusTarget: collectionNameInput,
       onClose: close,
@@ -162,12 +156,11 @@ export function createNuvioExportUi({ selection }) {
       updateCoverStatus();
       updateExistingJsonStatus();
       updateFolderImageStatus();
-      updateMediaTypeStatus();
       const exportJson = createExportJson();
       output.value = JSON.stringify(exportJson, null, 2);
       outputSummary.textContent = `${formatNumber(output.value.length)} chars`;
       updateExportSummary(exportJson);
-      setJsonActionsDisabled(mediaTypeLoading);
+      setJsonActionsDisabled(false);
     } catch (error) {
       output.value = `Could not build JSON: ${error.message}`;
       outputSummary.textContent = "Needs attention";
@@ -332,35 +325,6 @@ export function createNuvioExportUi({ selection }) {
       : "";
   }
 
-  function updateMediaTypeStatus(isLoading = mediaTypeLoading) {
-    const selected = getSelectedListsForExport();
-    if (!selected.length) {
-      mediaTypeStatus.textContent = "";
-      return;
-    }
-
-    if (isLoading) {
-      mediaTypeStatus.textContent = "Checking sampled titles for movie/series mix...";
-      return;
-    }
-
-    const counts = selected.reduce((summary, result) => {
-      const type = getDetectedMediaType(result);
-      summary[type] += 1;
-      return summary;
-    }, { MOVIE: 0, TV: 0, MIXED: 0, UNKNOWN: 0 });
-
-    const parts = [];
-    if (counts.MOVIE) parts.push(`${formatNumber(counts.MOVIE)} movie`);
-    if (counts.TV) parts.push(`${formatNumber(counts.TV)} series`);
-    if (counts.MIXED) parts.push(`${formatNumber(counts.MIXED)} mixed`);
-    if (counts.UNKNOWN) parts.push(`${formatNumber(counts.UNKNOWN)} unknown`);
-    mediaTypeStatus.textContent = `Sampled source type: ${parts.join(", ")}.`;
-    if (counts.MIXED || counts.UNKNOWN) {
-      mediaTypeStatus.textContent += " Mixed/unknown lists export as Movie by default; check those folders in Nuvio.";
-    }
-  }
-
   function updateMergeControls() {
     const collections = getExistingCollections();
     const hasExistingJson = collections.length > 0;
@@ -476,34 +440,7 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function getSelectedListsForExport() {
-    return sortNuvioLists(selection.values().map((result) => ({
-      ...result,
-      ...getDetectedMediaFields(result),
-    })), sortModeSelect.value);
-  }
-
-  function getDetectedMediaType(result) {
-    return getDetectedMediaMetadata(result).type;
-  }
-
-  function getDetectedMediaFields(result) {
-    const metadata = getDetectedMediaMetadata(result);
-    return {
-      nuvioMediaType: metadata.type,
-      mediaTypeDetection: metadata,
-      mediaTypeConfidence: metadata.confidence,
-      mediaTypeScanned: metadata.scanned,
-      mediaTypeTotal: metadata.total,
-      mediaTypeCounts: {
-        movie: metadata.movieCount,
-        tv: metadata.tvCount,
-        other: metadata.otherCount,
-      },
-    };
-  }
-
-  function getDetectedMediaMetadata(result) {
-    return normalizeMediaTypeMetadata(mediaTypeCache.get(getListSelectionKey(result)) || result.mediaTypeDetection || result.nuvioMediaType || result.mediaType);
+    return sortNuvioLists(selection.values(), sortModeSelect.value);
   }
 
   function getCoverUrl() {
@@ -562,47 +499,6 @@ export function createNuvioExportUi({ selection }) {
     refreshGeneratedOutput();
   }
 
-  async function refreshMediaTypes() {
-    const requestId = ++mediaTypeRequestId;
-    const selectedLists = sortNuvioLists(selection.values(), sortModeSelect.value);
-    const missing = selectedLists.filter((result) => {
-      const key = getListSelectionKey(result);
-      return key && !mediaTypeCache.has(key) && canFetchListItems(result);
-    });
-
-    if (!missing.length) {
-      mediaTypeLoading = false;
-      updateMediaTypeStatus(false);
-      refreshGeneratedOutput();
-      return;
-    }
-
-    mediaTypeLoading = true;
-    updateMediaTypeStatus(true);
-    setJsonActionsDisabled(true);
-
-    let cursor = 0;
-    const workers = Array.from({ length: Math.min(MEDIA_TYPE_CONCURRENCY, missing.length) }, async () => {
-      while (cursor < missing.length && requestId === mediaTypeRequestId) {
-        const result = missing[cursor];
-        cursor += 1;
-        try {
-          mediaTypeCache.set(getListSelectionKey(result), await fetchListMediaType(result, {
-            maxPages: 3,
-          }));
-        } catch {
-          mediaTypeCache.set(getListSelectionKey(result), getUnknownMediaTypeMetadata());
-        }
-      }
-    });
-
-    await Promise.all(workers);
-    if (requestId !== mediaTypeRequestId) return;
-    mediaTypeLoading = false;
-    updateMediaTypeStatus(false);
-    refreshGeneratedOutput();
-  }
-
   function setJsonActionsDisabled(disabled) {
     previewJsonButton.disabled = disabled;
     copyButton.disabled = disabled;
@@ -650,47 +546,6 @@ export function createNuvioExportUi({ selection }) {
     link.click();
     URL.revokeObjectURL(link.href);
   }
-}
-
-function normalizeMediaTypeMetadata(value) {
-  if (!value) return getUnknownMediaTypeMetadata();
-  if (typeof value === "string") {
-    const type = normalizeMediaTypeValue(value);
-    return {
-      ...getUnknownMediaTypeMetadata(),
-      type,
-      confidence: type === "UNKNOWN" ? "unknown" : "sampled",
-    };
-  }
-
-  return {
-    type: normalizeMediaTypeValue(value.type),
-    confidence: value.confidence || "sampled",
-    scanned: Number(value.scanned || 0),
-    total: value.total === null || value.total === undefined ? null : Number(value.total),
-    movieCount: Number(value.movieCount || 0),
-    tvCount: Number(value.tvCount || 0),
-    otherCount: Number(value.otherCount || 0),
-  };
-}
-
-function normalizeMediaTypeValue(value) {
-  const type = String(value || "").toUpperCase();
-  if (type === "TV" || type === "SHOW" || type === "SERIES") return "TV";
-  if (type === "MOVIE" || type === "MIXED" || type === "UNKNOWN") return type;
-  return "UNKNOWN";
-}
-
-function getUnknownMediaTypeMetadata() {
-  return {
-    type: "UNKNOWN",
-    confidence: "unknown",
-    scanned: 0,
-    total: null,
-    movieCount: 0,
-    tvCount: 0,
-    otherCount: 0,
-  };
 }
 
 function flashButton(button) {

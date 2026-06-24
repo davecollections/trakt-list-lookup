@@ -65,8 +65,6 @@ export function createResultsView({
       ownerButton.addEventListener("click", () => onLoadUserLists(result.user.username));
       const titleNode = node.querySelector(".result-title");
       titleNode.textContent = title;
-      const mediaBadge = createMediaBadge(result);
-      if (mediaBadge) card.append(mediaBadge);
       const fullDescription = cleanDescription(result.description);
       const readMoreButton = node.querySelector(".read-more-button");
       readMoreButton.hidden = !hasDescription(result.description);
@@ -101,17 +99,6 @@ export function createResultsView({
       renderPosterSamples(result);
       schedulePosterSampleLoad(card, result);
     });
-  }
-
-  function createMediaBadge(result) {
-    const mediaType = getMediaTypeValue(result);
-    if (!mediaType) return null;
-
-    const badge = document.createElement("span");
-    badge.className = "media-type-badge";
-    badge.dataset.mediaType = mediaType.toLowerCase();
-    badge.textContent = getMediaTypeLabel(mediaType);
-    return badge;
   }
 
   function renderQuickUsers(results, serverQuickUsers = null) {
@@ -318,18 +305,4 @@ function flashButton(button) {
   window.setTimeout(() => {
     button.textContent = original;
   }, 900);
-}
-
-function getMediaTypeValue(result) {
-  const value = String(result?.mediaTypeDetection?.type || result?.nuvioMediaType || result?.mediaType || "").toUpperCase();
-  if (value === "TV" || value === "SHOW" || value === "SERIES") return "TV";
-  if (value === "MOVIE" || value === "MIXED" || value === "UNKNOWN") return value;
-  return "";
-}
-
-function getMediaTypeLabel(value) {
-  if (value === "TV") return "Series";
-  if (value === "MIXED") return "Mixed";
-  if (value === "UNKNOWN") return "Unknown";
-  return "Movie";
 }

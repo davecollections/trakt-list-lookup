@@ -11,6 +11,9 @@ try {
   await testRateLimit();
   await testSortedRequestsAreWeighted();
   await testPopularPaginationAllowsPosterSamples();
+  await testAuthoritativeLikeCountsReplacePayloadCounts();
+  await testLikeCountFallbackKeepsPayloadCount();
+  await testSortedQuickUsersUseEnrichedLikeCounts();
   await testQuickUsersFromSampledPages();
   await testQuickUsersFailureStillReturnsResults();
   await testUpstreamNonJsonIsGeneric();
@@ -138,8 +141,74 @@ async function testPopularPaginationAllowsPosterSamples() {
   assert.equal(response.status, 200);
 }
 
+async function testAuthoritativeLikeCountsReplacePayloadCounts() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([list({
+        name: "IMDB: Top Rated Movies",
+        username: "justin",
+        trakt: 2142753,
+        likes: 46,
+      })]);
+    }
+    if (isListLikesPath(url, 2142753)) return jsonResponse([], paginationHeaders(4777, 4777, 1));
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].like_count, 4777);
+}
+
+async function testLikeCountFallbackKeepsPayloadCount() {
+  const response = await withMutedConsole(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname === "/lists/popular") return jsonResponse([list({ trakt: 2142753, likes: 46 })]);
+      if (isListLikesPath(url, 2142753)) {
+        return new Response(JSON.stringify({ error: "Rate limited" }), {
+          status: 429,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].like_count, 46);
+}
+
+async function testSortedQuickUsersUseEnrichedLikeCounts() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([
+        list({ name: "Stale A", username: "creator-a", trakt: 201, likes: 1 }),
+        list({ name: "Stale B", username: "creator-b", trakt: 202, likes: 2 }),
+      ], paginationHeaders(2, 1, 50));
+    }
+    if (isListLikesPath(url, 201)) return jsonResponse([], paginationHeaders(25, 25, 1));
+    if (isListLikesPath(url, 202)) return jsonResponse([], paginationHeaders(50, 50, 1));
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular&sort=likes", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results.map((result) => result.like_count), [50, 25]);
+  assert.deepEqual(body.quickUsers.map((user) => user.likeCount), [50, 25]);
+}
+
 async function testQuickUsersFromSampledPages() {
   mockFetch(({ url }) => {
+    if (isListLikesPath(url, 100)) return jsonResponse([], paginationHeaders(1, 1, 1));
     if (url.pathname !== "/lists/popular") throw new Error(`Unexpected path ${url.pathname}`);
 
     const limit = url.searchParams.get("limit");
@@ -175,6 +244,7 @@ async function testQuickUsersFromSampledPages() {
 async function testQuickUsersFailureStillReturnsResults() {
   const response = await withMutedConsole(async () => {
     mockFetch(({ url }) => {
+      if (isListLikesPath(url, 222)) return jsonResponse([], paginationHeaders(0, 0, 1));
       if (url.pathname !== "/lists/trending") throw new Error(`Unexpected path ${url.pathname}`);
       if (url.searchParams.get("limit") === "50") throw new Error("Summary failed");
       return jsonResponse([list({ name: "Trending", username: "demo", trakt: 222 })], paginationHeaders(1, 1));
@@ -226,6 +296,7 @@ async function testUpstreamForbiddenDoesNotExposeBody() {
 
 async function testSearchIncludesCuratedOwnerFallback() {
   mockFetch(({ url }) => {
+    if (isListLikesPath(url, 33753562)) return jsonResponse([], paginationHeaders(0, 0, 1));
     if (url.pathname === "/search/list") return jsonResponse([], paginationHeaders(0));
     if (url.pathname === "/users/snoak/lists") return jsonResponse([]);
     if (url.pathname === "/users/extreme_one/lists") {
@@ -252,6 +323,7 @@ async function testSearchIncludesCuratedOwnerFallback() {
 
 async function testSearchUsesExplicitOwnerHint() {
   const calls = mockFetch(({ url }) => {
+    if (isListLikesPath(url, 555)) return jsonResponse([], paginationHeaders(0, 0, 1));
     if (url.pathname === "/search/list") return jsonResponse([], paginationHeaders(0));
     if (url.pathname === "/users/demo_user/lists") {
       return jsonResponse([
@@ -278,9 +350,12 @@ async function testSearchUsesExplicitOwnerHint() {
 
 async function testResolveListUrl() {
   const calls = mockFetch(({ url }) => {
-    assert.equal(url.pathname, "/users/snoak/lists/demo");
-    assert.equal(url.searchParams.get("extended"), "full");
-    return jsonResponse(list({ name: "Demo", slug: "demo", trakt: 123, likes: 9 }));
+    if (url.pathname === "/users/snoak/lists/demo") {
+      assert.equal(url.searchParams.get("extended"), "full");
+      return jsonResponse(list({ name: "Demo", slug: "demo", trakt: 123, likes: 9 }));
+    }
+    if (isListLikesPath(url, 123)) return jsonResponse([], paginationHeaders(11, 11, 1));
+    throw new Error(`Unexpected path ${url.pathname}`);
   });
 
   const response = await callHandler(
@@ -290,9 +365,10 @@ async function testResolveListUrl() {
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(body.results.length, 1);
   assert.equal(body.results[0].name, "Demo");
+  assert.equal(body.results[0].like_count, 11);
   assert.equal(body.results[0].url, "https://trakt.tv/users/snoak/lists/demo");
   assert.deepEqual(body.pagination, {
     page: 1,
@@ -302,6 +378,7 @@ async function testResolveListUrl() {
   });
   assert.deepEqual(body.quickUsers.map((user) => user.username), ["snoak"]);
   assert.equal(body.quickUsers[0].topListName, "Demo");
+  assert.equal(body.quickUsers[0].likeCount, 11);
 }
 
 async function testListItems() {
@@ -406,6 +483,10 @@ function paginationHeaders(itemCount, pageCount = itemCount ? 1 : 0, limit = 30)
     "x-pagination-page-count": String(pageCount),
     "x-pagination-item-count": String(itemCount),
   };
+}
+
+function isListLikesPath(url, id) {
+  return url.pathname === `/lists/${id}/likes`;
 }
 
 function callHandler(url, testEnv, headers = {}) {
