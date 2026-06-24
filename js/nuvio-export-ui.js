@@ -1,7 +1,7 @@
 import { formatNumber, slugifyFilename } from "./formatting.js";
 import { canFetchListItems, fetchFirstPosterUrl } from "./list-item-cache.js";
 import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
-import { buildNuvioExport, getListSelectionKey, getSafeHttpsUrl, sortNuvioLists } from "./nuvio-export.js";
+import { buildNuvioExportPayload, getListSelectionKey, getSafeHttpsUrl, sortNuvioLists } from "./nuvio-export.js";
 
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
@@ -41,6 +41,7 @@ export function createNuvioExportUi({ selection }) {
   const importHelpClose = document.querySelector("#nuvio-import-help-close");
   const folderImageCache = new Map();
   let folderImageRequestId = 0;
+  let latestPayload = null;
 
   closeButton.addEventListener("click", close);
   previewJsonButton.addEventListener("click", openJsonPreview);
@@ -146,8 +147,11 @@ export function createNuvioExportUi({ selection }) {
       updateMergeControls();
       refreshGeneratedOutput();
     } catch (error) {
+      latestPayload = null;
       output.value = `Could not build JSON: ${error.message}`;
+      outputSummary.textContent = "Needs attention";
       exportSummary.textContent = "Fix the highlighted export settings before copying.";
+      setJsonActionsDisabled(true);
     }
   }
 
@@ -156,12 +160,14 @@ export function createNuvioExportUi({ selection }) {
       updateCoverStatus();
       updateExistingJsonStatus();
       updateFolderImageStatus();
-      const exportJson = createExportJson();
-      output.value = JSON.stringify(exportJson, null, 2);
-      outputSummary.textContent = `${formatNumber(output.value.length)} chars`;
-      updateExportSummary(exportJson);
+      const payload = createExportPayload();
+      latestPayload = payload;
+      output.value = payload.json;
+      outputSummary.textContent = getOutputSummaryText(payload);
+      updateExportSummary(payload);
       setJsonActionsDisabled(false);
     } catch (error) {
+      latestPayload = null;
       output.value = `Could not build JSON: ${error.message}`;
       outputSummary.textContent = "Needs attention";
       exportSummary.textContent = "Fix the highlighted export settings before copying.";
@@ -169,9 +175,9 @@ export function createNuvioExportUi({ selection }) {
     }
   }
 
-  function createExportJson() {
+  function createExportPayload() {
     const existing = parseExistingJson();
-    return buildNuvioExport({
+    return buildNuvioExportPayload({
       lists: getSelectedListsForExport(),
       existing,
       mode: getMergeMode(),
@@ -200,33 +206,82 @@ export function createNuvioExportUi({ selection }) {
     return document.querySelector("input[name='nuvio-merge-mode']:checked")?.value || "new";
   }
 
-  function updateExportSummary(exportJson) {
+  function updateExportSummary(payload) {
     const mode = getMergeMode();
     const selectedCount = selection.size;
     const coverUrl = getCoverUrl();
     const existingCount = getExistingCollections().length;
-    const collectionCount = Array.isArray(exportJson) ? exportJson.length : 0;
+    const collectionCount = payload.report.collectionCount;
+    const reportText = getExportReportText(payload.report);
+    let summary;
 
     if (mode === "split") {
       const splitCount = getSplitGroups().size;
-      exportSummary.textContent = `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(splitCount)} new collection${splitCount === 1 ? "" : "s"}${coverUrl ? " with a cover URL" : ""}.`;
+      summary = `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(splitCount)} new collection${splitCount === 1 ? "" : "s"}${coverUrl ? " with a cover URL" : ""}.`;
+      exportSummary.textContent = `${summary}${reportText}`;
       return;
     }
 
     if (mode === "existing") {
-      exportSummary.textContent = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added to one existing collection.`;
+      summary = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added to one existing collection.`;
+      exportSummary.textContent = `${summary}${reportText}`;
       return;
     }
 
     if (mode === "mapped") {
       const mappedCollections = new Set(selection.mappedAssignments.values());
-      exportSummary.textContent = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} mapped across ${formatNumber(mappedCollections.size || existingCount)} existing collection${(mappedCollections.size || existingCount) === 1 ? "" : "s"}.`;
+      summary = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} mapped across ${formatNumber(mappedCollections.size || existingCount)} existing collection${(mappedCollections.size || existingCount) === 1 ? "" : "s"}.`;
+      exportSummary.textContent = `${summary}${reportText}`;
       return;
     }
 
-    exportSummary.textContent = existingCount
+    summary = existingCount
       ? `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added as one new collection. Output contains ${formatNumber(collectionCount)} total collections.`
       : `${formatNumber(selectedCount)} selected list${selectedCount === 1 ? "" : "s"} will be exported as folders in one collection${coverUrl ? " with a cover URL" : ""}.`;
+    exportSummary.textContent = `${summary}${reportText}`;
+  }
+
+  function getOutputSummaryText(payload) {
+    const report = payload.report || {};
+    const details = [`${formatNumber(payload.json.length)} chars`];
+
+    if (report.idFixCount) {
+      details.push(`${formatNumber(report.idFixCount)} ID fix${report.idFixCount === 1 ? "" : "es"}`);
+    }
+
+    if (report.duplicateSourceFolderCount) {
+      details.push(`${formatNumber(report.duplicateSourceFolderCount)} duplicate folder${report.duplicateSourceFolderCount === 1 ? "" : "s"} skipped`);
+    }
+
+    if (report.warningCount) {
+      details.push(`${formatNumber(report.warningCount)} validation warning${report.warningCount === 1 ? "" : "s"}`);
+    }
+
+    return details.join("; ");
+  }
+
+  function getExportReportText(report) {
+    const messages = [];
+
+    if (report.duplicateSourceFolderCount) {
+      messages.push(`${formatNumber(report.duplicateSourceFolderCount)} duplicate source folder${report.duplicateSourceFolderCount === 1 ? " was" : "s were"} skipped because ${report.duplicateSourceFolderCount === 1 ? "it already exists" : "they already exist"} or would duplicate existing output.`);
+    }
+
+    if (report.idFixCount) {
+      messages.push(`${formatNumber(report.idFixCount)} missing or duplicate ID${report.idFixCount === 1 ? " was" : "s were"} repaired.`);
+    }
+
+    if (report.warningCount) {
+      messages.push(`${formatNumber(report.warningCount)} validation warning${report.warningCount === 1 ? "" : "s"} found.`);
+    }
+
+    return messages.length ? ` ${messages.join(" ")}` : "";
+  }
+
+  function getLatestPayload() {
+    if (latestPayload) return latestPayload;
+    refreshGeneratedOutput();
+    return latestPayload;
   }
 
   function updateCoverStatus() {
@@ -506,12 +561,16 @@ export function createNuvioExportUi({ selection }) {
   }
 
   async function copyJson() {
-    await navigator.clipboard.writeText(output.value);
+    const payload = getLatestPayload();
+    if (!payload) return;
+    await navigator.clipboard.writeText(payload.json);
     flashButton(copyButton);
   }
 
   function openJsonPreview() {
-    jsonPreviewOutput.value = output.value;
+    const payload = getLatestPayload();
+    if (!payload) return;
+    jsonPreviewOutput.value = payload.json;
     openModal(jsonPreviewModal, {
       focusTarget: jsonPreviewClose,
       onClose: closeJsonPreview,
@@ -539,7 +598,9 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function downloadJson() {
-    const blob = new Blob([`${output.value}\n`], { type: "application/json" });
+    const payload = getLatestPayload();
+    if (!payload) return;
+    const blob = new Blob([payload.json], { type: "application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `${slugifyFilename(collectionNameInput.value || "trakt-lists")}.nuvio.json`;
