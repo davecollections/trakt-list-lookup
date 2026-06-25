@@ -245,7 +245,6 @@
 
         <div class="nuvio-utility-row">
           <button id="reset-nuvio-export" type="button" class="ghost-button">Reset export form</button>
-          <button id="open-nuvio-import-help" type="button" class="ghost-button nuvio-help-button" aria-label="Open Nuvio import help" title="Import help">?</button>
         </div>
 
         <div class="nuvio-grid">
@@ -350,42 +349,21 @@
             <div id="nuvio-list-mapping" class="nuvio-list-mapping" hidden></div>
           </div>
 
-          <section class="nuvio-wide nuvio-panel export-preview-panel">
-            <div class="nuvio-panel-heading">
-              <h3>Export preview</h3>
-              <p id="nuvio-output-summary">Generated JSON</p>
-            </div>
+          <section class="nuvio-wide export-status-panel">
             <div id="nuvio-export-status" class="nuvio-export-status" role="status" aria-live="polite">
               <strong id="nuvio-export-status-title">Export ready</strong>
               <ul id="nuvio-export-status-list"></ul>
-            </div>
-            <div class="nuvio-output-actions">
-              <button id="preview-nuvio-json" type="button" class="ghost-button">Preview JSON</button>
             </div>
             <textarea id="nuvio-output" rows="8" readonly aria-readonly="true" hidden></textarea>
           </section>
         </div>
 
-        <div class="modal-actions">
-          <button id="copy-nuvio-json" type="button">Copy JSON</button>
-          <button id="download-nuvio-json" type="button" class="ghost-button">Download JSON</button>
-        </div>
-      </section>
-    </div>
-
-    <div id="json-preview-modal" class="modal" hidden>
-      <div class="modal-backdrop" data-close-json-preview></div>
-      <section class="modal-dialog json-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="json-preview-title">
-        <div class="modal-header">
-          <div>
-            <p class="result-owner">Generated export</p>
-            <h2 id="json-preview-title">JSON preview</h2>
+        <div class="modal-actions nuvio-modal-actions">
+          <button id="open-nuvio-import-help" type="button" class="ghost-button nuvio-help-button" aria-label="Open Nuvio import help" title="Import help">?</button>
+          <div class="nuvio-export-actions">
+            <button id="copy-nuvio-json" type="button">Copy JSON</button>
+            <button id="download-nuvio-json" type="button" class="ghost-button">Download JSON</button>
           </div>
-          <button id="json-preview-close" type="button" class="ghost-button">Close</button>
-        </div>
-        <textarea id="json-preview-output" rows="18" readonly aria-readonly="true"></textarea>
-        <div class="modal-actions">
-          <button id="copy-json-preview" type="button">Copy JSON</button>
         </div>
       </section>
     </div>

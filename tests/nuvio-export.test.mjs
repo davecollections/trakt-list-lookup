@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { buildNuvioExport, buildNuvioExportPayload, createNuvioIdFactory, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
 import { countImportedSelectedTraktListDuplicates, getNuvioDestinationCopy, getNuvioExportStatusModel } from "../js/nuvio-export-ui.js";
 
@@ -15,11 +16,19 @@ const fiveLists = [
 
 let nextId = 0;
 const createId = (prefix) => `${prefix}-${++nextId}`;
+const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
 assert.equal(getSafeHttpsUrl("http://example.com/cover.jpg"), "");
 assert.equal(getSafeHttpsUrl("not a url"), "");
 assert.equal(getSafeHttpsUrl("https://example.com/cover.jpg"), "https://example.com/cover.jpg");
 assert.deepEqual(sortNuvioLists(lists, "likes-desc").map((item) => item.name), ["More Comedy", "Horror Finds", "Comedy Nights"]);
+assert.ok(!indexHtml.includes("id=\"preview-nuvio-json\""));
+assert.ok(!indexHtml.includes("id=\"json-preview-modal\""));
+assert.ok(!indexHtml.includes("Export preview"));
+assert.match(indexHtml, /id="nuvio-output"[^>]*readonly[^>]*aria-readonly="true"[^>]*hidden/);
+assert.match(indexHtml, /id="nuvio-existing-json"[^>]*placeholder="Paste an existing Nuvio JSON array to append into it\."/);
+assert.doesNotMatch(indexHtml, /id="nuvio-existing-json"[^>]*readonly/);
+assert.match(indexHtml, /id="open-nuvio-import-help"[^>]*aria-label="Open Nuvio import help"[^>]*>\?/);
 
 nextId = 0;
 const defaultNamePayload = buildNuvioExportPayload({

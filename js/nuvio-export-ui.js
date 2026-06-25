@@ -33,17 +33,11 @@ export function createNuvioExportUi({ selection }) {
   const splitMapping = document.querySelector("#nuvio-split-mapping");
   const listMapping = document.querySelector("#nuvio-list-mapping");
   const output = document.querySelector("#nuvio-output");
-  const outputSummary = document.querySelector("#nuvio-output-summary");
   const exportStatus = document.querySelector("#nuvio-export-status");
   const exportStatusTitle = document.querySelector("#nuvio-export-status-title");
   const exportStatusList = document.querySelector("#nuvio-export-status-list");
-  const previewJsonButton = document.querySelector("#preview-nuvio-json");
   const copyButton = document.querySelector("#copy-nuvio-json");
   const downloadButton = document.querySelector("#download-nuvio-json");
-  const jsonPreviewModal = document.querySelector("#json-preview-modal");
-  const jsonPreviewOutput = document.querySelector("#json-preview-output");
-  const jsonPreviewClose = document.querySelector("#json-preview-close");
-  const jsonPreviewCopy = document.querySelector("#copy-json-preview");
   const importHelpModal = document.querySelector("#nuvio-import-help-modal");
   const resetButton = document.querySelector("#reset-nuvio-export");
   const importHelpOpen = document.querySelector("#open-nuvio-import-help");
@@ -59,11 +53,8 @@ export function createNuvioExportUi({ selection }) {
   let latestPayload = null;
 
   closeButton.addEventListener("click", close);
-  previewJsonButton.addEventListener("click", openJsonPreview);
   copyButton.addEventListener("click", copyJson);
   downloadButton.addEventListener("click", downloadJson);
-  jsonPreviewClose.addEventListener("click", closeJsonPreview);
-  jsonPreviewCopy.addEventListener("click", copyJsonPreview);
   resetButton.addEventListener("click", resetExportForm);
   importHelpOpen.addEventListener("click", openImportHelp);
   importHelpClose.addEventListener("click", closeImportHelp);
@@ -102,9 +93,6 @@ export function createNuvioExportUi({ selection }) {
   modal.addEventListener("click", (event) => {
     if (event.target.matches("[data-close-nuvio]")) close();
   });
-  jsonPreviewModal.addEventListener("click", (event) => {
-    if (event.target.matches("[data-close-json-preview]")) closeJsonPreview();
-  });
   importHelpModal.addEventListener("click", (event) => {
     if (event.target.matches("[data-close-nuvio-import-help]")) closeImportHelp();
   });
@@ -113,7 +101,7 @@ export function createNuvioExportUi({ selection }) {
     open,
     close,
     update,
-    isOpen: () => isModalOpen(modal) || isModalOpen(jsonPreviewModal) || isModalOpen(importHelpModal),
+    isOpen: () => isModalOpen(modal) || isModalOpen(importHelpModal),
   };
 
   function open() {
@@ -128,7 +116,6 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function close() {
-    closeJsonPreview();
     closeImportHelp();
     closeModal(modal);
   }
@@ -165,7 +152,6 @@ export function createNuvioExportUi({ selection }) {
     } catch (error) {
       latestPayload = null;
       output.value = `Could not build JSON: ${error.message}`;
-      outputSummary.textContent = "Needs attention";
       exportSummary.textContent = "Fix the highlighted export settings before copying.";
       renderExportStatus(null);
       setJsonActionsDisabled(true);
@@ -180,14 +166,12 @@ export function createNuvioExportUi({ selection }) {
       const payload = createExportPayload();
       latestPayload = payload;
       output.value = payload.json;
-      outputSummary.textContent = getOutputSummaryText(payload);
       updateExportSummary(payload);
       renderExportStatus(payload);
       setJsonActionsDisabled(false);
     } catch (error) {
       latestPayload = null;
       output.value = `Could not build JSON: ${error.message}`;
-      outputSummary.textContent = "Needs attention";
       exportSummary.textContent = "Fix the highlighted export settings before copying.";
       renderExportStatus(null);
       setJsonActionsDisabled(true);
@@ -259,10 +243,6 @@ export function createNuvioExportUi({ selection }) {
       ? `${formatNumber(selectedCount)} selected list${selectedCount === 1 ? "" : "s"} will be added as a new collection alongside the imported JSON. Output contains ${formatNumber(collectionCount)} total collections.`
       : `${formatNumber(selectedCount)} selected list${selectedCount === 1 ? "" : "s"} will be exported as folders in one collection${coverUrl ? " with a cover URL" : ""}.`;
     exportSummary.textContent = summary;
-  }
-
-  function getOutputSummaryText(payload) {
-    return `${formatNumber(payload.json.length)} chars`;
   }
 
   function renderExportStatus(payload) {
@@ -513,7 +493,6 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function resetExportForm() {
-    closeJsonPreview();
     closeImportHelp();
     folderImageRequestId += 1;
     latestPayload = null;
@@ -603,7 +582,6 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function setJsonActionsDisabled(disabled) {
-    previewJsonButton.disabled = disabled;
     copyButton.disabled = disabled;
     downloadButton.disabled = disabled;
   }
@@ -615,20 +593,6 @@ export function createNuvioExportUi({ selection }) {
     flashButton(copyButton);
   }
 
-  function openJsonPreview() {
-    const payload = getLatestPayload();
-    if (!payload) return;
-    jsonPreviewOutput.value = payload.json;
-    openModal(jsonPreviewModal, {
-      focusTarget: jsonPreviewClose,
-      onClose: closeJsonPreview,
-    });
-  }
-
-  function closeJsonPreview() {
-    closeModal(jsonPreviewModal);
-  }
-
   function openImportHelp() {
     openModal(importHelpModal, {
       focusTarget: importHelpClose,
@@ -638,11 +602,6 @@ export function createNuvioExportUi({ selection }) {
 
   function closeImportHelp() {
     closeModal(importHelpModal);
-  }
-
-  async function copyJsonPreview() {
-    await navigator.clipboard.writeText(jsonPreviewOutput.value);
-    flashButton(jsonPreviewCopy);
   }
 
   function downloadJson() {

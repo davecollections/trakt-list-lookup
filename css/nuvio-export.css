@@ -2,10 +2,6 @@
   width: min(860px, 100%);
 }
 
-.json-preview-dialog {
-  width: min(940px, 100%);
-}
-
 .nuvio-help-dialog {
   width: min(760px, 100%);
 }
@@ -23,7 +19,8 @@
   white-space: nowrap;
 }
 
-.nuvio-utility-row .nuvio-help-button {
+.nuvio-help-button,
+.modal-actions .nuvio-help-button {
   width: 30px;
   min-width: 30px;
   min-height: 30px;
@@ -37,7 +34,8 @@
   line-height: 1;
 }
 
-.nuvio-utility-row .nuvio-help-button:hover {
+.nuvio-help-button:hover,
+.modal-actions .nuvio-help-button:hover {
   border-color: color-mix(in srgb, #6366f1 36%, var(--border));
   background: color-mix(in srgb, #6366f1 7%, transparent);
   color: var(--text);
@@ -322,6 +320,10 @@
   margin: 0 10px;
 }
 
+.export-status-panel .nuvio-export-status {
+  margin: 0;
+}
+
 .nuvio-export-status {
   display: grid;
   gap: 5px;
@@ -396,29 +398,22 @@
   padding-top: 0;
 }
 
-.export-preview-panel textarea {
-  border-width: 1px 0 0;
-  border-radius: 0 0 8px 8px;
-}
-
-.nuvio-output-actions {
+.nuvio-modal-actions {
   display: flex;
-  justify-content: flex-end;
-  padding: 10px;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.json-preview-dialog textarea {
-  width: 100%;
-  min-height: min(58vh, 520px);
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  resize: vertical;
+.nuvio-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.nuvio-export-actions button {
+  min-height: 34px;
+  padding: 0 12px;
 }
 
 .nuvio-import-help {
@@ -480,6 +475,10 @@
 
   .nuvio-panel-heading {
     display: grid;
+  }
+
+  .nuvio-modal-actions {
+    align-items: stretch;
   }
 
   .nuvio-panel-heading p {
