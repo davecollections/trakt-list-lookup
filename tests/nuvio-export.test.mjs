@@ -46,11 +46,19 @@ assert.match(indexHtml, /Folder order/);
 assert.match(indexHtml, /Sorts generated folders, not the titles inside Trakt lists\./);
 assert.match(indexHtml, /Artwork defaults/);
 assert.match(indexHtml, /Auto from list posters/);
+assert.match(indexHtml, /Folder tile shape/);
+assert.match(indexHtml, /<option value="POSTER">Poster<\/option>/);
+assert.match(indexHtml, /Folder titles/);
+assert.match(indexHtml, /<option value="show">Show<\/option>/);
 assert.match(indexHtml, /id="nuvio-folder-artwork-overrides"/);
 assert.match(nuvioUiJs, /Folder artwork overrides/);
+assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_DEFAULT, "Default"/);
+assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_NONE, "None"/);
+assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_CUSTOM, "Custom"/);
 assert.match(nuvioUiJs, /Cover image URL/);
-assert.match(nuvioUiJs, /Clear custom cover/);
-assert.match(nuvioUiJs, /folderImageOverrides\.clear\(\)/);
+assert.match(nuvioUiJs, /clearButton\.textContent = "Clear"/);
+assert.match(nuvioUiJs, /setFolderArtworkChoice\(input\.dataset\.folderCoverKey, FOLDER_ARTWORK_MODE_CUSTOM, input\.value\)/);
+assert.match(nuvioUiJs, /folderArtworkChoices\.clear\(\)/);
 assert.match(indexHtml, /New collection/);
 assert.match(indexHtml, /Split into new collections/);
 assert.match(indexHtml, /Add to imported collection/);
@@ -262,6 +270,39 @@ const customCoverExport = buildNuvioExport({
 assert.equal(customCoverExport[0].folders[0].coverImageUrl, "https://example.com/custom-comedy.jpg");
 assert.equal(customCoverExport[0].folders[1].coverImageUrl, "https://example.com/custom-horror.jpg");
 assert.equal(customCoverExport[0].folders[2].coverImageUrl, "https://example.com/collection.jpg");
+
+nextId = 0;
+const noCoverChoiceExport = buildNuvioExport({
+  lists,
+  collectionName: "No Cover Choice",
+  coverUrl: "https://example.com/collection.jpg",
+  folderImages: {
+    101: "",
+  },
+  createId,
+});
+assert.equal(noCoverChoiceExport[0].folders[0].coverImageUrl, "");
+assert.equal(noCoverChoiceExport[0].folders[1].coverImageUrl, "https://example.com/collection.jpg");
+
+nextId = 0;
+const posterTileExport = buildNuvioExport({
+  lists,
+  folderTileShape: "POSTER",
+  hideFolderTitles: false,
+  createId,
+});
+assert.equal(posterTileExport[0].folders[0].tileShape, "POSTER");
+assert.equal(posterTileExport[0].folders[0].hideTitle, false);
+
+nextId = 0;
+const landscapeTileExport = buildNuvioExport({
+  lists,
+  folderTileShape: "LANDSCAPE",
+  hideFolderTitles: true,
+  createId,
+});
+assert.equal(landscapeTileExport[0].folders[0].tileShape, "LANDSCAPE");
+assert.equal(landscapeTileExport[0].folders[0].hideTitle, true);
 
 nextId = 0;
 const noFolderImageExport = buildNuvioExport({

@@ -143,10 +143,6 @@
   align-content: start;
 }
 
-.nuvio-artwork-grid {
-  grid-template-columns: minmax(220px, 0.45fr);
-}
-
 .nuvio-folder-artwork-overrides {
   display: grid;
   gap: 8px;
@@ -185,9 +181,9 @@
 
 .nuvio-folder-artwork-row {
   display: grid;
-  grid-template-columns: 72px minmax(0, 0.8fr) minmax(220px, 1fr) auto;
+  grid-template-columns: 82px minmax(0, 1fr);
   gap: 8px;
-  align-items: center;
+  align-items: start;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -196,7 +192,7 @@
 
 .nuvio-folder-artwork-preview {
   display: grid;
-  width: 72px;
+  width: 82px;
   aspect-ratio: 16 / 9;
   place-items: center;
   overflow: hidden;
@@ -207,6 +203,12 @@
   font-size: 0.66rem;
   font-weight: 800;
   text-align: center;
+}
+
+.nuvio-folder-artwork-body {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
 }
 
 .nuvio-folder-artwork-preview img {
@@ -231,13 +233,59 @@
   white-space: nowrap;
 }
 
+.nuvio-folder-artwork-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nuvio-folder-artwork-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.nuvio-mode-pill {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--soft) 52%, var(--panel));
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.nuvio-mode-pill:hover,
+.nuvio-mode-pill:focus-visible {
+  border-color: color-mix(in srgb, #6366f1 42%, var(--border));
+  color: var(--text);
+}
+
+.nuvio-mode-pill.is-active {
+  border-color: color-mix(in srgb, #6366f1 62%, var(--border));
+  background: color-mix(in srgb, #6366f1 12%, var(--panel));
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #6366f1 12%, transparent);
+}
+
 .nuvio-folder-artwork-row label {
   min-width: 0;
 }
 
 .nuvio-folder-artwork-row .ghost-button {
-  min-height: 34px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 0.72rem;
   white-space: nowrap;
+}
+
+.nuvio-custom-cover-field[hidden] {
+  display: none;
 }
 
 .nuvio-merge-options {
