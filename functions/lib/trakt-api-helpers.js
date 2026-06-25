@@ -131,6 +131,11 @@ export function isSafePathSegment(value) {
   return /^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/.test(value);
 }
 
+export function parseTraktListId(value) {
+  const text = String(value || "").trim();
+  return /^[1-9]\d{0,19}$/.test(text) ? text : "";
+}
+
 export function getPagination(response) {
   const page = getPositiveInteger(response.headers.get("x-pagination-page"), 1);
   const limit = getPositiveInteger(response.headers.get("x-pagination-limit"), RESULT_LIMIT);
@@ -194,9 +199,7 @@ export function normalizeList(list) {
   const username = user.username || user.ids?.slug || "";
   const url = username && ids.slug
     ? `${TRAKT_WEB_BASE}/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(ids.slug)}`
-    : ids.trakt
-      ? `${TRAKT_WEB_BASE}/lists/${ids.trakt}`
-      : "";
+    : "";
 
   return {
     name: list.name || "",

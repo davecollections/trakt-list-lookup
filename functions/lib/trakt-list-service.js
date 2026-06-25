@@ -6,6 +6,7 @@ import {
   listMatchesTerms,
   normalizeGlobalListEntry,
   normalizeSearchText,
+  parseTraktListId,
   parseTraktListUrl,
   parseUserListQuery,
   rankSearchResults,
@@ -118,6 +119,9 @@ export async function getUserLists(username, page, limit, clientId) {
 }
 
 export async function resolveListUrl(value, clientId) {
+  const directId = parseTraktListId(value);
+  if (directId) return resolveListId(directId, clientId);
+
   const parsed = parseTraktListUrl(value);
   if (!parsed) {
     throw httpError("That does not look like a supported Trakt list URL.", 400);
@@ -135,15 +139,31 @@ export async function resolveListUrl(value, clientId) {
   }
 
   if (parsed.kind === "list-id") {
-    const payload = await traktFetch(`/lists/${encodeURIComponent(parsed.id)}?extended=full`, clientId);
+    return resolveListId(parsed.id, clientId);
+  }
+
+  throw httpError("Unsupported Trakt list URL.", 400);
+}
+
+export async function resolveListId(id, clientId) {
+  const listId = parseTraktListId(id);
+  if (!listId) {
+    throw httpError("Invalid Trakt list ID.", 400);
+  }
+
+  try {
+    const payload = await traktFetch(`/lists/${encodeURIComponent(listId)}?extended=full`, clientId);
     return {
       data: [payload.data],
       quickUserLists: [payload.data],
       pagination: singleResultPagination(),
     };
+  } catch (error) {
+    if (error.status === 404) {
+      throw httpError("No public list found for this Trakt list ID.", 404);
+    }
+    throw error;
   }
-
-  throw httpError("Unsupported Trakt list URL.", 400);
 }
 
 export async function getQuickUsersForPayload(mode, query, payload, clientId) {
@@ -242,7 +262,7 @@ function getListUrl(list) {
   const username = list?.user?.username || list?.user?.ids?.slug || "";
   const slug = list?.ids?.slug || "";
   if (username && slug) return `https://trakt.tv/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}`;
-  return list?.ids?.trakt ? `https://trakt.tv/lists/${list.ids.trakt}` : "";
+  return "";
 }
 
 function normalizeCount(value) {

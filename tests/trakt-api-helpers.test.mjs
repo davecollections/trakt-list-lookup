@@ -13,6 +13,7 @@ import {
   normalizeSearchText,
   normalizeSort,
   normalizeSortOrder,
+  parseTraktListId,
   parseTraktListUrl,
   parseUserListQuery,
   rankSearchResults,
@@ -40,6 +41,10 @@ assert.deepEqual(parseTraktListUrl("https://app.trakt.tv/lists/12345"), {
 });
 assert.equal(parseTraktListUrl("https://example.com/users/snoak/lists/demo"), null);
 assert.equal(parseTraktListUrl("not a url"), null);
+assert.equal(parseTraktListId("33753562"), "33753562");
+assert.equal(parseTraktListId(" 33753562 "), "33753562");
+assert.equal(parseTraktListId("0"), "");
+assert.equal(parseTraktListId("33753562 aliens"), "");
 
 assert.equal(isSafePathSegment("demo.user-123"), true);
 assert.equal(isSafePathSegment("../demo"), false);
@@ -117,6 +122,15 @@ const normalized = normalizeList(list({
 assert.equal(normalized.url, "https://trakt.tv/users/snoak/lists/demo");
 assert.equal(normalized.ids.trakt, 123);
 assert.equal(normalized.like_count, 7);
+
+const normalizedWithoutOwnerSlug = normalizeList({
+  name: "ID Only",
+  ids: {
+    trakt: 456,
+  },
+});
+assert.equal(normalizedWithoutOwnerSlug.ids.trakt, 456);
+assert.equal(normalizedWithoutOwnerSlug.url, "");
 
 const globalEntry = normalizeGlobalListEntry({
   like_count: "11",

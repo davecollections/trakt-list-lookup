@@ -21,6 +21,9 @@ try {
   await testSearchIncludesCuratedOwnerFallback();
   await testSearchUsesExplicitOwnerHint();
   await testResolveListUrl();
+  await testResolveNumericListIdFromSearch();
+  await testResolveNumericListIdFromUrlMode();
+  await testMissingNumericListId();
   await testListItems();
   await testListItemsWithoutPosters();
 } finally {
@@ -379,6 +382,100 @@ async function testResolveListUrl() {
   assert.deepEqual(body.quickUsers.map((user) => user.username), ["snoak"]);
   assert.equal(body.quickUsers[0].topListName, "Demo");
   assert.equal(body.quickUsers[0].likeCount, 11);
+}
+
+async function testResolveNumericListIdFromSearch() {
+  const response = await withMutedConsole(async () => {
+    const calls = mockFetch(({ url }) => {
+      if (url.pathname === "/lists/33753562") {
+        assert.equal(url.searchParams.get("extended"), "full");
+        return jsonResponse(list({
+          name: "It's Aliens",
+          slug: "it-s-aliens",
+          username: "extreme_one",
+          trakt: 33753562,
+          likes: 9,
+        }));
+      }
+      if (isListLikesPath(url, 33753562)) {
+        return new Response(JSON.stringify({ error: "Not found" }), {
+          status: 404,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    const result = await callHandler("https://example.test/api/trakt?mode=search&q=33753562&sort=likes", env());
+    assert.ok(!calls.some((call) => call.url.pathname === "/search/list"));
+    return result;
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results.length, 1);
+  assert.equal(body.results[0].name, "It's Aliens");
+  assert.equal(body.results[0].ids.trakt, 33753562);
+  assert.equal(body.results[0].like_count, 9);
+  assert.equal(body.results[0].url, "https://trakt.tv/users/extreme_one/lists/it-s-aliens");
+  assert.deepEqual(body.pagination, {
+    page: 1,
+    limit: 1,
+    page_count: 1,
+    item_count: 1,
+  });
+  assert.deepEqual(body.quickUsers.map((user) => user.username), ["extreme_one"]);
+}
+
+async function testResolveNumericListIdFromUrlMode() {
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/33753562") {
+      assert.equal(url.searchParams.get("extended"), "full");
+      return jsonResponse(list({
+        name: "ID Lookup",
+        slug: "id-lookup",
+        username: "demo",
+        trakt: 33753562,
+        likes: 2,
+      }));
+    }
+    if (isListLikesPath(url, 33753562)) return jsonResponse([], paginationHeaders(12, 12, 1));
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=url&q=33753562", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 2);
+  assert.equal(body.results.length, 1);
+  assert.equal(body.results[0].ids.trakt, 33753562);
+  assert.equal(body.results[0].like_count, 12);
+  assert.equal(body.quickUsers[0].likeCount, 12);
+}
+
+async function testMissingNumericListId() {
+  const response = await withMutedConsoleError(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname === "/lists/99999999") {
+        return new Response("", {
+          status: 404,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=search&q=99999999", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 404);
+  assert.equal(body.error, "No public list found for this Trakt list ID.");
 }
 
 async function testListItems() {
