@@ -631,7 +631,9 @@ export function createNuvioExportUi({ selection }) {
       clearButton.type = "button";
       clearButton.className = "ghost-button";
       clearButton.dataset.clearFolderCover = key;
-      clearButton.textContent = "Clear";
+      clearButton.textContent = "Reset";
+      clearButton.title = "Reset folder artwork to default";
+      clearButton.setAttribute("aria-label", "Reset folder artwork to default");
 
       const actions = document.createElement("div");
       actions.className = "nuvio-folder-artwork-actions";
