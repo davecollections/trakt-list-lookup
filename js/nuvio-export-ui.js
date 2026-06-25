@@ -580,6 +580,7 @@ export function createNuvioExportUi({ selection }) {
       const preview = document.createElement("div");
       preview.className = "nuvio-folder-artwork-preview";
       preview.dataset.folderArtworkPreview = "true";
+      syncFolderArtworkPreviewShape(preview);
 
       const body = document.createElement("div");
       body.className = "nuvio-folder-artwork-body";
@@ -669,7 +670,15 @@ export function createNuvioExportUi({ selection }) {
     if (customField) customField.hidden = mode !== FOLDER_ARTWORK_MODE_CUSTOM;
     if (status) status.textContent = getFolderArtworkStatus(mode, defaultUrl, defaultSource);
     if (clearButton) clearButton.hidden = mode !== FOLDER_ARTWORK_MODE_CUSTOM;
-    if (preview) setFolderArtworkPreview(preview, previewUrl);
+    if (preview) {
+      syncFolderArtworkPreviewShape(preview);
+      setFolderArtworkPreview(preview, previewUrl);
+    }
+  }
+
+  function syncFolderArtworkPreviewShape(preview) {
+    preview.classList.toggle("is-poster", folderTileShape === "POSTER");
+    preview.setAttribute("data-tile-shape", folderTileShape === "POSTER" ? "Poster" : "Landscape");
   }
 
   function setFolderArtworkPreview(preview, url) {

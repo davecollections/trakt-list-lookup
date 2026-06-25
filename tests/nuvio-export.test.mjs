@@ -72,6 +72,8 @@ assert.match(nuvioUiJs, /setFolderArtworkChoice\(input\.dataset\.folderCoverKey,
 assert.match(nuvioUiJs, /folderArtworkChoices\.clear\(\)/);
 assert.match(nuvioUiJs, /input\.select\(\)/);
 assert.match(nuvioUiJs, /image\.addEventListener\("error"/);
+assert.match(nuvioUiJs, /syncFolderArtworkPreviewShape/);
+assert.match(nuvioUiJs, /classList\.toggle\("is-poster", folderTileShape === "POSTER"\)/);
 assert.match(indexHtml, /New collection/);
 assert.match(indexHtml, /Split into new collections/);
 assert.match(indexHtml, /Add to imported collection/);
