@@ -2,7 +2,7 @@ export function buildNuvioExport({
   lists,
   existing = null,
   mode = "new",
-  collectionName = "Trakt Lists",
+  collectionName = "My Collection",
   coverUrl = "",
   folderCoverUrl = null,
   sortAlpha = true,
@@ -34,7 +34,7 @@ export function buildNuvioExportPayload({
   lists,
   existing = null,
   mode = "new",
-  collectionName = "Trakt Lists",
+  collectionName = "My Collection",
   coverUrl = "",
   folderCoverUrl = null,
   sortAlpha = true,
@@ -59,7 +59,7 @@ export function buildNuvioExportPayload({
     collections = [...(existingCollections || []), ...createSplitNuvioCollections(selectedLists, splitAssignments, safeCoverUrl, safeFolderCoverUrl, folderImages, idFactory.create)];
   } else {
     const newCollection = createNuvioCollection({
-      title: collectionName || "Trakt Lists",
+      title: collectionName || "My Collection",
       lists: selectedLists,
       coverUrl: safeCoverUrl,
       folderCoverUrl: safeFolderCoverUrl,

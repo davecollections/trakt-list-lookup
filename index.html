@@ -245,7 +245,7 @@
 
         <div class="nuvio-utility-row">
           <button id="reset-nuvio-export" type="button" class="ghost-button">Reset export form</button>
-          <button id="open-nuvio-import-help" type="button" class="ghost-button">Import help</button>
+          <button id="open-nuvio-import-help" type="button" class="ghost-button nuvio-help-button" aria-label="Open Nuvio import help" title="Import help">?</button>
         </div>
 
         <div class="nuvio-grid">
@@ -257,7 +257,7 @@
             <div class="nuvio-field-grid">
               <label>
                 Collection name
-                <input id="nuvio-collection-name" type="text" placeholder="Trakt Lists">
+                <input id="nuvio-collection-name" type="text" placeholder="My Collection">
               </label>
               <label>
                 Cover image URL
@@ -287,7 +287,7 @@
             </div>
           </section>
 
-          <details class="nuvio-wide nuvio-panel nuvio-details">
+          <details id="nuvio-existing-details" class="nuvio-wide nuvio-panel nuvio-details">
             <summary>
               <span>Existing Nuvio JSON</span>
               <small>Optional</small>
@@ -362,7 +362,7 @@
             <div class="nuvio-output-actions">
               <button id="preview-nuvio-json" type="button" class="ghost-button">Preview JSON</button>
             </div>
-            <textarea id="nuvio-output" rows="8" readonly hidden></textarea>
+            <textarea id="nuvio-output" rows="8" readonly aria-readonly="true" hidden></textarea>
           </section>
         </div>
 
@@ -383,7 +383,7 @@
           </div>
           <button id="json-preview-close" type="button" class="ghost-button">Close</button>
         </div>
-        <textarea id="json-preview-output" rows="18" readonly></textarea>
+        <textarea id="json-preview-output" rows="18" readonly aria-readonly="true"></textarea>
         <div class="modal-actions">
           <button id="copy-json-preview" type="button">Copy JSON</button>
         </div>

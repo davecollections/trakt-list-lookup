@@ -6,7 +6,7 @@ import { buildNuvioExportPayload, getListSelectionKey, getSafeHttpsUrl, sortNuvi
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
 const MAX_EXISTING_JSON_BYTES = 2 * 1024 * 1024;
-const DEFAULT_COLLECTION_NAME = "Trakt Lists";
+const DEFAULT_COLLECTION_NAME = "My Collection";
 const DEFAULT_MERGE_MODE = "new";
 const DEFAULT_SORT_MODE = "title-asc";
 const DEFAULT_FOLDER_IMAGE_MODE = "auto";
@@ -23,6 +23,7 @@ export function createNuvioExportUi({ selection }) {
   const folderImageModeSelect = document.querySelector("#nuvio-folder-image-mode");
   const folderImageStatus = document.querySelector("#nuvio-folder-image-status");
   const existingJsonInput = document.querySelector("#nuvio-existing-json");
+  const existingJsonDetails = document.querySelector("#nuvio-existing-details");
   const existingFileInput = document.querySelector("#nuvio-existing-file");
   const existingFileStatus = document.querySelector("#nuvio-file-status");
   const existingJsonStatus = document.querySelector("#nuvio-existing-status");
@@ -530,6 +531,7 @@ export function createNuvioExportUi({ selection }) {
     coverStatus.textContent = "";
     coverStatus.classList.remove("invalid");
     folderImageStatus.textContent = "";
+    existingJsonDetails.open = false;
     setMergeMode(DEFAULT_MERGE_MODE);
     targetCollectionSelect.textContent = "";
     selection.clearExportAssignments?.();
@@ -649,7 +651,7 @@ export function createNuvioExportUi({ selection }) {
     const blob = new Blob([payload.json], { type: "application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${slugifyFilename(collectionNameInput.value || "trakt-lists")}.nuvio.json`;
+    link.download = `${slugifyFilename(collectionNameInput.value || DEFAULT_COLLECTION_NAME)}.nuvio.json`;
     link.click();
     URL.revokeObjectURL(link.href);
   }

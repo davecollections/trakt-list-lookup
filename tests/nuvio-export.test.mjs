@@ -22,6 +22,13 @@ assert.equal(getSafeHttpsUrl("https://example.com/cover.jpg"), "https://example.
 assert.deepEqual(sortNuvioLists(lists, "likes-desc").map((item) => item.name), ["More Comedy", "Horror Finds", "Comedy Nights"]);
 
 nextId = 0;
+const defaultNamePayload = buildNuvioExportPayload({
+  lists,
+  createId,
+});
+assert.equal(defaultNamePayload.collections[0].title, "My Collection");
+
+nextId = 0;
 const freshExport = buildNuvioExport({
   lists,
   collectionName: "Trakt Picks",
@@ -41,7 +48,7 @@ const fallbackTitleExport = buildNuvioExport({
   collectionName: "",
   createId,
 });
-assert.equal(fallbackTitleExport[0].title, "Trakt Lists");
+assert.equal(fallbackTitleExport[0].title, "My Collection");
 
 nextId = 0;
 const freshPayload = buildNuvioExportPayload({
