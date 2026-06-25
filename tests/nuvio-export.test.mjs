@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { buildNuvioExport, buildNuvioExportPayload, createNuvioIdFactory, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
-import { countImportedSelectedTraktListDuplicates, getNuvioExportStatusModel } from "../js/nuvio-export-ui.js";
+import { countImportedSelectedTraktListDuplicates, getNuvioDestinationCopy, getNuvioExportStatusModel } from "../js/nuvio-export-ui.js";
 
 const lists = [
   list("Comedy Nights", 101),
@@ -15,11 +16,26 @@ const fiveLists = [
 
 let nextId = 0;
 const createId = (prefix) => `${prefix}-${++nextId}`;
+const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
 assert.equal(getSafeHttpsUrl("http://example.com/cover.jpg"), "");
 assert.equal(getSafeHttpsUrl("not a url"), "");
 assert.equal(getSafeHttpsUrl("https://example.com/cover.jpg"), "https://example.com/cover.jpg");
 assert.deepEqual(sortNuvioLists(lists, "likes-desc").map((item) => item.name), ["More Comedy", "Horror Finds", "Comedy Nights"]);
+assert.ok(!indexHtml.includes("id=\"preview-nuvio-json\""));
+assert.ok(!indexHtml.includes("id=\"json-preview-modal\""));
+assert.ok(!indexHtml.includes("Export preview"));
+assert.match(indexHtml, /id="nuvio-output"[^>]*readonly[^>]*aria-readonly="true"[^>]*hidden/);
+assert.match(indexHtml, /id="nuvio-existing-json"[^>]*placeholder="Paste an existing Nuvio JSON array to append into it\."/);
+assert.doesNotMatch(indexHtml, /id="nuvio-existing-json"[^>]*readonly/);
+assert.match(indexHtml, /id="open-nuvio-import-help"[^>]*aria-label="Open Nuvio import help"[^>]*>\?/);
+
+nextId = 0;
+const defaultNamePayload = buildNuvioExportPayload({
+  lists,
+  createId,
+});
+assert.equal(defaultNamePayload.collections[0].title, "My Collection");
 
 nextId = 0;
 const freshExport = buildNuvioExport({
@@ -34,6 +50,14 @@ assert.equal(freshExport[0].folders.length, 3);
 assert.equal(freshExport[0].folders[0].sources[0].provider, "trakt");
 assert.equal(freshExport[0].backdropImageUrl, "https://example.com/cover.jpg");
 assert.equal(freshExport[0].folders[0].sources[0].mediaType, "MOVIE");
+
+nextId = 0;
+const fallbackTitleExport = buildNuvioExport({
+  lists,
+  collectionName: "",
+  createId,
+});
+assert.equal(fallbackTitleExport[0].title, "My Collection");
 
 nextId = 0;
 const freshPayload = buildNuvioExportPayload({
@@ -51,6 +75,16 @@ const freshPayloadStatus = getNuvioExportStatusModel(freshPayload);
 assert.equal(freshPayloadStatus.title, "Export ready");
 assert.equal(freshPayloadStatus.tone, "success");
 assert.ok(freshPayloadStatus.messages.includes("Output contains 3 folders."));
+
+const noExistingDestinationCopy = getNuvioDestinationCopy();
+assert.equal(noExistingDestinationCopy.summary, "Create a new Nuvio collection from selected lists.");
+assert.equal(noExistingDestinationCopy.newDescription, "Add selected lists as folders in one new collection.");
+
+const importedDestinationCopy = getNuvioDestinationCopy({ existingCollectionCount: 2 });
+assert.equal(importedDestinationCopy.summary, "2 imported collections detected.");
+assert.equal(importedDestinationCopy.newDescription, "Keep imported collections and add selected lists as a new collection.");
+assert.equal(importedDestinationCopy.existingDescription, "Add selected lists to the chosen imported collection. Already-existing Trakt lists may be skipped.");
+assert.equal(importedDestinationCopy.mappedDescription, "Choose an imported collection for each selected list. Already-existing Trakt lists may be skipped.");
 
 nextId = 0;
 const seriesExport = buildNuvioExport({

@@ -19,6 +19,14 @@ selection.setMappedAssignment("123", "collection-a");
 assert.deepEqual(selection.splitAssignmentObject(), { 123: "Grouped" });
 assert.deepEqual(selection.mappedAssignmentObject(), { 123: "collection-a" });
 
+selection.clearExportAssignments();
+assert.equal(selection.size, 1);
+assert.deepEqual(selection.values(), [demoList]);
+assert.deepEqual(selection.splitAssignmentObject(), {});
+assert.deepEqual(selection.mappedAssignmentObject(), {});
+
+selection.setSplitAssignment("123", "Grouped");
+selection.setMappedAssignment("123", "collection-a");
 assert.equal(selection.toggle(demoList), false);
 assert.equal(selection.size, 0);
 assert.deepEqual(selection.splitAssignmentObject(), {});

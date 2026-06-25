@@ -39,6 +39,10 @@ export function createSelectionState() {
       splitAssignments.clear();
       mappedAssignments.clear();
     },
+    clearExportAssignments() {
+      splitAssignments.clear();
+      mappedAssignments.clear();
+    },
     setSplitAssignment(key, value) {
       splitAssignments.set(key, value);
     },

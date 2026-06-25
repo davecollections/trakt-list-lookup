@@ -2,36 +2,43 @@
   width: min(860px, 100%);
 }
 
-.json-preview-dialog {
-  width: min(940px, 100%);
-}
-
 .nuvio-help-dialog {
   width: min(760px, 100%);
 }
 
-.nuvio-warning-row {
+.nuvio-utility-row {
   display: flex;
   gap: 10px;
   align-items: stretch;
+  justify-content: flex-end;
   margin-bottom: 10px;
 }
 
-.nuvio-warning {
-  flex: 1;
-  margin: 0;
-  padding: 7px 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--text);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.nuvio-warning-row .ghost-button {
+.nuvio-utility-row .ghost-button {
   min-height: 34px;
   white-space: nowrap;
+}
+
+.nuvio-help-button,
+.modal-actions .nuvio-help-button {
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.nuvio-help-button:hover,
+.modal-actions .nuvio-help-button:hover {
+  border-color: color-mix(in srgb, #6366f1 36%, var(--border));
+  background: color-mix(in srgb, #6366f1 7%, transparent);
+  color: var(--text);
 }
 
 .nuvio-grid {
@@ -62,6 +69,13 @@
 
 .field-status.invalid {
   color: var(--accent);
+}
+
+.nuvio-dialog button:focus-visible,
+.nuvio-dialog input:focus-visible,
+.nuvio-dialog select:focus-visible,
+.nuvio-dialog textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, #6366f1 24%, transparent);
 }
 
 .nuvio-panel {
@@ -153,7 +167,7 @@
 
 .radio-label:hover,
 .radio-label:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  border-color: color-mix(in srgb, #6366f1 40%, var(--border));
   background: color-mix(in srgb, var(--soft) 54%, var(--panel));
 }
 
@@ -177,11 +191,11 @@
 }
 
 .radio-label:has(input:checked) {
-  border-color: color-mix(in srgb, var(--accent) 64%, var(--border));
-  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+  border-color: color-mix(in srgb, #6366f1 64%, var(--border));
+  background: color-mix(in srgb, #6366f1 10%, var(--panel));
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+    0 0 0 1px color-mix(in srgb, #6366f1 20%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, #6366f1 12%, transparent);
 }
 
 .radio-label:has(input:checked)::after {
@@ -192,7 +206,7 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: var(--accent);
+  background: #6366f1;
 }
 
 .nuvio-grid input,
@@ -231,6 +245,12 @@
   resize: vertical;
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: 0.8rem;
+}
+
+.nuvio-grid input:focus,
+.nuvio-grid select:focus,
+.nuvio-grid textarea:focus {
+  border-color: color-mix(in srgb, #6366f1 54%, var(--border));
 }
 
 .nuvio-wide {
@@ -293,11 +313,15 @@
 
 .nuvio-file-field:focus-within .nuvio-file-button,
 .nuvio-file-button:hover {
-  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+  border-color: color-mix(in srgb, #6366f1 46%, var(--border));
 }
 
 .nuvio-target-field {
   margin: 0 10px;
+}
+
+.export-status-panel .nuvio-export-status {
+  margin: 0;
 }
 
 .nuvio-export-status {
@@ -374,29 +398,22 @@
   padding-top: 0;
 }
 
-.export-preview-panel textarea {
-  border-width: 1px 0 0;
-  border-radius: 0 0 8px 8px;
-}
-
-.nuvio-output-actions {
+.nuvio-modal-actions {
   display: flex;
-  justify-content: flex-end;
-  padding: 10px;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.json-preview-dialog textarea {
-  width: 100%;
-  min-height: min(58vh, 520px);
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  resize: vertical;
+.nuvio-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.nuvio-export-actions button {
+  min-height: 34px;
+  padding: 0 12px;
 }
 
 .nuvio-import-help {
@@ -435,12 +452,12 @@
 }
 
 @media (max-width: 720px) {
-  .nuvio-warning-row,
+  .nuvio-utility-row,
   .nuvio-import-help-grid {
     grid-template-columns: 1fr;
   }
 
-  .nuvio-warning-row {
+  .nuvio-utility-row {
     display: grid;
   }
 
@@ -458,6 +475,10 @@
 
   .nuvio-panel-heading {
     display: grid;
+  }
+
+  .nuvio-modal-actions {
+    align-items: stretch;
   }
 
   .nuvio-panel-heading p {
