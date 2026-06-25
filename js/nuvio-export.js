@@ -48,7 +48,9 @@ export function buildNuvioExportPayload({
   const report = createNuvioExportReport();
   const existingCollections = cloneNuvioJson(existing);
   const idFactory = createNuvioIdFactory(getNuvioOutputIds(existingCollections), createId);
-  const selectedLists = sortNuvioLists(lists, sortMode || (sortAlpha ? "title-asc" : "selected"));
+  const requestedLists = sortNuvioLists(lists, sortMode || (sortAlpha ? "title-asc" : "selected"));
+  const selectedLists = requestedLists.filter(isNuvioListExportable);
+  report.skippedUnavailableListCount = requestedLists.length - selectedLists.length;
   const safeCoverUrl = getSafeHttpsUrl(coverUrl);
   const safeFolderCoverUrl = folderCoverUrl === null ? safeCoverUrl : getSafeHttpsUrl(folderCoverUrl);
   let collections;
@@ -135,6 +137,7 @@ function createNuvioExportReport() {
   return {
     collectionCount: 0,
     folderCount: 0,
+    skippedUnavailableListCount: 0,
     duplicateSourceFolderCount: 0,
     missingCollectionIdsFixed: 0,
     duplicateCollectionIdsFixed: 0,
@@ -324,6 +327,13 @@ function addNuvioExportWarning(warnings, message) {
 
 function hasValue(value) {
   return value !== null && value !== undefined && String(value).trim() !== "";
+}
+
+function isNuvioListExportable(result) {
+  if (!result?.ids?.trakt) return false;
+  if (result.isExportable === false || result.isAvailable === false) return false;
+  const status = String(result.availabilityStatus || "available").toLowerCase();
+  return status !== "unavailable" && status !== "unverified";
 }
 
 function createNuvioCollection({ title, lists, coverUrl, folderCoverUrl, folderImages = {}, createId }) {

@@ -13,6 +13,11 @@ try {
   await testPopularPaginationAllowsPosterSamples();
   await testAuthoritativeLikeCountsReplacePayloadCounts();
   await testLikeCountFallbackKeepsPayloadCount();
+  await testNormalRowsDoNotValidateDetails();
+  await testPopularUnavailableSuspiciousResult();
+  await testKeywordSuspiciousLikes404Validation();
+  await testSuspiciousDetailSuccessRepairsResult();
+  await testNon404AvailabilityFailureIsUnverified();
   await testSortedQuickUsersUseEnrichedLikeCounts();
   await testQuickUsersFromSampledPages();
   await testQuickUsersFailureStillReturnsResults();
@@ -186,6 +191,196 @@ async function testLikeCountFallbackKeepsPayloadCount() {
 
   assert.equal(response.status, 200);
   assert.equal(body.results[0].like_count, 46);
+}
+
+async function testNormalRowsDoNotValidateDetails() {
+  const normalIds = new Set([2142753, 300, 301, 302]);
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") return jsonResponse([list({ trakt: 2142753, username: "justin", likes: 46 })]);
+    if (url.pathname === "/lists/trending") return jsonResponse([list({ trakt: 300, username: "trend", likes: 3 })]);
+    if (url.pathname === "/users/demo/lists") return jsonResponse([list({ trakt: 301, username: "demo", likes: 4 })]);
+    if (url.pathname === "/search/list") {
+      return jsonResponse([{ score: 1, list: list({ trakt: 302, username: "searcher", likes: 5 }) }]);
+    }
+    if (url.pathname === "/users/snoak/lists" || url.pathname === "/users/extreme_one/lists") return jsonResponse([]);
+    for (const id of normalIds) {
+      if (isListLikesPath(url, id)) return jsonResponse([], paginationHeaders(id, 1, 1));
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const responses = await Promise.all([
+    callHandler("https://example.test/api/trakt?mode=popular", env()),
+    callHandler("https://example.test/api/trakt?mode=trending", env()),
+    callHandler("https://example.test/api/trakt?mode=user&q=demo", env()),
+    callHandler("https://example.test/api/trakt?mode=search&q=horror", env()),
+  ]);
+  const bodies = await Promise.all(responses.map((response) => response.json()));
+
+  responses.forEach((response) => assert.equal(response.status, 200));
+  bodies.forEach((body) => {
+    assert.equal(body.results[0].availabilityStatus, "available");
+    assert.equal(body.results[0].isExportable, true);
+  });
+  assert.ok(!calls.some((call) => normalIds.has(Number(call.url.pathname.replace("/lists/", "")))));
+}
+
+async function testPopularUnavailableSuspiciousResult() {
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([
+        {
+          name: "500 Essential Cult Movies: The Ultimate Guide By Jennifer Eiss",
+          ids: {
+            trakt: 805686,
+          },
+          user: {
+            username: "unknown",
+          },
+          item_count: 500,
+        },
+      ], paginationHeaders(1, 1));
+    }
+    if (isListLikesPath(url, 805686)) {
+      return jsonErrorResponse(404);
+    }
+    if (url.pathname === "/lists/805686") {
+      return jsonErrorResponse(404);
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results.length, 1);
+  assert.equal(body.results[0].ids.trakt, 805686);
+  assert.equal(body.results[0].availabilityStatus, "unavailable");
+  assert.equal(body.results[0].isAvailable, false);
+  assert.equal(body.results[0].isExportable, false);
+  assert.equal(body.results[0].availabilityMessage, "Unavailable or not public");
+  assert.equal(body.results[0].url, "");
+  assert.deepEqual(body.quickUsers, []);
+  assert.ok(calls.some((call) => call.url.pathname === "/lists/805686"));
+}
+
+async function testKeywordSuspiciousLikes404Validation() {
+  const suspiciousIds = new Set([3469590, 825398, 3339599]);
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/search/list") {
+      return jsonResponse([...suspiciousIds].map((trakt, index) => ({
+        score: 10 - index,
+        list: {
+          name: `Apocalyptic ${index + 1}`,
+          ids: {
+            trakt,
+          },
+          user: {
+            username: "unknown",
+          },
+          item_count: 10,
+        },
+      })), paginationHeaders(3, 1));
+    }
+    if (url.pathname === "/users/snoak/lists" || url.pathname === "/users/extreme_one/lists") return jsonResponse([]);
+    for (const id of suspiciousIds) {
+      if (isListLikesPath(url, id) || url.pathname === `/lists/${id}`) {
+        return jsonErrorResponse(404);
+      }
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=search&q=apocalyptic", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results.map((result) => result.ids.trakt), [3469590, 825398, 3339599]);
+  assert.deepEqual(body.results.map((result) => result.availabilityStatus), ["unavailable", "unavailable", "unavailable"]);
+  assert.deepEqual(body.results.map((result) => result.isExportable), [false, false, false]);
+  assert.equal(calls.filter((call) => suspiciousIds.has(Number(call.url.pathname.replace("/lists/", "")))).length, 3);
+}
+
+async function testSuspiciousDetailSuccessRepairsResult() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([{
+        name: "Stale",
+        ids: {
+          trakt: 825398,
+        },
+        user: {
+          username: "unknown",
+        },
+      }], paginationHeaders(1, 1));
+    }
+    if (isListLikesPath(url, 825398)) {
+      return jsonErrorResponse(404);
+    }
+    if (url.pathname === "/lists/825398") {
+      return jsonResponse(list({
+        name: "Repaired List",
+        slug: "repaired-list",
+        username: "public_owner",
+        trakt: 825398,
+        likes: 12,
+        items: 44,
+      }));
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].name, "Repaired List");
+  assert.equal(body.results[0].item_count, 44);
+  assert.equal(body.results[0].user.username, "public_owner");
+  assert.equal(body.results[0].ids.slug, "repaired-list");
+  assert.equal(body.results[0].url, "https://trakt.tv/users/public_owner/lists/repaired-list");
+  assert.equal(body.results[0].availabilityStatus, "available");
+  assert.equal(body.results[0].isExportable, true);
+}
+
+async function testNon404AvailabilityFailureIsUnverified() {
+  const response = await withMutedConsole(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname === "/lists/popular") {
+        return jsonResponse([{
+          name: "Maybe Gone",
+          ids: {
+            trakt: 3339599,
+          },
+          user: {
+            username: "unknown",
+          },
+        }], paginationHeaders(1, 1));
+      }
+      if (isListLikesPath(url, 3339599)) {
+        return jsonErrorResponse(404);
+      }
+      if (url.pathname === "/lists/3339599") {
+        return new Response(JSON.stringify({ error: "Busy" }), {
+          status: 503,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].availabilityStatus, "unverified");
+  assert.equal(body.results[0].isAvailable, false);
+  assert.equal(body.results[0].isExportable, false);
+  assert.equal(body.results[0].availabilityMessage, "Could not verify public status");
 }
 
 async function testSortedQuickUsersUseEnrichedLikeCounts() {
@@ -569,6 +764,15 @@ function jsonResponse(payload, headers = {}) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       ...headers,
+    },
+  });
+}
+
+function jsonErrorResponse(status) {
+  return new Response(JSON.stringify({ error: "No matching Trakt list was found." }), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
     },
   });
 }

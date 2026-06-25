@@ -4,6 +4,7 @@ import {
   clampPositiveInteger,
   dedupeLists,
   getPagination,
+  isListAvailabilitySuspicious,
   isSafePathSegment,
   listMatchesTerms,
   normalizeGlobalListEntry,
@@ -19,6 +20,8 @@ import {
   rankSearchResults,
   singleResultPagination,
   sortLists,
+  shouldValidateListAvailability,
+  withListAvailability,
 } from "../functions/lib/trakt-api-helpers.js";
 
 assert.deepEqual(parseUserListQuery("@snoak horror movies"), {
@@ -122,6 +125,9 @@ const normalized = normalizeList(list({
 assert.equal(normalized.url, "https://trakt.tv/users/snoak/lists/demo");
 assert.equal(normalized.ids.trakt, 123);
 assert.equal(normalized.like_count, 7);
+assert.equal(normalized.availabilityStatus, "available");
+assert.equal(normalized.isAvailable, true);
+assert.equal(normalized.isExportable, true);
 
 const normalizedWithoutOwnerSlug = normalizeList({
   name: "ID Only",
@@ -131,6 +137,18 @@ const normalizedWithoutOwnerSlug = normalizeList({
 });
 assert.equal(normalizedWithoutOwnerSlug.ids.trakt, 456);
 assert.equal(normalizedWithoutOwnerSlug.url, "");
+assert.equal(normalizedWithoutOwnerSlug.availabilityStatus, "unverified");
+assert.equal(normalizedWithoutOwnerSlug.isExportable, false);
+assert.equal(normalizedWithoutOwnerSlug.availabilityMessage, "Could not verify public status");
+
+assert.equal(isListAvailabilitySuspicious(list({ username: "unknown", trakt: 789 })), true);
+assert.equal(shouldValidateListAvailability(list({ username: "unknown", trakt: 789 })), true);
+assert.equal(shouldValidateListAvailability(withListAvailability(list({ username: "unknown", trakt: 789 }), "available")), false);
+
+const unavailable = normalizeList(withListAvailability(list({ name: "Gone", trakt: 999 }), "unavailable", "Unavailable or not public"));
+assert.equal(unavailable.availabilityStatus, "unavailable");
+assert.equal(unavailable.isAvailable, false);
+assert.equal(unavailable.isExportable, false);
 
 const globalEntry = normalizeGlobalListEntry({
   like_count: "11",

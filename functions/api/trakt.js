@@ -19,6 +19,7 @@ import {
   resolveListId,
   resolveListUrl,
   searchLists,
+  validateListAvailability,
 } from "../lib/trakt-list-service.js";
 import {
   enrichListsWithLikeCounts,
@@ -99,9 +100,10 @@ export async function onRequestGet({ request, env }) {
       return json({ error: "Unsupported search mode." }, 400);
     }
 
-    const lists = sort && mode !== "url" && !directListId
+    const enrichedLists = sort && mode !== "url" && !directListId
       ? payload.data
       : await enrichListsWithLikeCounts(payload.data, clientId);
+    const lists = await validateListAvailability(enrichedLists, clientId);
     const quickUsersPayload = mode === "url" || directListId
       ? { ...payload, quickUserLists: lists }
       : payload;

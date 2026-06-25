@@ -270,11 +270,20 @@ assert.equal(repairedPayload.report.idFixCount, 4);
 assert.ok(repairedPayload.report.warningCount > 0);
 
 nextId = 0;
-const warningPayload = buildNuvioExportPayload({
-  lists: [{ name: "Missing Trakt ID", ids: {}, user: { username: "demo" } }],
+const skippedUnavailablePayload = buildNuvioExportPayload({
+  lists: [
+    { name: "Missing Trakt ID", ids: {}, user: { username: "demo" } },
+    {
+      ...list("Unavailable", 888),
+      availabilityStatus: "unavailable",
+      isExportable: false,
+    },
+  ],
   createId,
 });
-assert.ok(warningPayload.report.warnings.includes("Trakt source missing list ID."));
+assert.equal(skippedUnavailablePayload.collections[0].folders.length, 0);
+assert.equal(skippedUnavailablePayload.report.skippedUnavailableListCount, 2);
+assert.equal(skippedUnavailablePayload.report.warningCount, 0);
 
 function list(name, traktId) {
   return {

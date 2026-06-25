@@ -11,7 +11,7 @@ export function getTraktClientId(env) {
   return String(env.TRAKT_CLIENT_ID || "").trim();
 }
 
-export async function traktFetch(path, clientId) {
+export async function traktFetch(path, clientId, { quietStatuses = [] } = {}) {
   let response;
   try {
     response = await fetch(`${TRAKT_API_BASE}${path}`, {
@@ -31,12 +31,14 @@ export async function traktFetch(path, clientId) {
   }
 
   if (!response.ok) {
-    const body = await safeReadText(response);
-    console.error("Trakt API error", {
-      status: response.status,
-      path,
-      body: body.slice(0, 500),
-    });
+    if (!quietStatuses.includes(response.status)) {
+      const body = await safeReadText(response);
+      console.error("Trakt API error", {
+        status: response.status,
+        path,
+        body: body.slice(0, 500),
+      });
+    }
     throw httpError(getTraktErrorMessage(response.status), response.status);
   }
 
@@ -59,11 +61,20 @@ export async function getListItems(username, slug, page, limit, clientId) {
 
 export async function enrichListsWithLikeCounts(lists, clientId) {
   return mapWithConcurrency(lists, LIKE_COUNT_CONCURRENCY, async (list) => {
-    const likeCount = await getListLikeCount(list, clientId);
-    if (likeCount === null) return list;
-    return {
+    const likeResult = await getListLikeCount(list, clientId);
+    const withCount = likeResult.count === null ? list : {
       ...list,
-      like_count: likeCount,
+      like_count: likeResult.count,
+    };
+
+    if (!likeResult.notFound) return withCount;
+
+    return {
+      ...withCount,
+      _availabilitySignals: {
+        ...(withCount?._availabilitySignals || {}),
+        likesNotFound: true,
+      },
     };
   });
 }
@@ -71,18 +82,31 @@ export async function enrichListsWithLikeCounts(lists, clientId) {
 async function getListLikeCount(list, clientId) {
   const existingCount = normalizeOptionalCount(list?.like_count);
   const id = list?.ids?.trakt;
-  if (!id) return existingCount;
+  if (!id) return { count: existingCount, notFound: false };
 
   try {
-    const payload = await traktFetch(`/lists/${encodeURIComponent(id)}/likes?page=1&limit=1`, clientId);
-    return normalizeOptionalCount(payload.pagination?.item_count) ?? existingCount;
+    const payload = await traktFetch(`/lists/${encodeURIComponent(id)}/likes?page=1&limit=1`, clientId, { quietStatuses: [404] });
+    return {
+      count: normalizeOptionalCount(payload.pagination?.item_count) ?? existingCount,
+      notFound: false,
+    };
   } catch (error) {
+    if (error.status === 404) {
+      return {
+        count: existingCount,
+        notFound: true,
+      };
+    }
+
     console.warn("Could not fetch Trakt list likes", {
       id,
       status: error.status,
       message: error.message,
     });
-    return normalizeOptionalCount(list?.like_count);
+    return {
+      count: existingCount,
+      notFound: false,
+    };
   }
 }
 

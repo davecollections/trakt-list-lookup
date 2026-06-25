@@ -56,15 +56,23 @@ export function createResultsView({
       const title = result.name || "Untitled list";
       const owner = result.user?.username || result.user?.name || "unknown";
       const url = result.url || "";
+      const availability = getResultAvailability(result);
 
       card.id = `result-${index + 1}`;
+      card.dataset.availabilityStatus = availability.status;
       card.dataset.sampleKey = getPosterSampleKey(result);
       const ownerButton = node.querySelector(".result-owner");
       ownerButton.textContent = `@${owner}`;
-      ownerButton.disabled = !result.user?.username;
-      ownerButton.addEventListener("click", () => onLoadUserLists(result.user.username));
+      ownerButton.disabled = !hasUsableUsername(result);
+      if (hasUsableUsername(result)) {
+        ownerButton.addEventListener("click", () => onLoadUserLists(result.user.username));
+      }
       const titleNode = node.querySelector(".result-title");
       titleNode.textContent = title;
+      const availabilityBadge = node.querySelector(".availability-badge");
+      availabilityBadge.hidden = availability.status === "available";
+      availabilityBadge.textContent = availability.message;
+      availabilityBadge.title = availability.message;
       const fullDescription = cleanDescription(result.description);
       const readMoreButton = node.querySelector(".read-more-button");
       readMoreButton.hidden = !hasDescription(result.description);
@@ -76,7 +84,7 @@ export function createResultsView({
 
       const openLink = node.querySelector(".open-link");
       openLink.href = url;
-      openLink.hidden = !url;
+      openLink.hidden = !url || !availability.isAvailable;
 
       card.querySelectorAll("[data-copy]").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -88,12 +96,15 @@ export function createResultsView({
       });
 
       const posterButton = node.querySelector(".poster-samples");
-      posterButton.disabled = !result.user?.username || !result.ids?.slug;
+      posterButton.disabled = !availability.isAvailable || !hasUsableUsername(result) || !result.ids?.slug;
       posterButton.addEventListener("click", () => onOpenPreview(result, posterButton));
 
       const selectListButton = node.querySelector(".select-list-button");
-      updateSelectListButton(selectListButton, result);
-      selectListButton.addEventListener("click", () => onToggleSelectedList(result));
+      updateSelectListButton(selectListButton, result, availability);
+      selectListButton.addEventListener("click", () => {
+        if (!availability.isExportable) return;
+        onToggleSelectedList(result);
+      });
 
       resultsEl.append(node);
       renderPosterSamples(result);
@@ -286,9 +297,19 @@ export function createResultsView({
     return getListSelectionKey(result);
   }
 
-  function updateSelectListButton(button, result) {
+  function updateSelectListButton(button, result, availability = getResultAvailability(result)) {
+    if (!availability.isExportable) {
+      button.textContent = availability.status === "unverified" ? "Not verified" : "Unavailable";
+      button.disabled = true;
+      button.title = availability.message;
+      button.classList.remove("selected");
+      return;
+    }
+
     const selected = isSelected(result);
     button.textContent = selected ? "Remove" : "Add";
+    button.disabled = false;
+    button.title = "";
     button.classList.toggle("selected", selected);
   }
 }
@@ -297,6 +318,31 @@ function getCopyValue(kind, result) {
   if (kind === "id") return result.ids?.trakt ? String(result.ids.trakt) : "";
   if (kind === "url") return result.url || "";
   return "";
+}
+
+function getResultAvailability(result) {
+  const status = getAvailabilityStatus(result);
+  const blocked = result?.isExportable === false || result?.isAvailable === false || status === "unavailable" || status === "unverified";
+  const message = result?.availabilityMessage
+    || (status === "unverified" ? "Could not verify public status" : "Unavailable or not public");
+
+  return {
+    status: blocked ? status : "available",
+    isAvailable: !blocked && result?.isAvailable !== false,
+    isExportable: !blocked,
+    message,
+  };
+}
+
+function getAvailabilityStatus(result) {
+  const status = String(result?.availabilityStatus || "available").toLowerCase();
+  if (status === "unavailable" || status === "unverified") return status;
+  return "available";
+}
+
+function hasUsableUsername(result) {
+  const username = String(result?.user?.username || "").trim();
+  return Boolean(username && username.toLowerCase() !== "unknown");
 }
 
 function flashButton(button) {

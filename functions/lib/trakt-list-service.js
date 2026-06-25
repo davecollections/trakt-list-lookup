@@ -3,7 +3,10 @@ import {
   dedupeLists,
   getListKey,
   isSafePathSegment,
+  isNonPublicList,
+  isUnknownOwner,
   listMatchesTerms,
+  mapWithConcurrency,
   normalizeGlobalListEntry,
   normalizeSearchText,
   parseTraktListId,
@@ -11,8 +14,10 @@ import {
   parseUserListQuery,
   rankSearchResults,
   scoreListSearchMatch,
+  shouldValidateListAvailability,
   singleResultPagination,
   sortLists,
+  withListAvailability,
 } from "./trakt-api-helpers.js";
 import {
   enrichListsWithLikeCounts,
@@ -26,6 +31,7 @@ const SORT_MAX_ITEMS = 250;
 const QUICK_USER_SAMPLE_LIMIT = 250;
 const QUICK_USER_FETCH_LIMIT = 50;
 const QUICK_USER_LIMIT = 6;
+const AVAILABILITY_VALIDATION_CONCURRENCY = 4;
 const CURATED_USER_FALLBACKS = ["snoak", "extreme_one"];
 
 export async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
@@ -132,8 +138,8 @@ export async function resolveListUrl(value, clientId) {
     const slug = encodeURIComponent(parsed.slug);
     const payload = await traktFetch(`/users/${username}/lists/${slug}?extended=full`, clientId);
     return {
-      data: [payload.data],
-      quickUserLists: [payload.data],
+      data: [withListAvailability(payload.data, "available")],
+      quickUserLists: [withListAvailability(payload.data, "available")],
       pagination: singleResultPagination(),
     };
   }
@@ -152,10 +158,10 @@ export async function resolveListId(id, clientId) {
   }
 
   try {
-    const payload = await traktFetch(`/lists/${encodeURIComponent(listId)}?extended=full`, clientId);
+    const payload = await fetchListDetailById(listId, clientId, { quietNotFound: true });
     return {
-      data: [payload.data],
-      quickUserLists: [payload.data],
+      data: [withListAvailability(payload.data, "available")],
+      quickUserLists: [withListAvailability(payload.data, "available")],
       pagination: singleResultPagination(),
     };
   } catch (error) {
@@ -164,6 +170,40 @@ export async function resolveListId(id, clientId) {
     }
     throw error;
   }
+}
+
+export async function validateListAvailability(lists, clientId) {
+  return mapWithConcurrency(lists || [], AVAILABILITY_VALIDATION_CONCURRENCY, async (list) => {
+    if (!list) return list;
+
+    if (!list.ids?.trakt) {
+      return withListAvailability(list, "unavailable", "Unavailable or not public");
+    }
+
+    if (!shouldValidateListAvailability(list)) {
+      return list.availabilityStatus ? list : withListAvailability(list, "available");
+    }
+
+    try {
+      const detail = await fetchListDetailById(list.ids.trakt, clientId, { quietNotFound: true });
+      const merged = mergeListDetail(list, detail.data);
+      if (isNonPublicList(merged)) {
+        return withListAvailability(merged, "unavailable", "Unavailable or not public");
+      }
+      return withListAvailability(merged, "available");
+    } catch (error) {
+      if (error.status === 404) {
+        return withListAvailability(list, "unavailable", "Unavailable or not public");
+      }
+
+      console.warn("Could not verify Trakt list availability", {
+        id: list.ids.trakt,
+        status: error.status,
+        message: error.message,
+      });
+      return withListAvailability(list, "unverified", "Could not verify public status");
+    }
+  });
 }
 
 export async function getQuickUsersForPayload(mode, query, payload, clientId) {
@@ -200,6 +240,8 @@ function buildQuickUsers(lists) {
     } : null;
     const username = normalized?.user?.username || normalized?.user?.ids?.slug || "";
     if (!username) return;
+    if (isUnknownOwner(username)) return;
+    if (normalized.availabilityStatus && normalized.availabilityStatus !== "available") return;
 
     const key = username.toLowerCase();
     const existing = users.get(key) || {
@@ -361,6 +403,31 @@ async function getFilteredUserLists(username, filter, clientId) {
       item_count: results.length,
     },
   };
+}
+
+function fetchListDetailById(id, clientId, { quietNotFound = false } = {}) {
+  const quietStatuses = quietNotFound ? [404] : [];
+  return traktFetch(`/lists/${encodeURIComponent(id)}?extended=full`, clientId, { quietStatuses });
+}
+
+function mergeListDetail(list, detail) {
+  const merged = {
+    ...list,
+    ...(detail || {}),
+    ids: {
+      ...(list.ids || {}),
+      ...(detail?.ids || {}),
+    },
+    user: {
+      ...(list.user || {}),
+      ...(detail?.user || {}),
+    },
+    _availabilitySignals: {},
+  };
+
+  if (list.like_count !== undefined) merged.like_count = list.like_count;
+  if (list.comment_count !== undefined) merged.comment_count = list.comment_count;
+  return merged;
 }
 
 function httpError(message, status) {

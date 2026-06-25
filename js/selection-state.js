@@ -29,6 +29,8 @@ export function createSelectionState() {
         return false;
       }
 
+      if (!isSelectableResult(result)) return false;
+
       selectedLists.set(key, result);
       return true;
     },
@@ -56,4 +58,10 @@ export function createSelectionState() {
       return Object.fromEntries(mappedAssignments);
     },
   };
+}
+
+function isSelectableResult(result) {
+  if (result?.isExportable === false || result?.isAvailable === false) return false;
+  const status = String(result?.availabilityStatus || "available").toLowerCase();
+  return status !== "unavailable" && status !== "unverified";
 }

@@ -123,6 +123,41 @@ export function normalizeOptionalCount(value) {
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
+export function withListAvailability(list, status = "available", message = "") {
+  return {
+    ...list,
+    availabilityStatus: normalizeAvailabilityStatus(status),
+    availabilityMessage: message,
+  };
+}
+
+export function shouldValidateListAvailability(list) {
+  if (!list) return false;
+  if (normalizeAvailabilityStatus(list.availabilityStatus)) return false;
+  return isListAvailabilitySuspicious(list);
+}
+
+export function isListAvailabilitySuspicious(list) {
+  if (!list?.ids?.trakt) return true;
+  if (isNonPublicList(list)) return true;
+  if (list._availabilitySignals?.likesNotFound) return true;
+
+  const username = getListUsername(list);
+  if (!username || isUnknownOwner(username)) return true;
+  if (!list?.ids?.slug) return true;
+
+  return false;
+}
+
+export function isUnknownOwner(value) {
+  return String(value || "").trim().toLowerCase() === "unknown";
+}
+
+export function isNonPublicList(list) {
+  const privacy = String(list?.privacy || "").trim().toLowerCase();
+  return Boolean(privacy && privacy !== "public");
+}
+
 export function clampPositiveInteger(value, fallback, max) {
   return Math.min(getPositiveInteger(value, fallback), max);
 }
@@ -201,6 +236,8 @@ export function normalizeList(list) {
     ? `${TRAKT_WEB_BASE}/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(ids.slug)}`
     : "";
 
+  const availability = getListAvailability(list);
+
   return {
     name: list.name || "",
     description: list.description || "",
@@ -218,6 +255,10 @@ export function normalizeList(list) {
       name: user.name || "",
     },
     url,
+    availabilityStatus: availability.status,
+    isAvailable: availability.isAvailable,
+    isExportable: availability.isExportable,
+    availabilityMessage: availability.message,
   };
 }
 
@@ -280,4 +321,51 @@ export async function mapWithConcurrency(items, concurrency, mapper) {
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, worker);
   await Promise.all(workers);
   return results;
+}
+
+function getListAvailability(list) {
+  if (!list?.ids?.trakt) {
+    return availability("unavailable", "Unavailable or not public");
+  }
+
+  if (isNonPublicList(list)) {
+    return availability("unavailable", "Unavailable or not public");
+  }
+
+  const explicitStatus = normalizeAvailabilityStatus(list.availabilityStatus);
+  if (explicitStatus === "unavailable") {
+    return availability("unavailable", list.availabilityMessage || "Unavailable or not public");
+  }
+
+  if (explicitStatus === "unverified") {
+    return availability("unverified", list.availabilityMessage || "Could not verify public status");
+  }
+
+  if (explicitStatus === "available") {
+    return availability("available", "");
+  }
+
+  if (isListAvailabilitySuspicious(list)) {
+    return availability("unverified", "Could not verify public status");
+  }
+
+  return availability("available", "");
+}
+
+function getListUsername(list) {
+  return list?.user?.username || list?.user?.ids?.slug || "";
+}
+
+function normalizeAvailabilityStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  return value === "available" || value === "unavailable" || value === "unverified" ? value : "";
+}
+
+function availability(status, message) {
+  return {
+    status,
+    isAvailable: status === "available",
+    isExportable: status === "available",
+    message,
+  };
 }
