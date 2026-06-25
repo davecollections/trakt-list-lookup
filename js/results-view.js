@@ -54,29 +54,51 @@ export function createResultsView({
       const node = template.content.cloneNode(true);
       const card = node.querySelector(".result-card");
       const title = result.name || "Untitled list";
-      const owner = result.user?.username || result.user?.name || "unknown";
-      const url = result.url || "";
+      const availability = getResultAvailability(result);
+      const displayState = getResultDisplayState(result);
 
       card.id = `result-${index + 1}`;
+      card.dataset.availabilityStatus = availability.status;
       card.dataset.sampleKey = getPosterSampleKey(result);
       const ownerButton = node.querySelector(".result-owner");
-      ownerButton.textContent = `@${owner}`;
-      ownerButton.disabled = !result.user?.username;
-      ownerButton.addEventListener("click", () => onLoadUserLists(result.user.username));
+      ownerButton.textContent = getOwnerLabel(result, availability);
+      ownerButton.disabled = !hasRouteUsername(result);
+      if (hasRouteUsername(result)) {
+        ownerButton.addEventListener("click", () => onLoadUserLists(getRouteUsername(result)));
+      }
       const titleNode = node.querySelector(".result-title");
       titleNode.textContent = title;
+      const availabilityBadge = node.querySelector(".availability-badge");
+      availabilityBadge.hidden = availability.status === "available";
+      availabilityBadge.textContent = availability.message;
+      availabilityBadge.title = availability.message;
       const fullDescription = cleanDescription(result.description);
       const readMoreButton = node.querySelector(".read-more-button");
-      readMoreButton.hidden = !hasDescription(result.description);
-      readMoreButton.addEventListener("click", () => onOpenDescription(result, fullDescription));
+      readMoreButton.hidden = !displayState.showDescription;
+      if (displayState.showDescription) {
+        readMoreButton.addEventListener("click", () => onOpenDescription(result, fullDescription));
+      }
       node.querySelector(".trakt-id-button").textContent = result.ids?.trakt || "n/a";
-      node.querySelector(".items").textContent = formatNumber(result.item_count);
-      node.querySelector(".likes").textContent = formatNumber(result.like_count);
-      node.querySelector(".updated").textContent = formatDate(result.updated_at);
+      const itemCount = node.querySelector(".result-counts");
+      itemCount.hidden = !displayState.showTrustedMetadata;
+      itemCount.querySelector(".items").textContent = displayState.showTrustedMetadata ? formatNumber(result.item_count) : "";
+      const likes = node.querySelector(".result-likes");
+      likes.hidden = !displayState.showTrustedMetadata;
+      likes.querySelector(".likes").textContent = displayState.showTrustedMetadata ? formatNumber(result.like_count) : "";
+      const updated = node.querySelector(".updated-line");
+      updated.hidden = !displayState.showTrustedMetadata;
+      updated.querySelector(".updated").textContent = displayState.showTrustedMetadata ? formatDate(result.updated_at) : "";
 
       const openLink = node.querySelector(".open-link");
-      openLink.href = url;
-      openLink.hidden = !url;
+      const openAction = getResultOpenAction(result);
+      openLink.hidden = openAction.hidden;
+      openLink.toggleAttribute("aria-disabled", openAction.hidden);
+      openLink.tabIndex = openAction.hidden ? -1 : 0;
+      if (openAction.href) {
+        openLink.href = openAction.href;
+      } else {
+        openLink.removeAttribute("href");
+      }
 
       card.querySelectorAll("[data-copy]").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -88,12 +110,15 @@ export function createResultsView({
       });
 
       const posterButton = node.querySelector(".poster-samples");
-      posterButton.disabled = !result.user?.username || !result.ids?.slug;
+      posterButton.disabled = !result.canPreview;
       posterButton.addEventListener("click", () => onOpenPreview(result, posterButton));
 
       const selectListButton = node.querySelector(".select-list-button");
-      updateSelectListButton(selectListButton, result);
-      selectListButton.addEventListener("click", () => onToggleSelectedList(result));
+      updateSelectListButton(selectListButton, result, availability);
+      selectListButton.addEventListener("click", () => {
+        if (!availability.isExportable) return;
+        onToggleSelectedList(result);
+      });
 
       resultsEl.append(node);
       renderPosterSamples(result);
@@ -130,7 +155,7 @@ export function createResultsView({
   function getPopularUsersFromResults(results) {
     const users = new Map();
     results.forEach((result) => {
-      const username = result.user?.username;
+      const username = getRouteUsername(result);
       if (!username) return;
       const existing = users.get(username) || { username, listCount: 0, likeCount: 0 };
       existing.listCount += 1;
@@ -286,17 +311,100 @@ export function createResultsView({
     return getListSelectionKey(result);
   }
 
-  function updateSelectListButton(button, result) {
+  function updateSelectListButton(button, result, availability = getResultAvailability(result)) {
+    if (!availability.isExportable) {
+      button.textContent = availability.status === "unverified" ? "Not verified" : "Unavailable";
+      button.disabled = true;
+      button.title = availability.message;
+      button.classList.remove("selected");
+      return;
+    }
+
     const selected = isSelected(result);
     button.textContent = selected ? "Remove" : "Add";
+    button.disabled = false;
+    button.title = "";
     button.classList.toggle("selected", selected);
   }
+}
+
+export function getResultOpenAction(result) {
+  const availability = getResultAvailability(result);
+  const href = getTrustedTraktListUrl(result?.url);
+  const canOpen = availability.status === "available" && result?.canOpen === true && Boolean(href);
+  return {
+    hidden: !canOpen,
+    href: canOpen ? href : "",
+  };
+}
+
+export function getResultDisplayState(result) {
+  const availability = getResultAvailability(result);
+  const showTrustedMetadata = availability.status === "available";
+  return {
+    showDescription: showTrustedMetadata && hasDescription(result?.description),
+    showTrustedMetadata,
+    showTitle: true,
+    showTraktId: true,
+  };
 }
 
 function getCopyValue(kind, result) {
   if (kind === "id") return result.ids?.trakt ? String(result.ids.trakt) : "";
   if (kind === "url") return result.url || "";
   return "";
+}
+
+function getResultAvailability(result) {
+  const status = getAvailabilityStatus(result);
+  const blocked = result?.isExportable === false || result?.isAvailable === false || status === "unavailable" || status === "unverified";
+  const message = result?.availabilityMessage
+    || (status === "unverified" ? "Could not verify public status" : "Unavailable or not public");
+
+  return {
+    status: blocked ? status : "available",
+    isAvailable: !blocked && result?.isAvailable !== false,
+    isExportable: !blocked,
+    message,
+  };
+}
+
+function getAvailabilityStatus(result) {
+  const status = String(result?.availabilityStatus || "available").toLowerCase();
+  if (status === "unavailable" || status === "unverified") return status;
+  return "available";
+}
+
+function getOwnerLabel(result, availability = getResultAvailability(result)) {
+  if (availability.status === "unavailable") return "Owner unavailable";
+  if (availability.status === "unverified") return "Owner unverified";
+
+  const owner = result?.ownerDisplayName || result?.user?.name || result?.ownerUsername || result?.user?.username || "";
+  return owner ? `@${owner}` : "Owner unavailable";
+}
+
+function getRouteUsername(result) {
+  return String(result?.ownerUsername || result?.user?.username || "").trim();
+}
+
+function getTrustedTraktListUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const host = url.hostname.replace(/^www\./, "");
+    const parts = url.pathname.split("/").filter(Boolean);
+    if ((host === "trakt.tv" || host === "app.trakt.tv") && parts[0] === "users" && parts[2] === "lists" && parts[1] && parts[3]) {
+      return url.toString();
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function hasRouteUsername(result) {
+  const username = getRouteUsername(result);
+  return Boolean(username && username.toLowerCase() !== "unknown");
 }
 
 function flashButton(button) {

@@ -35,7 +35,7 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
     }
 
     previewTitle.textContent = result.name || "List Preview";
-    previewOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
+    previewOwner.textContent = getOwnerLabel(result);
     previewStatus.textContent = "Loading preview...";
     modalItemList.textContent = "";
     openModal(previewModal, {
@@ -75,7 +75,7 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
 
   function openDescription(result, text) {
     descriptionTitle.textContent = result.name || "Description";
-    descriptionOwner.textContent = result.user?.username ? `@${result.user.username}` : "Unknown owner";
+    descriptionOwner.textContent = getOwnerLabel(result);
     descriptionFull.textContent = text;
     openModal(descriptionModal, {
       focusTarget: descriptionCloseButton,
@@ -106,6 +106,17 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
     openDescription,
     openPreview,
   };
+}
+
+function getOwnerLabel(result) {
+  const status = String(result?.availabilityStatus || "available").toLowerCase();
+  if (status === "unavailable") return "Owner unavailable";
+  if (status === "unverified") return "Owner unverified";
+  if (result?.isAvailable === false) return "Owner unavailable";
+  if (result?.isExportable === false) return "Owner unverified";
+
+  const owner = result?.ownerDisplayName || result?.user?.name || result?.ownerUsername || result?.user?.username || "";
+  return owner ? `@${owner}` : "Unknown owner";
 }
 
 function renderItems(container, items) {

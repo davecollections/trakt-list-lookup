@@ -28,3 +28,15 @@ selection.toggle(demoList);
 selection.clear();
 assert.equal(selection.size, 0);
 assert.deepEqual(selection.values(), []);
+
+const unavailableList = {
+  name: "Unavailable",
+  ids: {
+    trakt: 456,
+  },
+  availabilityStatus: "unavailable",
+  isExportable: false,
+};
+
+assert.equal(selection.toggle(unavailableList), false);
+assert.equal(selection.size, 0);

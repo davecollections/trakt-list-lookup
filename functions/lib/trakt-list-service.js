@@ -2,8 +2,11 @@ import {
   RESULT_LIMIT,
   dedupeLists,
   getListKey,
+  getRouteUsername,
   isSafePathSegment,
+  isNonPublicList,
   listMatchesTerms,
+  mapWithConcurrency,
   normalizeGlobalListEntry,
   normalizeSearchText,
   parseTraktListId,
@@ -11,8 +14,10 @@ import {
   parseUserListQuery,
   rankSearchResults,
   scoreListSearchMatch,
+  shouldValidateListAvailability,
   singleResultPagination,
   sortLists,
+  withListAvailability,
 } from "./trakt-api-helpers.js";
 import {
   enrichListsWithLikeCounts,
@@ -26,6 +31,10 @@ const SORT_MAX_ITEMS = 250;
 const QUICK_USER_SAMPLE_LIMIT = 250;
 const QUICK_USER_FETCH_LIMIT = 50;
 const QUICK_USER_LIMIT = 6;
+const QUICK_USER_PAGE_CONCURRENCY = 3;
+const AVAILABILITY_VALIDATION_CONCURRENCY = 4;
+const AVAILABILITY_ITEM_LIMIT = 1;
+const AVAILABILITY_VALIDATION_TIMEOUT_MS = 1000;
 const CURATED_USER_FALLBACKS = ["snoak", "extreme_one"];
 
 export async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
@@ -132,8 +141,8 @@ export async function resolveListUrl(value, clientId) {
     const slug = encodeURIComponent(parsed.slug);
     const payload = await traktFetch(`/users/${username}/lists/${slug}?extended=full`, clientId);
     return {
-      data: [payload.data],
-      quickUserLists: [payload.data],
+      data: [withListAvailability(payload.data, "available")],
+      quickUserLists: [withListAvailability(payload.data, "available")],
       pagination: singleResultPagination(),
     };
   }
@@ -152,10 +161,10 @@ export async function resolveListId(id, clientId) {
   }
 
   try {
-    const payload = await traktFetch(`/lists/${encodeURIComponent(listId)}?extended=full`, clientId);
+    const payload = await fetchListDetailById(listId, clientId, { quietNotFound: true });
     return {
-      data: [payload.data],
-      quickUserLists: [payload.data],
+      data: [withListAvailability(payload.data, "available")],
+      quickUserLists: [withListAvailability(payload.data, "available")],
       pagination: singleResultPagination(),
     };
   } catch (error) {
@@ -166,27 +175,91 @@ export async function resolveListId(id, clientId) {
   }
 }
 
+export async function validateListAvailability(lists, clientId) {
+  const validationCache = new Map();
+  return mapWithConcurrency(lists || [], AVAILABILITY_VALIDATION_CONCURRENCY, async (list) => {
+    if (!list) return list;
+
+    if (!list.ids?.trakt) {
+      return withListAvailability(list, "unavailable", "Unavailable or not public");
+    }
+
+    if (list._availabilitySignals?.likesNotFound) {
+      return withListAvailability(list, "unavailable", "Unavailable or not public");
+    }
+
+    if (!shouldValidateListAvailability(list)) {
+      return list.availabilityStatus ? list : withListAvailability(list, "available");
+    }
+
+    const id = String(list.ids.trakt);
+    if (!validationCache.has(id)) {
+      validationCache.set(id, validateSuspiciousListAvailability(list, clientId));
+    }
+    return validationCache.get(id);
+  });
+}
+
+async function validateSuspiciousListAvailability(list, clientId) {
+  try {
+    const detail = await fetchListDetailById(list.ids.trakt, clientId, {
+      quietNotFound: true,
+      timeoutMs: AVAILABILITY_VALIDATION_TIMEOUT_MS,
+    });
+    const merged = mergeListDetail(list, detail.data);
+    if (isNonPublicList(merged)) {
+      return withListAvailability(merged, "unavailable", "Unavailable or not public");
+    }
+
+    const itemsAvailability = await verifyListItemsAvailability(merged, clientId);
+    if (itemsAvailability.status !== "available") {
+      return withListAvailability(merged, itemsAvailability.status, itemsAvailability.message);
+    }
+    return withListAvailability(merged, "available");
+  } catch (error) {
+    if (error.status === 404) {
+      return withListAvailability(list, "unavailable", "Unavailable or not public");
+    }
+
+    console.warn("Could not verify Trakt list availability", {
+      id: list.ids.trakt,
+      status: error.status,
+      message: error.message,
+    });
+    return withListAvailability(list, "unverified", "Could not verify public status");
+  }
+}
+
 export async function getQuickUsersForPayload(mode, query, payload, clientId) {
-  const lists = payload.quickUserLists || await getQuickUserSampleLists(mode, query, clientId);
+  const lists = payload.quickUserLists || await getQuickUserSampleLists(mode, query, payload, clientId);
   return buildQuickUsers(lists);
 }
 
-async function getQuickUserSampleLists(mode, query, clientId) {
+async function getQuickUserSampleLists(mode, query, payload, clientId) {
   if (mode === "url") return [];
 
-  const firstPage = await getListPayload(mode, query, 1, QUICK_USER_FETCH_LIMIT, clientId);
+  const firstPage = canReuseQuickUserFirstPage(payload)
+    ? payload
+    : await getListPayload(mode, query, 1, QUICK_USER_FETCH_LIMIT, clientId);
   const pageCount = Math.min(
     firstPage.pagination?.page_count || 1,
     Math.ceil(QUICK_USER_SAMPLE_LIMIT / QUICK_USER_FETCH_LIMIT),
     MAX_PAGE,
   );
-  const pages = [firstPage];
-
-  for (let nextPage = 2; nextPage <= pageCount; nextPage += 1) {
-    pages.push(await getListPayload(mode, query, nextPage, QUICK_USER_FETCH_LIMIT, clientId));
-  }
+  const nextPages = [];
+  for (let nextPage = 2; nextPage <= pageCount; nextPage += 1) nextPages.push(nextPage);
+  const pages = [
+    firstPage,
+    ...await mapWithConcurrency(nextPages, QUICK_USER_PAGE_CONCURRENCY, (nextPage) => getListPayload(mode, query, nextPage, QUICK_USER_FETCH_LIMIT, clientId)),
+  ];
 
   return dedupeLists(pages.flatMap((page) => page.data)).slice(0, QUICK_USER_SAMPLE_LIMIT);
+}
+
+function canReuseQuickUserFirstPage(payload) {
+  return Array.isArray(payload?.data)
+    && (payload.pagination?.page || 1) === 1
+    && (payload.pagination?.page_count || 1) >= 1;
 }
 
 function buildQuickUsers(lists) {
@@ -198,13 +271,14 @@ function buildQuickUsers(lists) {
       user: list.user || {},
       ids: list.ids || {},
     } : null;
-    const username = normalized?.user?.username || normalized?.user?.ids?.slug || "";
+    const username = getRouteUsername(normalized);
     if (!username) return;
+    if (normalized.availabilityStatus && normalized.availabilityStatus !== "available") return;
 
     const key = username.toLowerCase();
     const existing = users.get(key) || {
       username,
-      name: normalized.user.name || "",
+      name: normalized.user.name || normalized.user.username || "",
       listCount: 0,
       likeCount: 0,
       itemCount: 0,
@@ -259,7 +333,7 @@ function isBetterTopList(candidate, current) {
 }
 
 function getListUrl(list) {
-  const username = list?.user?.username || list?.user?.ids?.slug || "";
+  const username = getRouteUsername(list);
   const slug = list?.ids?.slug || "";
   if (username && slug) return `https://trakt.tv/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}`;
   return "";
@@ -361,6 +435,88 @@ async function getFilteredUserLists(username, filter, clientId) {
       item_count: results.length,
     },
   };
+}
+
+function fetchListDetailById(id, clientId, { quietNotFound = false, timeoutMs = 0 } = {}) {
+  const quietStatuses = quietNotFound ? [404] : [];
+  return traktFetch(`/lists/${encodeURIComponent(id)}?extended=full`, clientId, {
+    quietStatuses,
+    quietNetworkErrors: timeoutMs > 0,
+    timeoutMs,
+  });
+}
+
+async function verifyListItemsAvailability(list, clientId) {
+  const username = getRouteUsername(list);
+  const slug = list?.ids?.slug || "";
+  if (!username || !slug) {
+    return {
+      status: "available",
+      message: "",
+    };
+  }
+
+  if (!isSafePathSegment(username) || !isSafePathSegment(slug)) {
+    return {
+      status: "unverified",
+      message: "Could not verify public status",
+    };
+  }
+
+  const params = new URLSearchParams({
+    page: "1",
+    limit: String(AVAILABILITY_ITEM_LIMIT),
+    extended: "full",
+  });
+
+  try {
+    await traktFetch(`/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}/items?${params.toString()}`, clientId, {
+      quietStatuses: [404],
+      quietNetworkErrors: true,
+      timeoutMs: AVAILABILITY_VALIDATION_TIMEOUT_MS,
+    });
+    return {
+      status: "available",
+      message: "",
+    };
+  } catch (error) {
+    if (error.status === 404) {
+      return {
+        status: "unavailable",
+        message: "Unavailable or not public",
+      };
+    }
+
+    console.warn("Could not verify Trakt list items", {
+      id: list?.ids?.trakt,
+      status: error.status,
+      message: error.message,
+    });
+    return {
+      status: "unverified",
+      message: "Could not verify public status",
+    };
+  }
+}
+
+function mergeListDetail(list, detail) {
+  const merged = {
+    ...list,
+    ...(detail || {}),
+    ids: {
+      ...(list.ids || {}),
+      ...(detail?.ids || {}),
+    },
+    user: {
+      ...(list.user || {}),
+      ...(detail?.user || {}),
+    },
+    _availabilitySignals: {},
+  };
+
+  if (list.like_count !== undefined) merged.like_count = list.like_count;
+  if (list.comment_count !== undefined) merged.comment_count = list.comment_count;
+  return merged;
 }
 
 function httpError(message, status) {

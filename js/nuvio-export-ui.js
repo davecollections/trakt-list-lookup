@@ -253,6 +253,10 @@ export function createNuvioExportUi({ selection }) {
       details.push(`${formatNumber(report.duplicateSourceFolderCount)} duplicate folder${report.duplicateSourceFolderCount === 1 ? "" : "s"} skipped`);
     }
 
+    if (report.skippedUnavailableListCount) {
+      details.push(`${formatNumber(report.skippedUnavailableListCount)} unavailable list${report.skippedUnavailableListCount === 1 ? "" : "s"} skipped`);
+    }
+
     if (report.warningCount) {
       details.push(`${formatNumber(report.warningCount)} validation warning${report.warningCount === 1 ? "" : "s"}`);
     }
@@ -265,6 +269,10 @@ export function createNuvioExportUi({ selection }) {
 
     if (report.duplicateSourceFolderCount) {
       messages.push(`${formatNumber(report.duplicateSourceFolderCount)} duplicate source folder${report.duplicateSourceFolderCount === 1 ? " was" : "s were"} skipped because ${report.duplicateSourceFolderCount === 1 ? "it already exists" : "they already exist"} or would duplicate existing output.`);
+    }
+
+    if (report.skippedUnavailableListCount) {
+      messages.push(`${formatNumber(report.skippedUnavailableListCount)} unavailable or unverified selected list${report.skippedUnavailableListCount === 1 ? " was" : "s were"} skipped.`);
     }
 
     if (report.idFixCount) {

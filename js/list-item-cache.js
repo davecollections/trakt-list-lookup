@@ -5,7 +5,8 @@ const DEFAULT_ITEM_PAGE_LIMIT = 15;
 const pageCache = new Map();
 
 export function canFetchListItems(result) {
-  return Boolean(result?.user?.username && result?.ids?.slug);
+  if (result?.canPreview === false) return false;
+  return Boolean((result?.ownerUsername || result?.user?.username) && result?.ids?.slug);
 }
 
 export async function fetchPosterPreviewItems(result, {
@@ -75,7 +76,7 @@ async function fetchCachedListItemsPage(result, { page, limit, posters = true })
   if (pageCache.has(cacheKey)) return pageCache.get(cacheKey);
 
   const request = fetchTraktListItems({
-    user: result.user.username,
+    user: result.ownerUsername || result.user.username,
     slug: result.ids.slug,
     limit,
     page,

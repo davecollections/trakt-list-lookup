@@ -4,6 +4,7 @@ import {
   clampPositiveInteger,
   dedupeLists,
   getPagination,
+  isListAvailabilitySuspicious,
   isSafePathSegment,
   listMatchesTerms,
   normalizeGlobalListEntry,
@@ -19,6 +20,8 @@ import {
   rankSearchResults,
   singleResultPagination,
   sortLists,
+  shouldValidateListAvailability,
+  withListAvailability,
 } from "../functions/lib/trakt-api-helpers.js";
 
 assert.deepEqual(parseUserListQuery("@snoak horror movies"), {
@@ -122,6 +125,30 @@ const normalized = normalizeList(list({
 assert.equal(normalized.url, "https://trakt.tv/users/snoak/lists/demo");
 assert.equal(normalized.ids.trakt, 123);
 assert.equal(normalized.like_count, 7);
+assert.equal(normalized.availabilityStatus, "available");
+assert.equal(normalized.isAvailable, true);
+assert.equal(normalized.isExportable, true);
+assert.equal(normalized.ownerUsername, "snoak");
+assert.equal(normalized.ownerDisplayName, "snoak");
+assert.equal(normalized.canOpen, true);
+assert.equal(normalized.canPreview, true);
+
+const normalizedDisplayOwner = normalizeList(listWithDisplayOwner({
+  trakt: 6652017,
+  name: "Attenborough Documentaries",
+  listSlug: "attenborough-documentaries",
+  username: "Hammers Lists",
+  userSlug: "hammers-lists",
+  displayName: "Hammers lists",
+}));
+assert.equal(normalizedDisplayOwner.user.username, "hammers-lists");
+assert.equal(normalizedDisplayOwner.user.name, "Hammers lists");
+assert.equal(normalizedDisplayOwner.ownerUsername, "hammers-lists");
+assert.equal(normalizedDisplayOwner.ownerDisplayName, "Hammers lists");
+assert.equal(normalizedDisplayOwner.url, "https://trakt.tv/users/hammers-lists/lists/attenborough-documentaries");
+assert.equal(normalizedDisplayOwner.isExportable, true);
+assert.equal(normalizedDisplayOwner.canOpen, true);
+assert.equal(normalizedDisplayOwner.canPreview, true);
 
 const normalizedWithoutOwnerSlug = normalizeList({
   name: "ID Only",
@@ -131,6 +158,43 @@ const normalizedWithoutOwnerSlug = normalizeList({
 });
 assert.equal(normalizedWithoutOwnerSlug.ids.trakt, 456);
 assert.equal(normalizedWithoutOwnerSlug.url, "");
+assert.equal(normalizedWithoutOwnerSlug.availabilityStatus, "unverified");
+assert.equal(normalizedWithoutOwnerSlug.isExportable, false);
+assert.equal(normalizedWithoutOwnerSlug.availabilityMessage, "Could not verify public status");
+assert.equal(normalizedWithoutOwnerSlug.ownerUsername, "");
+assert.equal(normalizedWithoutOwnerSlug.ownerDisplayName, "Owner unverified");
+assert.equal(normalizedWithoutOwnerSlug.canOpen, false);
+assert.equal(normalizedWithoutOwnerSlug.canPreview, false);
+
+const routeUnavailableButExportable = normalizeList(withListAvailability({
+  name: "ID Valid Route Unavailable",
+  ids: {
+    trakt: 6652017,
+    slug: "attenborough-documentaries",
+  },
+  user: {
+    username: "Hammers Lists",
+    name: "Hammers lists",
+  },
+}, "available"));
+assert.equal(routeUnavailableButExportable.isExportable, true);
+assert.equal(routeUnavailableButExportable.url, "");
+assert.equal(routeUnavailableButExportable.canOpen, false);
+assert.equal(routeUnavailableButExportable.canPreview, false);
+
+assert.equal(isListAvailabilitySuspicious(list({ username: "unknown", trakt: 789 })), true);
+assert.equal(shouldValidateListAvailability(list({ username: "unknown", trakt: 789 })), true);
+assert.equal(shouldValidateListAvailability(withListAvailability(list({ username: "unknown", trakt: 789 }), "available")), false);
+
+const unavailable = normalizeList(withListAvailability(list({ name: "Gone", trakt: 999 }), "unavailable", "Unavailable or not public"));
+assert.equal(unavailable.availabilityStatus, "unavailable");
+assert.equal(unavailable.isAvailable, false);
+assert.equal(unavailable.isExportable, false);
+assert.equal(unavailable.ownerUsername, "");
+assert.equal(unavailable.ownerDisplayName, "Owner unavailable");
+assert.equal(unavailable.url, "");
+assert.equal(unavailable.canOpen, false);
+assert.equal(unavailable.canPreview, false);
 
 const globalEntry = normalizeGlobalListEntry({
   like_count: "11",
@@ -227,6 +291,34 @@ function list({
     },
     user: {
       username,
+    },
+  };
+}
+
+function listWithDisplayOwner({
+  name,
+  trakt,
+  listSlug,
+  username,
+  userSlug,
+  displayName,
+}) {
+  return {
+    name,
+    description: "",
+    item_count: 1,
+    like_count: 0,
+    updated_at: "2024-01-01T00:00:00.000Z",
+    ids: {
+      trakt,
+      slug: listSlug,
+    },
+    user: {
+      username,
+      name: displayName,
+      ids: {
+        slug: userSlug,
+      },
     },
   };
 }

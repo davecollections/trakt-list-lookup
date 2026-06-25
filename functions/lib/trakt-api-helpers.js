@@ -123,6 +123,55 @@ export function normalizeOptionalCount(value) {
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
+export function withListAvailability(list, status = "available", message = "") {
+  return {
+    ...list,
+    availabilityStatus: normalizeAvailabilityStatus(status),
+    availabilityMessage: message,
+  };
+}
+
+export function shouldValidateListAvailability(list) {
+  if (!list) return false;
+  if (normalizeAvailabilityStatus(list.availabilityStatus)) return false;
+  return isListAvailabilitySuspicious(list);
+}
+
+export function isListAvailabilitySuspicious(list) {
+  if (!list?.ids?.trakt) return true;
+  if (isNonPublicList(list)) return true;
+  if (list._availabilitySignals?.likesNotFound) return true;
+
+  const username = getListUsername(list);
+  if (!username || isUnknownOwner(username)) return true;
+  if (!list?.ids?.slug) return true;
+
+  return false;
+}
+
+export function isUnknownOwner(value) {
+  return String(value || "").trim().toLowerCase() === "unknown";
+}
+
+export function isNonPublicList(list) {
+  const privacy = String(list?.privacy || "").trim().toLowerCase();
+  return Boolean(privacy && privacy !== "public");
+}
+
+export function getRouteUsername(list) {
+  const slug = String(list?.user?.ids?.slug || "").trim();
+  if (slug && !isUnknownOwner(slug) && isSafePathSegment(slug)) return slug;
+
+  const username = String(list?.user?.username || "").trim();
+  if (username && !isUnknownOwner(username) && isSafePathSegment(username)) return username;
+
+  return "";
+}
+
+export function getOwnerDisplayName(list) {
+  return String(list?.user?.name || list?.user?.username || list?.user?.ids?.slug || "").trim();
+}
+
 export function clampPositiveInteger(value, fallback, max) {
   return Math.min(getPositiveInteger(value, fallback), max);
 }
@@ -195,11 +244,13 @@ export function normalizeList(list) {
   if (!list) return null;
 
   const ids = list.ids || {};
-  const user = list.user || {};
-  const username = user.username || user.ids?.slug || "";
-  const url = username && ids.slug
-    ? `${TRAKT_WEB_BASE}/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(ids.slug)}`
+  const availability = getListAvailability(list);
+  const ownerUsername = availability.status === "available" ? getRouteUsername(list) : "";
+  const ownerDisplayName = getAvailabilityOwnerDisplayName(availability.status, getOwnerDisplayName(list));
+  const url = availability.isAvailable && ownerUsername && ids.slug
+    ? `${TRAKT_WEB_BASE}/users/${encodeURIComponent(ownerUsername)}/lists/${encodeURIComponent(ids.slug)}`
     : "";
+  const canRoute = availability.isAvailable && Boolean(ownerUsername && ids.slug);
 
   return {
     name: list.name || "",
@@ -214,11 +265,25 @@ export function normalizeList(list) {
       slug: ids.slug,
     },
     user: {
-      username,
-      name: user.name || "",
+      username: ownerUsername,
+      name: ownerDisplayName,
     },
+    ownerUsername,
+    ownerDisplayName,
     url,
+    canOpen: canRoute,
+    canPreview: canRoute,
+    availabilityStatus: availability.status,
+    isAvailable: availability.isAvailable,
+    isExportable: availability.isExportable,
+    availabilityMessage: availability.message,
   };
+}
+
+function getAvailabilityOwnerDisplayName(status, fallback) {
+  if (status === "unavailable") return "Owner unavailable";
+  if (status === "unverified") return "Owner unverified";
+  return fallback;
 }
 
 export function normalizeGlobalListEntry(entry) {
@@ -280,4 +345,51 @@ export async function mapWithConcurrency(items, concurrency, mapper) {
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, worker);
   await Promise.all(workers);
   return results;
+}
+
+function getListAvailability(list) {
+  if (!list?.ids?.trakt) {
+    return availability("unavailable", "Unavailable or not public");
+  }
+
+  if (isNonPublicList(list)) {
+    return availability("unavailable", "Unavailable or not public");
+  }
+
+  const explicitStatus = normalizeAvailabilityStatus(list.availabilityStatus);
+  if (explicitStatus === "unavailable") {
+    return availability("unavailable", list.availabilityMessage || "Unavailable or not public");
+  }
+
+  if (explicitStatus === "unverified") {
+    return availability("unverified", list.availabilityMessage || "Could not verify public status");
+  }
+
+  if (explicitStatus === "available") {
+    return availability("available", "");
+  }
+
+  if (isListAvailabilitySuspicious(list)) {
+    return availability("unverified", "Could not verify public status");
+  }
+
+  return availability("available", "");
+}
+
+function getListUsername(list) {
+  return getRouteUsername(list);
+}
+
+function normalizeAvailabilityStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  return value === "available" || value === "unavailable" || value === "unverified" ? value : "";
+}
+
+function availability(status, message) {
+  return {
+    status,
+    isAvailable: status === "available",
+    isExportable: status === "available",
+    message,
+  };
 }

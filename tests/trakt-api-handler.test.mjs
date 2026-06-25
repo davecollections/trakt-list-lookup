@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { onRequestGet } from "../functions/api/trakt.js";
+import { enrichListsWithLikeCounts } from "../functions/lib/trakt-client.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -13,6 +14,16 @@ try {
   await testPopularPaginationAllowsPosterSamples();
   await testAuthoritativeLikeCountsReplacePayloadCounts();
   await testLikeCountFallbackKeepsPayloadCount();
+  await testLikeCountTransientFailureIsQuietAndExportable();
+  await testLikeCountTimeoutFallsBackQuickly();
+  await testNormalRowsDoNotValidateDetails();
+  await testPopularUnavailableSuspiciousResult();
+  await testKeywordSuspiciousLikes404Validation();
+  await testSuspiciousDetailSuccessRepairsResult();
+  await testSuspiciousDetailSuccessItems404Unavailable();
+  await testDuplicateSuspiciousRowsShareAvailabilityValidation();
+  await testSuspiciousDetailSuccessItems503Unverified();
+  await testNon404AvailabilityFailureIsUnverified();
   await testSortedQuickUsersUseEnrichedLikeCounts();
   await testQuickUsersFromSampledPages();
   await testQuickUsersFailureStillReturnsResults();
@@ -23,6 +34,8 @@ try {
   await testResolveListUrl();
   await testResolveNumericListIdFromSearch();
   await testResolveNumericListIdFromUrlMode();
+  await testDisplayNameOwnerUsesRouteSlug();
+  await testNumericValidRouteUnavailableRemainsExportable();
   await testMissingNumericListId();
   await testListItems();
   await testListItemsWithoutPosters();
@@ -188,6 +201,441 @@ async function testLikeCountFallbackKeepsPayloadCount() {
   assert.equal(body.results[0].like_count, 46);
 }
 
+async function testLikeCountTransientFailureIsQuietAndExportable() {
+  const { result: response, events } = await withCapturedConsole(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname === "/lists/popular") {
+        return jsonResponse([list({
+          name: "Known Valid",
+          slug: "known-valid",
+          username: "valid_user",
+          trakt: 11150552,
+          likes: 7,
+        })]);
+      }
+      if (isListLikesPath(url, 11150552)) {
+        return new Response(JSON.stringify({ error: "upstream timeout" }), {
+          status: 504,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].ids.trakt, 11150552);
+  assert.equal(body.results[0].like_count, 7);
+  assert.equal(body.results[0].availabilityStatus, "available");
+  assert.equal(body.results[0].isAvailable, true);
+  assert.equal(body.results[0].isExportable, true);
+  assert.equal(body.results[0].url, "https://trakt.tv/users/valid_user/lists/known-valid");
+  assert.deepEqual(events, []);
+}
+
+async function testLikeCountTimeoutFallsBackQuickly() {
+  const { result: lists, events } = await withCapturedConsole(async () => {
+    mockFetch(({ url, init }) => {
+      if (isListLikesPath(url, 11150552)) {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => resolve(jsonResponse([], paginationHeaders(7, 1, 1))), 50);
+          init.signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            const error = new Error("Aborted");
+            error.name = "AbortError";
+            reject(error);
+          }, { once: true });
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return enrichListsWithLikeCounts([
+      list({
+        name: "Known Valid",
+        slug: "known-valid",
+        username: "valid_user",
+        trakt: 11150552,
+        likes: 7,
+      }),
+    ], env().TRAKT_CLIENT_ID, { likeTimeoutMs: 5 });
+  });
+
+  assert.equal(lists[0].like_count, 7);
+  assert.equal(lists[0]._availabilitySignals?.likesNotFound, undefined);
+  assert.deepEqual(events, []);
+}
+
+async function testNormalRowsDoNotValidateDetails() {
+  const normalIds = new Set([2142753, 300, 301, 302]);
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") return jsonResponse([list({ trakt: 2142753, username: "justin", likes: 46 })]);
+    if (url.pathname === "/lists/trending") return jsonResponse([list({ trakt: 300, username: "trend", likes: 3 })]);
+    if (url.pathname === "/users/demo/lists") return jsonResponse([list({ trakt: 301, username: "demo", likes: 4 })]);
+    if (url.pathname === "/search/list") {
+      return jsonResponse([{ score: 1, list: list({ trakt: 302, username: "searcher", likes: 5 }) }]);
+    }
+    if (url.pathname === "/users/snoak/lists" || url.pathname === "/users/extreme_one/lists") return jsonResponse([]);
+    for (const id of normalIds) {
+      if (isListLikesPath(url, id)) return jsonResponse([], paginationHeaders(id, 1, 1));
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const responses = await Promise.all([
+    callHandler("https://example.test/api/trakt?mode=popular", env()),
+    callHandler("https://example.test/api/trakt?mode=trending", env()),
+    callHandler("https://example.test/api/trakt?mode=user&q=demo", env()),
+    callHandler("https://example.test/api/trakt?mode=search&q=horror", env()),
+  ]);
+  const bodies = await Promise.all(responses.map((response) => response.json()));
+
+  responses.forEach((response) => assert.equal(response.status, 200));
+  bodies.forEach((body) => {
+    assert.equal(body.results[0].availabilityStatus, "available");
+    assert.equal(body.results[0].isExportable, true);
+  });
+  assert.ok(!calls.some((call) => normalIds.has(Number(call.url.pathname.replace("/lists/", "")))));
+}
+
+async function testPopularUnavailableSuspiciousResult() {
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([
+        {
+          name: "500 Essential Cult Movies: The Ultimate Guide By Jennifer Eiss",
+          ids: {
+            trakt: 805686,
+          },
+          user: {
+            username: "unknown",
+          },
+          item_count: 500,
+        },
+      ], paginationHeaders(1, 1));
+    }
+    if (isListLikesPath(url, 805686)) {
+      return jsonErrorResponse(404);
+    }
+    if (url.pathname === "/lists/805686") {
+      return jsonErrorResponse(404);
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results.length, 1);
+  assert.equal(body.results[0].ids.trakt, 805686);
+  assert.equal(body.results[0].availabilityStatus, "unavailable");
+  assert.equal(body.results[0].isAvailable, false);
+  assert.equal(body.results[0].isExportable, false);
+  assert.equal(body.results[0].availabilityMessage, "Unavailable or not public");
+  assert.equal(body.results[0].url, "");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].ownerDisplayName, "Owner unavailable");
+  assert.equal(body.results[0].user.username, "");
+  assert.equal(body.results[0].user.name, "Owner unavailable");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
+  assert.deepEqual(body.quickUsers, []);
+  assert.ok(!calls.some((call) => call.url.pathname === "/lists/805686"));
+}
+
+async function testKeywordSuspiciousLikes404Validation() {
+  const suspiciousIds = new Set([3469590, 825398, 3339599]);
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/search/list") {
+      return jsonResponse([...suspiciousIds].map((trakt, index) => ({
+        score: 10 - index,
+        list: {
+          name: `Apocalyptic ${index + 1}`,
+          ids: {
+            trakt,
+          },
+          user: {
+            username: "unknown",
+          },
+          item_count: 10,
+        },
+      })), paginationHeaders(3, 1));
+    }
+    if (url.pathname === "/users/snoak/lists" || url.pathname === "/users/extreme_one/lists") return jsonResponse([]);
+    for (const id of suspiciousIds) {
+      if (isListLikesPath(url, id) || url.pathname === `/lists/${id}`) {
+        return jsonErrorResponse(404);
+      }
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=search&q=apocalyptic", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results.map((result) => result.ids.trakt), [3469590, 825398, 3339599]);
+  assert.deepEqual(body.results.map((result) => result.availabilityStatus), ["unavailable", "unavailable", "unavailable"]);
+  assert.deepEqual(body.results.map((result) => result.isExportable), [false, false, false]);
+  assert.deepEqual(body.results.map((result) => result.ownerDisplayName), ["Owner unavailable", "Owner unavailable", "Owner unavailable"]);
+  assert.deepEqual(body.results.map((result) => result.canOpen), [false, false, false]);
+  assert.deepEqual(body.results.map((result) => result.canPreview), [false, false, false]);
+  assert.equal(calls.filter((call) => [...suspiciousIds].some((id) => isListLikesPath(call.url, id))).length, 3);
+  assert.equal(calls.filter((call) => suspiciousIds.has(Number(call.url.pathname.replace("/lists/", "")))).length, 0);
+}
+
+async function testSuspiciousDetailSuccessRepairsResult() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([{
+        name: "Stale",
+        ids: {
+          trakt: 825398,
+        },
+        user: {
+          username: "unknown",
+        },
+      }], paginationHeaders(1, 1));
+    }
+    if (isListLikesPath(url, 825398)) {
+      return jsonResponse([], paginationHeaders(12, 1, 1));
+    }
+    if (url.pathname === "/lists/825398") {
+      return jsonResponse(list({
+        name: "Repaired List",
+        slug: "repaired-list",
+        username: "public_owner",
+        trakt: 825398,
+        likes: 12,
+        items: 44,
+      }));
+    }
+    if (url.pathname === "/users/public_owner/lists/repaired-list/items") {
+      return jsonResponse([], paginationHeaders(44, 1, 1));
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].name, "Repaired List");
+  assert.equal(body.results[0].item_count, 44);
+  assert.equal(body.results[0].user.username, "public_owner");
+  assert.equal(body.results[0].ids.slug, "repaired-list");
+  assert.equal(body.results[0].url, "https://trakt.tv/users/public_owner/lists/repaired-list");
+  assert.equal(body.results[0].availabilityStatus, "available");
+  assert.equal(body.results[0].isExportable, true);
+}
+
+async function testSuspiciousDetailSuccessItems404Unavailable() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([{
+        name: "Apocalyptic and Post-Apocalyptic Movies",
+        ids: {
+          trakt: 825398,
+        },
+        user: {
+          username: "unknown",
+        },
+      }], paginationHeaders(1, 1));
+    }
+    if (isListLikesPath(url, 825398)) {
+      return jsonResponse([], paginationHeaders(12, 1, 1));
+    }
+    if (url.pathname === "/lists/825398") {
+      return jsonResponse(list({
+        name: "Apocalyptic and Post-Apocalyptic Movies",
+        slug: "apocalyptic-and-post-apocalyptic-movies",
+        username: "Trakt",
+        trakt: 825398,
+        likes: 12,
+        items: 44,
+      }));
+    }
+    if (url.pathname === "/users/Trakt/lists/apocalyptic-and-post-apocalyptic-movies/items") {
+      return jsonErrorResponse(404);
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].ids.trakt, 825398);
+  assert.equal(body.results[0].user.username, "");
+  assert.equal(body.results[0].user.name, "Owner unavailable");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].ownerDisplayName, "Owner unavailable");
+  assert.equal(body.results[0].availabilityStatus, "unavailable");
+  assert.equal(body.results[0].isAvailable, false);
+  assert.equal(body.results[0].isExportable, false);
+  assert.equal(body.results[0].availabilityMessage, "Unavailable or not public");
+  assert.equal(body.results[0].url, "");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
+}
+
+async function testDuplicateSuspiciousRowsShareAvailabilityValidation() {
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([
+        {
+          name: "Duplicate stale A",
+          ids: {
+            trakt: 825398,
+          },
+          user: {
+            username: "unknown",
+          },
+        },
+        {
+          name: "Duplicate stale B",
+          ids: {
+            trakt: 825398,
+          },
+          user: {
+            username: "unknown",
+          },
+        },
+      ], paginationHeaders(2, 1));
+    }
+    if (isListLikesPath(url, 825398)) {
+      return jsonResponse([], paginationHeaders(12, 1, 1));
+    }
+    if (url.pathname === "/lists/825398") {
+      return jsonResponse(list({
+        name: "Apocalyptic and Post-Apocalyptic Movies",
+        slug: "apocalyptic-and-post-apocalyptic-movies",
+        username: "Trakt",
+        trakt: 825398,
+        likes: 12,
+        items: 44,
+      }));
+    }
+    if (url.pathname === "/users/Trakt/lists/apocalyptic-and-post-apocalyptic-movies/items") {
+      return jsonErrorResponse(404);
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results.map((result) => result.availabilityStatus), ["unavailable", "unavailable"]);
+  assert.deepEqual(body.results.map((result) => result.isExportable), [false, false]);
+  assert.equal(calls.filter((call) => call.url.pathname === "/lists/825398").length, 1);
+  assert.equal(calls.filter((call) => call.url.pathname === "/users/Trakt/lists/apocalyptic-and-post-apocalyptic-movies/items").length, 1);
+}
+
+async function testSuspiciousDetailSuccessItems503Unverified() {
+  const response = await withMutedConsole(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname === "/lists/popular") {
+        return jsonResponse([{
+          name: "Maybe Public",
+          ids: {
+            trakt: 3339599,
+          },
+          user: {
+            username: "unknown",
+          },
+        }], paginationHeaders(1, 1));
+      }
+      if (isListLikesPath(url, 3339599)) {
+        return jsonResponse([], paginationHeaders(12, 1, 1));
+      }
+      if (url.pathname === "/lists/3339599") {
+        return jsonResponse(list({
+          name: "Maybe Public",
+          slug: "maybe-public",
+          username: "public_owner",
+          trakt: 3339599,
+          likes: 12,
+          items: 44,
+        }));
+      }
+      if (url.pathname === "/users/public_owner/lists/maybe-public/items") {
+        return new Response(JSON.stringify({ error: "Busy" }), {
+          status: 503,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].ids.trakt, 3339599);
+  assert.equal(body.results[0].availabilityStatus, "unverified");
+  assert.equal(body.results[0].isAvailable, false);
+  assert.equal(body.results[0].isExportable, false);
+  assert.equal(body.results[0].availabilityMessage, "Could not verify public status");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].ownerDisplayName, "Owner unverified");
+  assert.equal(body.results[0].url, "");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
+}
+
+async function testNon404AvailabilityFailureIsUnverified() {
+  const response = await withMutedConsole(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname === "/lists/popular") {
+        return jsonResponse([{
+          name: "Maybe Gone",
+          ids: {
+            trakt: 3339599,
+          },
+          user: {
+            username: "unknown",
+          },
+        }], paginationHeaders(1, 1));
+      }
+      if (isListLikesPath(url, 3339599)) {
+        return jsonResponse([], paginationHeaders(2, 1, 1));
+      }
+      if (url.pathname === "/lists/3339599") {
+        return new Response(JSON.stringify({ error: "Busy" }), {
+          status: 503,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].availabilityStatus, "unverified");
+  assert.equal(body.results[0].isAvailable, false);
+  assert.equal(body.results[0].isExportable, false);
+  assert.equal(body.results[0].availabilityMessage, "Could not verify public status");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].ownerDisplayName, "Owner unverified");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
+}
+
 async function testSortedQuickUsersUseEnrichedLikeCounts() {
   mockFetch(({ url }) => {
     if (url.pathname === "/lists/popular") {
@@ -212,21 +660,28 @@ async function testSortedQuickUsersUseEnrichedLikeCounts() {
 async function testQuickUsersFromSampledPages() {
   mockFetch(({ url }) => {
     if (isListLikesPath(url, 100)) return jsonResponse([], paginationHeaders(1, 1, 1));
+    if (isListLikesPath(url, 201)) return jsonResponse([], paginationHeaders(10, 1, 1));
+    if (isListLikesPath(url, 202)) return jsonResponse([], paginationHeaders(5, 1, 1));
     if (url.pathname !== "/lists/popular") throw new Error(`Unexpected path ${url.pathname}`);
 
     const limit = url.searchParams.get("limit");
     const page = url.searchParams.get("page");
-    if (limit === "30") return jsonResponse([list({ username: "visible", likes: 1 })], paginationHeaders(75, 3, 30));
-    if (limit === "50" && page === "1") {
+    if (limit === "30") {
       return jsonResponse([
         list({ name: "A One", username: "creator-a", trakt: 201, likes: 10, items: 4 }),
         list({ name: "B One", username: "creator-b", trakt: 202, likes: 5, items: 8 }),
-      ], paginationHeaders(75, 2, 50));
+        list({ username: "visible", trakt: 100, likes: 1 }),
+      ], paginationHeaders(75, 3, 30));
     }
     if (limit === "50" && page === "2") {
       return jsonResponse([
         list({ name: "A Two", username: "creator-a", trakt: 203, likes: 7, items: 6 }),
         list({ name: "C One", username: "creator-c", trakt: 204, likes: 30, items: 10 }),
+      ], paginationHeaders(75, 2, 50));
+    }
+    if (limit === "50" && page === "3") {
+      return jsonResponse([
+        list({ name: "Page Three", username: "creator-d", trakt: 205, likes: 2, items: 2 }),
       ], paginationHeaders(75, 2, 50));
     }
     throw new Error(`Unexpected popular request ${url.search}`);
@@ -236,7 +691,7 @@ async function testQuickUsersFromSampledPages() {
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.deepEqual(body.quickUsers.map((user) => user.username), ["creator-c", "creator-a", "creator-b"]);
+  assert.deepEqual(body.quickUsers.map((user) => user.username).slice(0, 3), ["creator-c", "creator-a", "creator-b"]);
   assert.equal(body.quickUsers[0].likeCount, 30);
   assert.equal(body.quickUsers[1].listCount, 2);
   assert.equal(body.quickUsers[1].itemCount, 10);
@@ -249,8 +704,8 @@ async function testQuickUsersFailureStillReturnsResults() {
     mockFetch(({ url }) => {
       if (isListLikesPath(url, 222)) return jsonResponse([], paginationHeaders(0, 0, 1));
       if (url.pathname !== "/lists/trending") throw new Error(`Unexpected path ${url.pathname}`);
-      if (url.searchParams.get("limit") === "50") throw new Error("Summary failed");
-      return jsonResponse([list({ name: "Trending", username: "demo", trakt: 222 })], paginationHeaders(1, 1));
+      if (url.searchParams.get("limit") === "50" && url.searchParams.get("page") === "2") throw new Error("Summary failed");
+      return jsonResponse([list({ name: "Trending", username: "demo", trakt: 222 })], paginationHeaders(75, 2));
     });
 
     return callHandler("https://example.test/api/trakt?mode=trending", env());
@@ -398,12 +853,7 @@ async function testResolveNumericListIdFromSearch() {
         }));
       }
       if (isListLikesPath(url, 33753562)) {
-        return new Response(JSON.stringify({ error: "Not found" }), {
-          status: 404,
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-          },
-        });
+        return jsonResponse([], paginationHeaders(9, 1, 1));
       }
       throw new Error(`Unexpected path ${url.pathname}`);
     });
@@ -454,6 +904,87 @@ async function testResolveNumericListIdFromUrlMode() {
   assert.equal(body.results[0].ids.trakt, 33753562);
   assert.equal(body.results[0].like_count, 12);
   assert.equal(body.quickUsers[0].likeCount, 12);
+}
+
+async function testDisplayNameOwnerUsesRouteSlug() {
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/6652017") {
+      assert.equal(url.searchParams.get("extended"), "full");
+      return jsonResponse({
+        name: "Attenborough Documentaries",
+        privacy: "public",
+        item_count: 93,
+        like_count: null,
+        updated_at: "2026-06-23T17:37:14Z",
+        ids: {
+          trakt: 6652017,
+          slug: "attenborough-documentaries",
+        },
+        user: {
+          username: "Hammers Lists",
+          name: "Hammers lists",
+          ids: {
+            slug: "hammers-lists",
+          },
+        },
+      });
+    }
+    if (isListLikesPath(url, 6652017)) return jsonResponse([], paginationHeaders(818, 1, 1));
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=search&q=6652017", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 2);
+  assert.equal(body.results[0].ids.trakt, 6652017);
+  assert.equal(body.results[0].user.username, "hammers-lists");
+  assert.equal(body.results[0].user.name, "Hammers lists");
+  assert.equal(body.results[0].ownerUsername, "hammers-lists");
+  assert.equal(body.results[0].ownerDisplayName, "Hammers lists");
+  assert.equal(body.results[0].url, "https://trakt.tv/users/hammers-lists/lists/attenborough-documentaries");
+  assert.equal(body.results[0].canOpen, true);
+  assert.equal(body.results[0].canPreview, true);
+  assert.equal(body.results[0].isExportable, true);
+}
+
+async function testNumericValidRouteUnavailableRemainsExportable() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/6652018") {
+      assert.equal(url.searchParams.get("extended"), "full");
+      return jsonResponse({
+        name: "Route Missing",
+        privacy: "public",
+        item_count: 10,
+        like_count: 2,
+        updated_at: "2026-06-23T17:37:14Z",
+        ids: {
+          trakt: 6652018,
+          slug: "route-missing",
+        },
+        user: {
+          username: "Display Owner",
+          name: "Display Owner",
+        },
+      });
+    }
+    if (isListLikesPath(url, 6652018)) return jsonResponse([], paginationHeaders(2, 1, 1));
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=url&q=6652018", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].ids.trakt, 6652018);
+  assert.equal(body.results[0].isExportable, true);
+  assert.equal(body.results[0].availabilityStatus, "available");
+  assert.equal(body.results[0].ownerDisplayName, "Display Owner");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].url, "");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
 }
 
 async function testMissingNumericListId() {
@@ -573,6 +1104,15 @@ function jsonResponse(payload, headers = {}) {
   });
 }
 
+function jsonErrorResponse(status) {
+  return new Response(JSON.stringify({ error: "No matching Trakt list was found." }), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+    },
+  });
+}
+
 function paginationHeaders(itemCount, pageCount = itemCount ? 1 : 0, limit = 30) {
   return {
     "x-pagination-page": "1",
@@ -616,6 +1156,23 @@ async function withMutedConsole(callback) {
   console.warn = () => {};
   try {
     return await callback();
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+}
+
+async function withCapturedConsole(callback) {
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  const events = [];
+  console.error = (...args) => events.push(["error", ...args]);
+  console.warn = (...args) => events.push(["warn", ...args]);
+  try {
+    return {
+      result: await callback(),
+      events,
+    };
   } finally {
     console.error = originalError;
     console.warn = originalWarn;
