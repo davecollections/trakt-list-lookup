@@ -6,6 +6,10 @@ import { buildNuvioExportPayload, getListSelectionKey, getSafeHttpsUrl, sortNuvi
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
 const MAX_EXISTING_JSON_BYTES = 2 * 1024 * 1024;
+const DEFAULT_COLLECTION_NAME = "Trakt Lists";
+const DEFAULT_MERGE_MODE = "new";
+const DEFAULT_SORT_MODE = "title-asc";
+const DEFAULT_FOLDER_IMAGE_MODE = "auto";
 
 export function createNuvioExportUi({ selection }) {
   const modal = document.querySelector("#nuvio-modal");
@@ -40,8 +44,15 @@ export function createNuvioExportUi({ selection }) {
   const jsonPreviewClose = document.querySelector("#json-preview-close");
   const jsonPreviewCopy = document.querySelector("#copy-json-preview");
   const importHelpModal = document.querySelector("#nuvio-import-help-modal");
+  const resetButton = document.querySelector("#reset-nuvio-export");
   const importHelpOpen = document.querySelector("#open-nuvio-import-help");
   const importHelpClose = document.querySelector("#nuvio-import-help-close");
+  const destinationDescriptions = {
+    new: document.querySelector("#nuvio-new-mode-description"),
+    split: document.querySelector("#nuvio-split-mode-description"),
+    existing: document.querySelector("#nuvio-existing-mode-description"),
+    mapped: document.querySelector("#nuvio-mapped-mode-description"),
+  };
   const folderImageCache = new Map();
   let folderImageRequestId = 0;
   let latestPayload = null;
@@ -52,6 +63,7 @@ export function createNuvioExportUi({ selection }) {
   downloadButton.addEventListener("click", downloadJson);
   jsonPreviewClose.addEventListener("click", closeJsonPreview);
   jsonPreviewCopy.addEventListener("click", copyJsonPreview);
+  resetButton.addEventListener("click", resetExportForm);
   importHelpOpen.addEventListener("click", openImportHelp);
   importHelpClose.addEventListener("click", closeImportHelp);
   collectionNameInput.addEventListener("input", update);
@@ -187,7 +199,7 @@ export function createNuvioExportUi({ selection }) {
       lists: getSelectedListsForExport(),
       existing,
       mode: getMergeMode(),
-      collectionName: collectionNameInput.value.trim() || "Trakt Lists",
+      collectionName: collectionNameInput.value.trim() || DEFAULT_COLLECTION_NAME,
       coverUrl: coverUrlInput.value,
       folderCoverUrl: getFolderCoverFallbackUrl(),
       folderImages: getFolderImageObject(),
@@ -209,7 +221,7 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function getMergeMode() {
-    return document.querySelector("input[name='nuvio-merge-mode']:checked")?.value || "new";
+    return document.querySelector("input[name='nuvio-merge-mode']:checked")?.value || DEFAULT_MERGE_MODE;
   }
 
   function updateExportSummary(payload) {
@@ -222,13 +234,15 @@ export function createNuvioExportUi({ selection }) {
 
     if (mode === "split") {
       const splitCount = getSplitGroups().size;
-      summary = `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(splitCount)} new collection${splitCount === 1 ? "" : "s"}${coverUrl ? " with a cover URL" : ""}.`;
+      summary = existingCount
+        ? `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(splitCount)} new collection${splitCount === 1 ? "" : "s"} alongside the imported JSON${coverUrl ? " with a cover URL" : ""}.`
+        : `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(splitCount)} new collection${splitCount === 1 ? "" : "s"}${coverUrl ? " with a cover URL" : ""}.`;
       exportSummary.textContent = summary;
       return;
     }
 
     if (mode === "existing") {
-      summary = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added to one existing collection.`;
+      summary = `${formatNumber(selectedCount)} selected list${selectedCount === 1 ? "" : "s"} will be added to the chosen imported collection.`;
       exportSummary.textContent = summary;
       return;
     }
@@ -241,7 +255,7 @@ export function createNuvioExportUi({ selection }) {
     }
 
     summary = existingCount
-      ? `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added as one new collection. Output contains ${formatNumber(collectionCount)} total collections.`
+      ? `${formatNumber(selectedCount)} selected list${selectedCount === 1 ? "" : "s"} will be added as a new collection alongside the imported JSON. Output contains ${formatNumber(collectionCount)} total collections.`
       : `${formatNumber(selectedCount)} selected list${selectedCount === 1 ? "" : "s"} will be exported as folders in one collection${coverUrl ? " with a cover URL" : ""}.`;
     exportSummary.textContent = summary;
   }
@@ -378,10 +392,15 @@ export function createNuvioExportUi({ selection }) {
     const collections = getExistingCollections();
     const hasExistingJson = collections.length > 0;
     const canSplit = selection.size > 1;
+    const destinationCopy = getNuvioDestinationCopy({
+      existingCollectionCount: collections.length,
+    });
     mergeOptions.hidden = false;
-    existingSummary.textContent = collections.length
-      ? `${formatNumber(collections.length)} existing collection${collections.length === 1 ? "" : "s"} detected.`
-      : "Create new collection output.";
+    existingSummary.textContent = destinationCopy.summary;
+    destinationDescriptions.new.textContent = destinationCopy.newDescription;
+    destinationDescriptions.split.textContent = destinationCopy.splitDescription;
+    destinationDescriptions.existing.textContent = destinationCopy.existingDescription;
+    destinationDescriptions.mapped.textContent = destinationCopy.mappedDescription;
 
     mergeOptions.querySelectorAll(".existing-json-option").forEach((element) => {
       element.hidden = !hasExistingJson;
@@ -392,10 +411,10 @@ export function createNuvioExportUi({ selection }) {
     });
 
     if (!hasExistingJson && (getMergeMode() === "existing" || getMergeMode() === "mapped")) {
-      document.querySelector("input[name='nuvio-merge-mode'][value='new']").checked = true;
+      setMergeMode(DEFAULT_MERGE_MODE);
     }
     if (!canSplit && getMergeMode() === "split") {
-      document.querySelector("input[name='nuvio-merge-mode'][value='new']").checked = true;
+      setMergeMode(DEFAULT_MERGE_MODE);
     }
 
     populateCollectionSelect(targetCollectionSelect, collections);
@@ -490,6 +509,39 @@ export function createNuvioExportUi({ selection }) {
 
   function getSelectedListsForExport() {
     return sortNuvioLists(selection.values(), sortModeSelect.value);
+  }
+
+  function resetExportForm() {
+    closeJsonPreview();
+    closeImportHelp();
+    folderImageRequestId += 1;
+    latestPayload = null;
+
+    collectionNameInput.value = "";
+    coverUrlInput.value = "";
+    sortModeSelect.value = DEFAULT_SORT_MODE;
+    folderImageModeSelect.value = DEFAULT_FOLDER_IMAGE_MODE;
+    existingJsonInput.value = "";
+    existingFileInput.value = "";
+    existingFileStatus.textContent = "No file selected";
+    existingFileStatus.classList.remove("invalid");
+    existingJsonStatus.textContent = "";
+    existingJsonStatus.classList.remove("invalid");
+    coverStatus.textContent = "";
+    coverStatus.classList.remove("invalid");
+    folderImageStatus.textContent = "";
+    setMergeMode(DEFAULT_MERGE_MODE);
+    targetCollectionSelect.textContent = "";
+    selection.clearExportAssignments?.();
+
+    update();
+    refreshFolderImages();
+    collectionNameInput.focus();
+  }
+
+  function setMergeMode(mode) {
+    const radio = document.querySelector(`input[name='nuvio-merge-mode'][value='${mode}']`);
+    if (radio) radio.checked = true;
   }
 
   function getCoverUrl() {
@@ -609,6 +661,25 @@ function flashButton(button) {
   window.setTimeout(() => {
     button.textContent = original;
   }, 900);
+}
+
+export function getNuvioDestinationCopy({ existingCollectionCount = 0 } = {}) {
+  const count = Number(existingCollectionCount) || 0;
+  const hasExistingJson = count > 0;
+
+  return {
+    summary: hasExistingJson
+      ? `${formatCount(count, "imported collection", "imported collections")} detected.`
+      : "Create a new Nuvio collection from selected lists.",
+    newDescription: hasExistingJson
+      ? "Keep imported collections and add selected lists as a new collection."
+      : "Add selected lists as folders in one new collection.",
+    splitDescription: hasExistingJson
+      ? "Keep imported collections and add grouped selected lists as new collections."
+      : "Group selected lists into multiple new collections.",
+    existingDescription: "Add selected lists to the chosen imported collection. Already-existing Trakt lists may be skipped.",
+    mappedDescription: "Choose an imported collection for each selected list. Already-existing Trakt lists may be skipped.",
+  };
 }
 
 export function getNuvioExportStatusModel(payload, context = {}) {

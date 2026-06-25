@@ -10,26 +10,15 @@
   width: min(760px, 100%);
 }
 
-.nuvio-warning-row {
+.nuvio-utility-row {
   display: flex;
   gap: 10px;
   align-items: stretch;
+  justify-content: flex-end;
   margin-bottom: 10px;
 }
 
-.nuvio-warning {
-  flex: 1;
-  margin: 0;
-  padding: 7px 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--text);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.nuvio-warning-row .ghost-button {
+.nuvio-utility-row .ghost-button {
   min-height: 34px;
   white-space: nowrap;
 }
@@ -153,7 +142,7 @@
 
 .radio-label:hover,
 .radio-label:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  border-color: color-mix(in srgb, #6366f1 40%, var(--border));
   background: color-mix(in srgb, var(--soft) 54%, var(--panel));
 }
 
@@ -177,11 +166,11 @@
 }
 
 .radio-label:has(input:checked) {
-  border-color: color-mix(in srgb, var(--accent) 64%, var(--border));
-  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+  border-color: color-mix(in srgb, #6366f1 64%, var(--border));
+  background: color-mix(in srgb, #6366f1 10%, var(--panel));
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+    0 0 0 1px color-mix(in srgb, #6366f1 20%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, #6366f1 12%, transparent);
 }
 
 .radio-label:has(input:checked)::after {
@@ -192,7 +181,7 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: var(--accent);
+  background: #6366f1;
 }
 
 .nuvio-grid input,
@@ -435,12 +424,12 @@
 }
 
 @media (max-width: 720px) {
-  .nuvio-warning-row,
+  .nuvio-utility-row,
   .nuvio-import-help-grid {
     grid-template-columns: 1fr;
   }
 
-  .nuvio-warning-row {
+  .nuvio-utility-row {
     display: grid;
   }
 

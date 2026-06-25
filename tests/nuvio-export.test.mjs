@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { buildNuvioExport, buildNuvioExportPayload, createNuvioIdFactory, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
-import { countImportedSelectedTraktListDuplicates, getNuvioExportStatusModel } from "../js/nuvio-export-ui.js";
+import { countImportedSelectedTraktListDuplicates, getNuvioDestinationCopy, getNuvioExportStatusModel } from "../js/nuvio-export-ui.js";
 
 const lists = [
   list("Comedy Nights", 101),
@@ -36,6 +36,14 @@ assert.equal(freshExport[0].backdropImageUrl, "https://example.com/cover.jpg");
 assert.equal(freshExport[0].folders[0].sources[0].mediaType, "MOVIE");
 
 nextId = 0;
+const fallbackTitleExport = buildNuvioExport({
+  lists,
+  collectionName: "",
+  createId,
+});
+assert.equal(fallbackTitleExport[0].title, "Trakt Lists");
+
+nextId = 0;
 const freshPayload = buildNuvioExportPayload({
   lists,
   collectionName: "Trakt Picks",
@@ -51,6 +59,16 @@ const freshPayloadStatus = getNuvioExportStatusModel(freshPayload);
 assert.equal(freshPayloadStatus.title, "Export ready");
 assert.equal(freshPayloadStatus.tone, "success");
 assert.ok(freshPayloadStatus.messages.includes("Output contains 3 folders."));
+
+const noExistingDestinationCopy = getNuvioDestinationCopy();
+assert.equal(noExistingDestinationCopy.summary, "Create a new Nuvio collection from selected lists.");
+assert.equal(noExistingDestinationCopy.newDescription, "Add selected lists as folders in one new collection.");
+
+const importedDestinationCopy = getNuvioDestinationCopy({ existingCollectionCount: 2 });
+assert.equal(importedDestinationCopy.summary, "2 imported collections detected.");
+assert.equal(importedDestinationCopy.newDescription, "Keep imported collections and add selected lists as a new collection.");
+assert.equal(importedDestinationCopy.existingDescription, "Add selected lists to the chosen imported collection. Already-existing Trakt lists may be skipped.");
+assert.equal(importedDestinationCopy.mappedDescription, "Choose an imported collection for each selected list. Already-existing Trakt lists may be skipped.");
 
 nextId = 0;
 const seriesExport = buildNuvioExport({

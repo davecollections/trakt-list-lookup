@@ -243,7 +243,8 @@
           <button id="nuvio-close" type="button" class="ghost-button">Close</button>
         </div>
 
-        <div class="nuvio-warning-row">
+        <div class="nuvio-utility-row">
+          <button id="reset-nuvio-export" type="button" class="ghost-button">Reset export form</button>
           <button id="open-nuvio-import-help" type="button" class="ghost-button">Import help</button>
         </div>
 
@@ -256,7 +257,7 @@
             <div class="nuvio-field-grid">
               <label>
                 Collection name
-                <input id="nuvio-collection-name" type="text" value="Trakt Lists">
+                <input id="nuvio-collection-name" type="text" placeholder="Trakt Lists">
               </label>
               <label>
                 Cover image URL
@@ -316,28 +317,28 @@
                 <input type="radio" name="nuvio-merge-mode" value="new" checked>
                 <span>
                   <strong>New collection</strong>
-                  <small>Add all selected lists as folders in one new collection.</small>
+                  <small id="nuvio-new-mode-description">Add selected lists as folders in one new collection.</small>
                 </span>
               </label>
               <label class="radio-label split-option">
                 <input type="radio" name="nuvio-merge-mode" value="split">
                 <span>
                   <strong>Split into collections</strong>
-                  <small>Group selected lists into multiple new collections.</small>
+                  <small id="nuvio-split-mode-description">Group selected lists into multiple new collections.</small>
                 </span>
               </label>
               <label class="radio-label existing-json-option">
                 <input type="radio" name="nuvio-merge-mode" value="existing">
                 <span>
                   <strong>Add to existing</strong>
-                  <small>Put every selected list into the same existing collection.</small>
+                  <small id="nuvio-existing-mode-description">Add selected lists to the chosen imported collection.</small>
                 </span>
               </label>
               <label class="radio-label existing-json-option">
                 <input type="radio" name="nuvio-merge-mode" value="mapped">
                 <span>
                   <strong>Map per list</strong>
-                  <small>Choose a different destination collection for each selected list.</small>
+                  <small id="nuvio-mapped-mode-description">Choose an imported collection for each selected list.</small>
                 </span>
               </label>
             </div>
