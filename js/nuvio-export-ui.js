@@ -10,6 +10,7 @@ const DEFAULT_COLLECTION_NAME = "My Collection";
 const DEFAULT_MERGE_MODE = "new";
 const DEFAULT_SORT_MODE = "title-asc";
 const DEFAULT_FOLDER_IMAGE_MODE = "auto";
+const PASTED_JSON_SOURCE_ID = "pasted-json";
 
 export function createNuvioExportUi({ selection }) {
   const modal = document.querySelector("#nuvio-modal");
@@ -25,8 +26,16 @@ export function createNuvioExportUi({ selection }) {
   const existingJsonInput = document.querySelector("#nuvio-existing-json");
   const existingJsonDetails = document.querySelector("#nuvio-existing-details");
   const existingFileInput = document.querySelector("#nuvio-existing-file");
-  const existingFileStatus = document.querySelector("#nuvio-file-status");
   const existingJsonStatus = document.querySelector("#nuvio-existing-status");
+  const importSummary = document.querySelector("#nuvio-import-summary");
+  const importManageButton = document.querySelector("#manage-nuvio-imports");
+  const importClearButton = document.querySelector("#clear-nuvio-imports");
+  const importPasteToggle = document.querySelector("#toggle-nuvio-paste");
+  const importPastePanel = document.querySelector("#nuvio-paste-panel");
+  const importManageModal = document.querySelector("#nuvio-import-manage-modal");
+  const importManageClose = document.querySelector("#nuvio-import-manage-close");
+  const importManageCount = document.querySelector("#nuvio-import-manage-count");
+  const importSourceList = document.querySelector("#nuvio-import-source-list");
   const mergeOptions = document.querySelector("#nuvio-merge-options");
   const existingSummary = document.querySelector("#nuvio-existing-summary");
   const targetCollectionSelect = document.querySelector("#nuvio-target-collection");
@@ -49,6 +58,8 @@ export function createNuvioExportUi({ selection }) {
     mapped: document.querySelector("#nuvio-mapped-mode-description"),
   };
   const folderImageCache = new Map();
+  let importSources = [];
+  let importSourceCounter = 0;
   let folderImageRequestId = 0;
   let latestPayload = null;
 
@@ -66,11 +77,19 @@ export function createNuvioExportUi({ selection }) {
     refreshFolderImages();
   });
   existingJsonInput.addEventListener("input", () => {
-    existingFileStatus.classList.remove("invalid");
-    if (!existingFileInput.files?.length) existingFileStatus.textContent = "No file selected";
+    updatePastedJsonSource();
     update();
   });
-  existingFileInput.addEventListener("change", loadExistingFile);
+  existingFileInput.addEventListener("change", loadExistingFiles);
+  importManageButton.addEventListener("click", openImportManage);
+  importManageClose.addEventListener("click", closeImportManage);
+  importClearButton.addEventListener("click", clearImportedJson);
+  importPasteToggle.addEventListener("click", togglePastePanel);
+  importSourceList.addEventListener("click", (event) => {
+    const removeButton = event.target.closest("[data-remove-import-source]");
+    if (!removeButton) return;
+    removeImportSource(removeButton.dataset.removeImportSource);
+  });
   targetCollectionSelect.addEventListener("change", refreshGeneratedOutput);
   splitMapping.addEventListener("input", (event) => {
     if (event.target.matches("input[data-list-key]")) {
@@ -96,12 +115,15 @@ export function createNuvioExportUi({ selection }) {
   importHelpModal.addEventListener("click", (event) => {
     if (event.target.matches("[data-close-nuvio-import-help]")) closeImportHelp();
   });
+  importManageModal.addEventListener("click", (event) => {
+    if (event.target.matches("[data-close-nuvio-import-manage]")) closeImportManage();
+  });
 
   return {
     open,
     close,
     update,
-    isOpen: () => isModalOpen(modal) || isModalOpen(importHelpModal),
+    isOpen: () => isModalOpen(modal) || isModalOpen(importHelpModal) || isModalOpen(importManageModal),
   };
 
   function open() {
@@ -117,32 +139,18 @@ export function createNuvioExportUi({ selection }) {
 
   function close() {
     closeImportHelp();
+    closeImportManage();
     closeModal(modal);
   }
 
-  async function loadExistingFile() {
-    const file = existingFileInput.files?.[0];
-    if (!file) return;
+  async function loadExistingFiles() {
+    const files = Array.from(existingFileInput.files || []);
+    if (!files.length) return;
 
-    if (file.size > MAX_EXISTING_JSON_BYTES) {
-      existingJsonInput.value = "";
-      existingFileStatus.textContent = "File is too large. Keep JSON under 2 MB.";
-      existingFileStatus.classList.add("invalid");
-      update();
-      return;
-    }
-
-    try {
-      existingJsonInput.value = await file.text();
-      existingFileStatus.textContent = file.name;
-      existingFileStatus.classList.remove("invalid");
-      update();
-    } catch {
-      existingJsonInput.value = "";
-      existingFileStatus.textContent = "Could not read that file.";
-      existingFileStatus.classList.add("invalid");
-      update();
-    }
+    const sources = await Promise.all(files.map(readImportFileSource));
+    upsertImportSources(sources);
+    existingFileInput.value = "";
+    update();
   }
 
   function update() {
@@ -289,61 +297,171 @@ export function createNuvioExportUi({ selection }) {
   function updateExistingJsonStatus() {
     const state = getExistingJsonState();
     existingJsonStatus.classList.toggle("invalid", Boolean(state.error));
-    existingJsonStatus.textContent = state.message;
+    existingJsonStatus.textContent = state.error ? state.error : "";
+    renderImportSummary(state);
+    renderImportSources(state);
   }
 
   function getExistingJsonState() {
-    const text = existingJsonInput.value.trim();
-    if (!text) {
-      return {
-        collections: [],
-        error: "",
-        message: "",
-      };
+    return getNuvioImportState(importSources);
+  }
+
+  function renderImportSummary(state = getExistingJsonState()) {
+    importSummary.textContent = state.message;
+    const hasSources = importSources.length > 0;
+    importManageButton.disabled = !hasSources;
+    importManageButton.hidden = !hasSources;
+    importClearButton.hidden = !hasSources;
+    importManageCount.textContent = state.message;
+  }
+
+  function renderImportSources(state = getExistingJsonState()) {
+    importSourceList.textContent = "";
+
+    if (!importSources.length) {
+      const empty = document.createElement("p");
+      empty.className = "field-status";
+      empty.textContent = "No imported JSON.";
+      importSourceList.append(empty);
+      return;
     }
 
-    if (text.length > MAX_EXISTING_JSON_BYTES) {
-      return {
-        collections: [],
-        error: "Existing Nuvio JSON is too large.",
-        message: "Existing Nuvio JSON is too large. Keep it under 2 MB.",
-      };
+    for (const source of importSources) {
+      const row = document.createElement("div");
+      row.className = "nuvio-import-source-row";
+
+      const body = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = source.label;
+      const meta = document.createElement("small");
+      meta.textContent = source.error
+        ? source.error
+        : `${formatCount(source.collectionCount, "collection", "collections")} · ${formatCount(source.folderCount, "folder", "folders")}`;
+      meta.classList.toggle("invalid", Boolean(source.error));
+      body.append(title, meta);
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "ghost-button";
+      remove.textContent = "Remove";
+      remove.dataset.removeImportSource = source.id;
+
+      row.append(body, remove);
+      importSourceList.append(row);
+    }
+
+    importManageCount.textContent = state.message;
+  }
+
+  async function readImportFileSource(file) {
+    const id = createImportSourceId("file");
+    const key = getFileSourceKey(file);
+    if (file.size > MAX_EXISTING_JSON_BYTES) {
+      return createInvalidNuvioImportSource({
+        id,
+        key,
+        type: "file",
+        label: file.name,
+        error: "File is too large. Keep JSON under 2 MB.",
+      });
     }
 
     try {
-      const parsed = JSON.parse(text);
-      const validationError = getExistingJsonValidationError(parsed);
-      if (validationError) {
-        return {
-          collections: [],
-          error: validationError,
-          message: validationError,
-        };
-      }
-
-      const folderCount = parsed.reduce((count, collection) => count + (Array.isArray(collection?.folders) ? collection.folders.length : 0), 0);
-      return {
-        collections: parsed,
-        error: "",
-        message: `Detected ${formatNumber(parsed.length)} collection${parsed.length === 1 ? "" : "s"} and ${formatNumber(folderCount)} folder${folderCount === 1 ? "" : "s"}.`,
-      };
-    } catch (error) {
-      return {
-        collections: [],
-        error: error.message,
-        message: "Could not read that as JSON.",
-      };
+      const text = await file.text();
+      return createNuvioImportSource({
+        id,
+        key,
+        type: "file",
+        label: file.name,
+        text,
+      });
+    } catch {
+      return createInvalidNuvioImportSource({
+        id,
+        key,
+        type: "file",
+        label: file.name,
+        error: "Could not read that file.",
+      });
     }
   }
 
-  function getExistingJsonValidationError(value) {
-    if (!Array.isArray(value)) return "Existing Nuvio JSON must be an array.";
-    if (!value.length) return "Existing Nuvio JSON must include at least one collection.";
+  function updatePastedJsonSource() {
+    const text = existingJsonInput.value.trim();
+    if (!text) {
+      importSources = removeNuvioImportSource(importSources, PASTED_JSON_SOURCE_ID);
+      return;
+    }
 
-    const invalidIndex = value.findIndex((collection) => !collection || typeof collection !== "object" || !Array.isArray(collection.folders));
-    if (invalidIndex !== -1) return `Collection ${formatNumber(invalidIndex + 1)} is missing a folders array.`;
+    upsertImportSources([
+      createNuvioImportSource({
+        id: PASTED_JSON_SOURCE_ID,
+        key: PASTED_JSON_SOURCE_ID,
+        type: "paste",
+        label: "Pasted JSON",
+        text,
+      }),
+    ]);
+  }
 
-    return "";
+  function upsertImportSources(sources) {
+    for (const source of sources) {
+      const index = importSources.findIndex((existingSource) => existingSource.key === source.key);
+      if (index === -1) {
+        importSources.push(source);
+      } else {
+        importSources[index] = {
+          ...source,
+          id: importSources[index].id,
+        };
+      }
+    }
+  }
+
+  function removeImportSource(sourceId) {
+    importSources = removeNuvioImportSource(importSources, sourceId);
+    if (sourceId === PASTED_JSON_SOURCE_ID) {
+      existingJsonInput.value = "";
+    }
+    if (!importSources.length) closeImportManage();
+    update();
+  }
+
+  function clearImportedJson() {
+    importSources = [];
+    existingJsonInput.value = "";
+    existingFileInput.value = "";
+    importPastePanel.hidden = true;
+    importPasteToggle.textContent = "Paste JSON instead";
+    closeImportManage();
+    update();
+  }
+
+  function togglePastePanel() {
+    importPastePanel.hidden = !importPastePanel.hidden;
+    importPasteToggle.textContent = importPastePanel.hidden ? "Paste JSON instead" : "Hide paste box";
+    if (!importPastePanel.hidden) existingJsonInput.focus();
+  }
+
+  function openImportManage() {
+    renderImportSources();
+    openModal(importManageModal, {
+      focusTarget: importManageClose,
+      onClose: closeImportManage,
+    });
+  }
+
+  function closeImportManage() {
+    closeModal(importManageModal);
+  }
+
+  function createImportSourceId(type) {
+    importSourceCounter += 1;
+    return `${type}-${importSourceCounter}`;
+  }
+
+  function getFileSourceKey(file) {
+    return `file:${file.name}:${file.size}:${file.lastModified}`;
   }
 
   function updateFolderImageStatus(isLoading = false) {
@@ -494,8 +612,10 @@ export function createNuvioExportUi({ selection }) {
 
   function resetExportForm() {
     closeImportHelp();
+    closeImportManage();
     folderImageRequestId += 1;
     latestPayload = null;
+    importSources = [];
 
     collectionNameInput.value = "";
     coverUrlInput.value = "";
@@ -503,8 +623,8 @@ export function createNuvioExportUi({ selection }) {
     folderImageModeSelect.value = DEFAULT_FOLDER_IMAGE_MODE;
     existingJsonInput.value = "";
     existingFileInput.value = "";
-    existingFileStatus.textContent = "No file selected";
-    existingFileStatus.classList.remove("invalid");
+    importPastePanel.hidden = true;
+    importPasteToggle.textContent = "Paste JSON instead";
     existingJsonStatus.textContent = "";
     existingJsonStatus.classList.remove("invalid");
     coverStatus.textContent = "";
@@ -614,6 +734,150 @@ export function createNuvioExportUi({ selection }) {
     link.click();
     URL.revokeObjectURL(link.href);
   }
+}
+
+export function createNuvioImportSource({
+  id = "",
+  key = "",
+  type = "file",
+  label = "",
+  text = "",
+} = {}) {
+  const sourceLabel = label || (type === "paste" ? "Pasted JSON" : "Imported JSON");
+  const trimmed = String(text || "").trim();
+  const source = {
+    id: id || key || sourceLabel,
+    key: key || id || sourceLabel,
+    type,
+    label: sourceLabel,
+    collections: [],
+    collectionCount: 0,
+    folderCount: 0,
+    error: "",
+  };
+
+  if (trimmed.length > MAX_EXISTING_JSON_BYTES) {
+    return {
+      ...source,
+      error: "Existing Nuvio JSON is too large. Keep it under 2 MB.",
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    const validationError = getExistingJsonValidationError(parsed);
+    if (validationError) {
+      return {
+        ...source,
+        error: validationError,
+      };
+    }
+
+    return {
+      ...source,
+      collections: parsed,
+      collectionCount: parsed.length,
+      folderCount: getNuvioFolderCount(parsed),
+    };
+  } catch {
+    return {
+      ...source,
+      error: "Could not read that as JSON.",
+    };
+  }
+}
+
+export function createInvalidNuvioImportSource({
+  id = "",
+  key = "",
+  type = "file",
+  label = "",
+  error = "Could not read that file.",
+} = {}) {
+  const sourceLabel = label || (type === "paste" ? "Pasted JSON" : "Imported JSON");
+  return {
+    id: id || key || sourceLabel,
+    key: key || id || sourceLabel,
+    type,
+    label: sourceLabel,
+    collections: [],
+    collectionCount: 0,
+    folderCount: 0,
+    error,
+  };
+}
+
+export function getNuvioImportState(sources = []) {
+  const sourceList = Array.isArray(sources) ? sources : [];
+  const collections = sourceList.flatMap((source) => source.collections || []);
+  const errorCount = sourceList.filter((source) => source.error).length;
+  const fileCount = sourceList.filter((source) => source.type === "file").length;
+  const pasteCount = sourceList.filter((source) => source.type === "paste").length;
+  const collectionCount = collections.length;
+  const folderCount = getNuvioFolderCount(collections);
+
+  return {
+    sources: sourceList,
+    collections,
+    sourceCount: sourceList.length,
+    fileCount,
+    pasteCount,
+    collectionCount,
+    folderCount,
+    errorCount,
+    error: errorCount ? `${formatNeedsAttention(errorCount)}. Remove or fix imported JSON before copying or downloading.` : "",
+    message: getNuvioImportSummary(sourceList),
+  };
+}
+
+export function getNuvioImportSummary(sources = []) {
+  const sourceList = Array.isArray(sources) ? sources : [];
+  const state = {
+    sourceCount: sourceList.length,
+    fileCount: sourceList.filter((source) => source.type === "file").length,
+    pasteCount: sourceList.filter((source) => source.type === "paste").length,
+    errorCount: sourceList.filter((source) => source.error).length,
+    collectionCount: sourceList.reduce((count, source) => count + (Number(source.collectionCount) || 0), 0),
+    folderCount: sourceList.reduce((count, source) => count + (Number(source.folderCount) || 0), 0),
+  };
+
+  if (!state.sourceCount) return "No imported JSON";
+
+  const importLabel = getImportSourceLabel(state);
+  if (state.errorCount) return `${importLabel} · ${formatNeedsAttention(state.errorCount)}`;
+
+  return `${importLabel} · ${formatCount(state.collectionCount, "collection", "collections")} · ${formatCount(state.folderCount, "folder", "folders")}`;
+}
+
+export function removeNuvioImportSource(sources = [], sourceId = "") {
+  return (Array.isArray(sources) ? sources : []).filter((source) => source.id !== sourceId);
+}
+
+export function getExistingJsonValidationError(value) {
+  if (!Array.isArray(value)) return "Existing Nuvio JSON must be an array.";
+  if (!value.length) return "Existing Nuvio JSON must include at least one collection.";
+
+  const invalidIndex = value.findIndex((collection) => !collection || typeof collection !== "object" || !Array.isArray(collection.folders));
+  if (invalidIndex !== -1) return `Collection ${formatNumber(invalidIndex + 1)} is missing a folders array.`;
+
+  return "";
+}
+
+function getImportSourceLabel(state) {
+  if (state.fileCount && !state.pasteCount) {
+    return formatCount(state.fileCount, "file imported", "files imported");
+  }
+  if (!state.fileCount && state.pasteCount === 1) return "Pasted JSON imported";
+  return formatCount(state.sourceCount, "import added", "imports added");
+}
+
+function formatNeedsAttention(count) {
+  const value = Number(count) || 0;
+  return `${formatNumber(value)} need${value === 1 ? "s" : ""} attention`;
+}
+
+function getNuvioFolderCount(collections = []) {
+  return (collections || []).reduce((count, collection) => count + (Array.isArray(collection?.folders) ? collection.folders.length : 0), 0);
 }
 
 function flashButton(button) {
