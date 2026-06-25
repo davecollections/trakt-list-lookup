@@ -5,8 +5,8 @@ import {
 } from "./trakt-api-helpers.js";
 
 const TRAKT_API_BASE = "https://api.trakt.tv";
-const LIKE_COUNT_CONCURRENCY = 5;
-const LIKE_COUNT_TIMEOUT_MS = 1000;
+const LIKE_COUNT_CONCURRENCY = 12;
+const LIKE_COUNT_TIMEOUT_MS = 400;
 const TRANSIENT_LIKE_ERROR_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 export function getTraktClientId(env) {

@@ -21,6 +21,7 @@ try {
   await testKeywordSuspiciousLikes404Validation();
   await testSuspiciousDetailSuccessRepairsResult();
   await testSuspiciousDetailSuccessItems404Unavailable();
+  await testDuplicateSuspiciousRowsShareAvailabilityValidation();
   await testSuspiciousDetailSuccessItems503Unverified();
   await testNon404AvailabilityFailureIsUnverified();
   await testSortedQuickUsersUseEnrichedLikeCounts();
@@ -484,6 +485,59 @@ async function testSuspiciousDetailSuccessItems404Unavailable() {
   assert.equal(body.results[0].canPreview, false);
 }
 
+async function testDuplicateSuspiciousRowsShareAvailabilityValidation() {
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([
+        {
+          name: "Duplicate stale A",
+          ids: {
+            trakt: 825398,
+          },
+          user: {
+            username: "unknown",
+          },
+        },
+        {
+          name: "Duplicate stale B",
+          ids: {
+            trakt: 825398,
+          },
+          user: {
+            username: "unknown",
+          },
+        },
+      ], paginationHeaders(2, 1));
+    }
+    if (isListLikesPath(url, 825398)) {
+      return jsonResponse([], paginationHeaders(12, 1, 1));
+    }
+    if (url.pathname === "/lists/825398") {
+      return jsonResponse(list({
+        name: "Apocalyptic and Post-Apocalyptic Movies",
+        slug: "apocalyptic-and-post-apocalyptic-movies",
+        username: "Trakt",
+        trakt: 825398,
+        likes: 12,
+        items: 44,
+      }));
+    }
+    if (url.pathname === "/users/Trakt/lists/apocalyptic-and-post-apocalyptic-movies/items") {
+      return jsonErrorResponse(404);
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results.map((result) => result.availabilityStatus), ["unavailable", "unavailable"]);
+  assert.deepEqual(body.results.map((result) => result.isExportable), [false, false]);
+  assert.equal(calls.filter((call) => call.url.pathname === "/lists/825398").length, 1);
+  assert.equal(calls.filter((call) => call.url.pathname === "/users/Trakt/lists/apocalyptic-and-post-apocalyptic-movies/items").length, 1);
+}
+
 async function testSuspiciousDetailSuccessItems503Unverified() {
   const response = await withMutedConsole(async () => {
     mockFetch(({ url }) => {
@@ -606,21 +660,28 @@ async function testSortedQuickUsersUseEnrichedLikeCounts() {
 async function testQuickUsersFromSampledPages() {
   mockFetch(({ url }) => {
     if (isListLikesPath(url, 100)) return jsonResponse([], paginationHeaders(1, 1, 1));
+    if (isListLikesPath(url, 201)) return jsonResponse([], paginationHeaders(10, 1, 1));
+    if (isListLikesPath(url, 202)) return jsonResponse([], paginationHeaders(5, 1, 1));
     if (url.pathname !== "/lists/popular") throw new Error(`Unexpected path ${url.pathname}`);
 
     const limit = url.searchParams.get("limit");
     const page = url.searchParams.get("page");
-    if (limit === "30") return jsonResponse([list({ username: "visible", likes: 1 })], paginationHeaders(75, 3, 30));
-    if (limit === "50" && page === "1") {
+    if (limit === "30") {
       return jsonResponse([
         list({ name: "A One", username: "creator-a", trakt: 201, likes: 10, items: 4 }),
         list({ name: "B One", username: "creator-b", trakt: 202, likes: 5, items: 8 }),
-      ], paginationHeaders(75, 2, 50));
+        list({ username: "visible", trakt: 100, likes: 1 }),
+      ], paginationHeaders(75, 3, 30));
     }
     if (limit === "50" && page === "2") {
       return jsonResponse([
         list({ name: "A Two", username: "creator-a", trakt: 203, likes: 7, items: 6 }),
         list({ name: "C One", username: "creator-c", trakt: 204, likes: 30, items: 10 }),
+      ], paginationHeaders(75, 2, 50));
+    }
+    if (limit === "50" && page === "3") {
+      return jsonResponse([
+        list({ name: "Page Three", username: "creator-d", trakt: 205, likes: 2, items: 2 }),
       ], paginationHeaders(75, 2, 50));
     }
     throw new Error(`Unexpected popular request ${url.search}`);
@@ -630,7 +691,7 @@ async function testQuickUsersFromSampledPages() {
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.deepEqual(body.quickUsers.map((user) => user.username), ["creator-c", "creator-a", "creator-b"]);
+  assert.deepEqual(body.quickUsers.map((user) => user.username).slice(0, 3), ["creator-c", "creator-a", "creator-b"]);
   assert.equal(body.quickUsers[0].likeCount, 30);
   assert.equal(body.quickUsers[1].listCount, 2);
   assert.equal(body.quickUsers[1].itemCount, 10);
@@ -643,8 +704,8 @@ async function testQuickUsersFailureStillReturnsResults() {
     mockFetch(({ url }) => {
       if (isListLikesPath(url, 222)) return jsonResponse([], paginationHeaders(0, 0, 1));
       if (url.pathname !== "/lists/trending") throw new Error(`Unexpected path ${url.pathname}`);
-      if (url.searchParams.get("limit") === "50") throw new Error("Summary failed");
-      return jsonResponse([list({ name: "Trending", username: "demo", trakt: 222 })], paginationHeaders(1, 1));
+      if (url.searchParams.get("limit") === "50" && url.searchParams.get("page") === "2") throw new Error("Summary failed");
+      return jsonResponse([list({ name: "Trending", username: "demo", trakt: 222 })], paginationHeaders(75, 2));
     });
 
     return callHandler("https://example.test/api/trakt?mode=trending", env());

@@ -31,8 +31,10 @@ const SORT_MAX_ITEMS = 250;
 const QUICK_USER_SAMPLE_LIMIT = 250;
 const QUICK_USER_FETCH_LIMIT = 50;
 const QUICK_USER_LIMIT = 6;
+const QUICK_USER_PAGE_CONCURRENCY = 3;
 const AVAILABILITY_VALIDATION_CONCURRENCY = 4;
 const AVAILABILITY_ITEM_LIMIT = 1;
+const AVAILABILITY_VALIDATION_TIMEOUT_MS = 1000;
 const CURATED_USER_FALLBACKS = ["snoak", "extreme_one"];
 
 export async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
@@ -174,6 +176,7 @@ export async function resolveListId(id, clientId) {
 }
 
 export async function validateListAvailability(lists, clientId) {
+  const validationCache = new Map();
   return mapWithConcurrency(lists || [], AVAILABILITY_VALIDATION_CONCURRENCY, async (list) => {
     if (!list) return list;
 
@@ -189,54 +192,74 @@ export async function validateListAvailability(lists, clientId) {
       return list.availabilityStatus ? list : withListAvailability(list, "available");
     }
 
-    try {
-      const detail = await fetchListDetailById(list.ids.trakt, clientId, { quietNotFound: true });
-      const merged = mergeListDetail(list, detail.data);
-      if (isNonPublicList(merged)) {
-        return withListAvailability(merged, "unavailable", "Unavailable or not public");
-      }
-
-      const itemsAvailability = await verifyListItemsAvailability(merged, clientId);
-      if (itemsAvailability.status !== "available") {
-        return withListAvailability(merged, itemsAvailability.status, itemsAvailability.message);
-      }
-      return withListAvailability(merged, "available");
-    } catch (error) {
-      if (error.status === 404) {
-        return withListAvailability(list, "unavailable", "Unavailable or not public");
-      }
-
-      console.warn("Could not verify Trakt list availability", {
-        id: list.ids.trakt,
-        status: error.status,
-        message: error.message,
-      });
-      return withListAvailability(list, "unverified", "Could not verify public status");
+    const id = String(list.ids.trakt);
+    if (!validationCache.has(id)) {
+      validationCache.set(id, validateSuspiciousListAvailability(list, clientId));
     }
+    return validationCache.get(id);
   });
 }
 
+async function validateSuspiciousListAvailability(list, clientId) {
+  try {
+    const detail = await fetchListDetailById(list.ids.trakt, clientId, {
+      quietNotFound: true,
+      timeoutMs: AVAILABILITY_VALIDATION_TIMEOUT_MS,
+    });
+    const merged = mergeListDetail(list, detail.data);
+    if (isNonPublicList(merged)) {
+      return withListAvailability(merged, "unavailable", "Unavailable or not public");
+    }
+
+    const itemsAvailability = await verifyListItemsAvailability(merged, clientId);
+    if (itemsAvailability.status !== "available") {
+      return withListAvailability(merged, itemsAvailability.status, itemsAvailability.message);
+    }
+    return withListAvailability(merged, "available");
+  } catch (error) {
+    if (error.status === 404) {
+      return withListAvailability(list, "unavailable", "Unavailable or not public");
+    }
+
+    console.warn("Could not verify Trakt list availability", {
+      id: list.ids.trakt,
+      status: error.status,
+      message: error.message,
+    });
+    return withListAvailability(list, "unverified", "Could not verify public status");
+  }
+}
+
 export async function getQuickUsersForPayload(mode, query, payload, clientId) {
-  const lists = payload.quickUserLists || await getQuickUserSampleLists(mode, query, clientId);
+  const lists = payload.quickUserLists || await getQuickUserSampleLists(mode, query, payload, clientId);
   return buildQuickUsers(lists);
 }
 
-async function getQuickUserSampleLists(mode, query, clientId) {
+async function getQuickUserSampleLists(mode, query, payload, clientId) {
   if (mode === "url") return [];
 
-  const firstPage = await getListPayload(mode, query, 1, QUICK_USER_FETCH_LIMIT, clientId);
+  const firstPage = canReuseQuickUserFirstPage(payload)
+    ? payload
+    : await getListPayload(mode, query, 1, QUICK_USER_FETCH_LIMIT, clientId);
   const pageCount = Math.min(
     firstPage.pagination?.page_count || 1,
     Math.ceil(QUICK_USER_SAMPLE_LIMIT / QUICK_USER_FETCH_LIMIT),
     MAX_PAGE,
   );
-  const pages = [firstPage];
-
-  for (let nextPage = 2; nextPage <= pageCount; nextPage += 1) {
-    pages.push(await getListPayload(mode, query, nextPage, QUICK_USER_FETCH_LIMIT, clientId));
-  }
+  const nextPages = [];
+  for (let nextPage = 2; nextPage <= pageCount; nextPage += 1) nextPages.push(nextPage);
+  const pages = [
+    firstPage,
+    ...await mapWithConcurrency(nextPages, QUICK_USER_PAGE_CONCURRENCY, (nextPage) => getListPayload(mode, query, nextPage, QUICK_USER_FETCH_LIMIT, clientId)),
+  ];
 
   return dedupeLists(pages.flatMap((page) => page.data)).slice(0, QUICK_USER_SAMPLE_LIMIT);
+}
+
+function canReuseQuickUserFirstPage(payload) {
+  return Array.isArray(payload?.data)
+    && (payload.pagination?.page || 1) === 1
+    && (payload.pagination?.page_count || 1) >= 1;
 }
 
 function buildQuickUsers(lists) {
@@ -414,9 +437,13 @@ async function getFilteredUserLists(username, filter, clientId) {
   };
 }
 
-function fetchListDetailById(id, clientId, { quietNotFound = false } = {}) {
+function fetchListDetailById(id, clientId, { quietNotFound = false, timeoutMs = 0 } = {}) {
   const quietStatuses = quietNotFound ? [404] : [];
-  return traktFetch(`/lists/${encodeURIComponent(id)}?extended=full`, clientId, { quietStatuses });
+  return traktFetch(`/lists/${encodeURIComponent(id)}?extended=full`, clientId, {
+    quietStatuses,
+    quietNetworkErrors: timeoutMs > 0,
+    timeoutMs,
+  });
 }
 
 async function verifyListItemsAvailability(list, clientId) {
@@ -443,7 +470,11 @@ async function verifyListItemsAvailability(list, clientId) {
   });
 
   try {
-    await traktFetch(`/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}/items?${params.toString()}`, clientId, { quietStatuses: [404] });
+    await traktFetch(`/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}/items?${params.toString()}`, clientId, {
+      quietStatuses: [404],
+      quietNetworkErrors: true,
+      timeoutMs: AVAILABILITY_VALIDATION_TIMEOUT_MS,
+    });
     return {
       status: "available",
       message: "",

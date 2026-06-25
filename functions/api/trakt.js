@@ -33,6 +33,7 @@ const MAX_PAGE = 25;
 const MAX_ITEM_LIMIT = 15;
 const MAX_QUERY_LENGTH = 220;
 const SORT_REQUEST_COST = 8;
+const QUICK_USERS_TIMEOUT_MS = 1200;
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -100,6 +101,9 @@ export async function onRequestGet({ request, env }) {
       return json({ error: "Unsupported search mode." }, 400);
     }
 
+    const quickUsersPromise = mode !== "url" && !directListId
+      ? getQuickUsers(mode, query, payload, clientId)
+      : null;
     const enrichedLists = sort && mode !== "url" && !directListId
       ? payload.data
       : await enrichListsWithLikeCounts(payload.data, clientId);
@@ -107,7 +111,9 @@ export async function onRequestGet({ request, env }) {
     const quickUsersPayload = mode === "url" || directListId
       ? { ...payload, quickUserLists: lists }
       : payload;
-    const quickUsers = await getQuickUsers(mode, query, quickUsersPayload, clientId);
+    const quickUsers = quickUsersPromise
+      ? await withTimeout(quickUsersPromise, QUICK_USERS_TIMEOUT_MS, null)
+      : await withTimeout(getQuickUsers(mode, query, quickUsersPayload, clientId), QUICK_USERS_TIMEOUT_MS, null);
 
     const responsePayload = {
       results: lists.map(normalizeList).filter(Boolean),
@@ -149,5 +155,19 @@ async function getQuickUsers(mode, query, payload, clientId) {
       message: error.message,
     });
     return null;
+  }
+}
+
+async function withTimeout(promise, timeoutMs, fallback) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve) => {
+        timeoutId = setTimeout(() => resolve(fallback), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
