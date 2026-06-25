@@ -50,6 +50,7 @@ assert.ok(!indexHtml.includes("id=\"json-preview-modal\""));
 assert.ok(!indexHtml.includes("Export preview"));
 assert.match(indexHtml, /id="nuvio-output"[^>]*readonly[^>]*aria-readonly="true"[^>]*hidden/);
 assert.match(indexHtml, /id="nuvio-close"[^>]*aria-label="Close Nuvio export"[^>]*>X</);
+assert.match(indexHtml, /id="reset-nuvio-export"[^>]*title="Clears export settings but keeps selected lists\."[^>]*aria-label="Clears export settings but keeps selected lists\."[^>]*>Reset modal settings</);
 assert.match(indexHtml, /<h2 id="nuvio-title">Create Nuvio JSON<\/h2>\s*<p id="nuvio-count" class="result-owner"><\/p>/);
 assert.match(indexHtml, /Collection details/);
 assert.match(indexHtml, /Hero\/backdrop image URL/);
