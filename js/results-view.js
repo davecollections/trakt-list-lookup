@@ -54,7 +54,6 @@ export function createResultsView({
       const node = template.content.cloneNode(true);
       const card = node.querySelector(".result-card");
       const title = result.name || "Untitled list";
-      const url = result.url || "";
       const availability = getResultAvailability(result);
 
       card.id = `result-${index + 1}`;
@@ -82,8 +81,15 @@ export function createResultsView({
       node.querySelector(".updated").textContent = formatDate(result.updated_at);
 
       const openLink = node.querySelector(".open-link");
-      openLink.href = url;
-      openLink.hidden = !url || !result.canOpen;
+      const openAction = getResultOpenAction(result);
+      openLink.hidden = openAction.hidden;
+      openLink.toggleAttribute("aria-disabled", openAction.hidden);
+      openLink.tabIndex = openAction.hidden ? -1 : 0;
+      if (openAction.href) {
+        openLink.href = openAction.href;
+      } else {
+        openLink.removeAttribute("href");
+      }
 
       card.querySelectorAll("[data-copy]").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -313,6 +319,16 @@ export function createResultsView({
   }
 }
 
+export function getResultOpenAction(result) {
+  const availability = getResultAvailability(result);
+  const href = getTrustedTraktListUrl(result?.url);
+  const canOpen = availability.status === "available" && result?.canOpen === true && Boolean(href);
+  return {
+    hidden: !canOpen,
+    href: canOpen ? href : "",
+  };
+}
+
 function getCopyValue(kind, result) {
   if (kind === "id") return result.ids?.trakt ? String(result.ids.trakt) : "";
   if (kind === "url") return result.url || "";
@@ -349,6 +365,21 @@ function getOwnerLabel(result, availability = getResultAvailability(result)) {
 
 function getRouteUsername(result) {
   return String(result?.ownerUsername || result?.user?.username || "").trim();
+}
+
+function getTrustedTraktListUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const host = url.hostname.replace(/^www\./, "");
+    const parts = url.pathname.split("/").filter(Boolean);
+    if ((host === "trakt.tv" || host === "app.trakt.tv") && parts[0] === "users" && parts[2] === "lists" && parts[1] && parts[3]) {
+      return url.toString();
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
 }
 
 function hasRouteUsername(result) {

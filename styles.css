@@ -768,6 +768,10 @@ a:focus-visible {
   font-weight: 700;
 }
 
+.open-link[hidden] {
+  display: none;
+}
+
 .trakt-symbol-img {
   display: block;
   width: 20px;
