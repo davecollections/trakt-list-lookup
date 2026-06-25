@@ -54,7 +54,7 @@ export function createResultsView({
       const node = template.content.cloneNode(true);
       const card = node.querySelector(".result-card");
       const title = result.name || "Untitled list";
-      const owner = result.user?.username || result.user?.name || "unknown";
+      const owner = result.ownerDisplayName || result.user?.name || result.ownerUsername || result.user?.username || "unknown";
       const url = result.url || "";
       const availability = getResultAvailability(result);
 
@@ -63,9 +63,9 @@ export function createResultsView({
       card.dataset.sampleKey = getPosterSampleKey(result);
       const ownerButton = node.querySelector(".result-owner");
       ownerButton.textContent = `@${owner}`;
-      ownerButton.disabled = !hasUsableUsername(result);
-      if (hasUsableUsername(result)) {
-        ownerButton.addEventListener("click", () => onLoadUserLists(result.user.username));
+      ownerButton.disabled = !hasRouteUsername(result);
+      if (hasRouteUsername(result)) {
+        ownerButton.addEventListener("click", () => onLoadUserLists(getRouteUsername(result)));
       }
       const titleNode = node.querySelector(".result-title");
       titleNode.textContent = title;
@@ -84,7 +84,7 @@ export function createResultsView({
 
       const openLink = node.querySelector(".open-link");
       openLink.href = url;
-      openLink.hidden = !url || !availability.isAvailable;
+      openLink.hidden = !url || !result.canOpen;
 
       card.querySelectorAll("[data-copy]").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -96,7 +96,7 @@ export function createResultsView({
       });
 
       const posterButton = node.querySelector(".poster-samples");
-      posterButton.disabled = !availability.isAvailable || !hasUsableUsername(result) || !result.ids?.slug;
+      posterButton.disabled = !result.canPreview;
       posterButton.addEventListener("click", () => onOpenPreview(result, posterButton));
 
       const selectListButton = node.querySelector(".select-list-button");
@@ -141,7 +141,7 @@ export function createResultsView({
   function getPopularUsersFromResults(results) {
     const users = new Map();
     results.forEach((result) => {
-      const username = result.user?.username;
+      const username = getRouteUsername(result);
       if (!username) return;
       const existing = users.get(username) || { username, listCount: 0, likeCount: 0 };
       existing.listCount += 1;
@@ -340,8 +340,12 @@ function getAvailabilityStatus(result) {
   return "available";
 }
 
-function hasUsableUsername(result) {
-  const username = String(result?.user?.username || "").trim();
+function getRouteUsername(result) {
+  return String(result?.ownerUsername || result?.user?.username || "").trim();
+}
+
+function hasRouteUsername(result) {
+  const username = getRouteUsername(result);
   return Boolean(username && username.toLowerCase() !== "unknown");
 }
 

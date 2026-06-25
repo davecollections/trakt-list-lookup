@@ -2,9 +2,9 @@ import {
   RESULT_LIMIT,
   dedupeLists,
   getListKey,
+  getRouteUsername,
   isSafePathSegment,
   isNonPublicList,
-  isUnknownOwner,
   listMatchesTerms,
   mapWithConcurrency,
   normalizeGlobalListEntry,
@@ -248,15 +248,14 @@ function buildQuickUsers(lists) {
       user: list.user || {},
       ids: list.ids || {},
     } : null;
-    const username = normalized?.user?.username || normalized?.user?.ids?.slug || "";
+    const username = getRouteUsername(normalized);
     if (!username) return;
-    if (isUnknownOwner(username)) return;
     if (normalized.availabilityStatus && normalized.availabilityStatus !== "available") return;
 
     const key = username.toLowerCase();
     const existing = users.get(key) || {
       username,
-      name: normalized.user.name || "",
+      name: normalized.user.name || normalized.user.username || "",
       listCount: 0,
       likeCount: 0,
       itemCount: 0,
@@ -311,7 +310,7 @@ function isBetterTopList(candidate, current) {
 }
 
 function getListUrl(list) {
-  const username = list?.user?.username || list?.user?.ids?.slug || "";
+  const username = getRouteUsername(list);
   const slug = list?.ids?.slug || "";
   if (username && slug) return `https://trakt.tv/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}`;
   return "";
@@ -421,9 +420,16 @@ function fetchListDetailById(id, clientId, { quietNotFound = false } = {}) {
 }
 
 async function verifyListItemsAvailability(list, clientId) {
-  const username = list?.user?.username || list?.user?.ids?.slug || "";
+  const username = getRouteUsername(list);
   const slug = list?.ids?.slug || "";
-  if (!username || isUnknownOwner(username) || !slug || !isSafePathSegment(username) || !isSafePathSegment(slug)) {
+  if (!username || !slug) {
+    return {
+      status: "available",
+      message: "",
+    };
+  }
+
+  if (!isSafePathSegment(username) || !isSafePathSegment(slug)) {
     return {
       status: "unverified",
       message: "Could not verify public status",

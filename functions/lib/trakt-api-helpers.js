@@ -158,6 +158,20 @@ export function isNonPublicList(list) {
   return Boolean(privacy && privacy !== "public");
 }
 
+export function getRouteUsername(list) {
+  const slug = String(list?.user?.ids?.slug || "").trim();
+  if (slug && !isUnknownOwner(slug) && isSafePathSegment(slug)) return slug;
+
+  const username = String(list?.user?.username || "").trim();
+  if (username && !isUnknownOwner(username) && isSafePathSegment(username)) return username;
+
+  return "";
+}
+
+export function getOwnerDisplayName(list) {
+  return String(list?.user?.name || list?.user?.username || list?.user?.ids?.slug || "").trim();
+}
+
 export function clampPositiveInteger(value, fallback, max) {
   return Math.min(getPositiveInteger(value, fallback), max);
 }
@@ -231,12 +245,14 @@ export function normalizeList(list) {
 
   const ids = list.ids || {};
   const user = list.user || {};
-  const username = user.username || user.ids?.slug || "";
-  const url = username && ids.slug
-    ? `${TRAKT_WEB_BASE}/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(ids.slug)}`
+  const ownerUsername = getRouteUsername(list);
+  const ownerDisplayName = getOwnerDisplayName(list);
+  const url = ownerUsername && ids.slug
+    ? `${TRAKT_WEB_BASE}/users/${encodeURIComponent(ownerUsername)}/lists/${encodeURIComponent(ids.slug)}`
     : "";
 
   const availability = getListAvailability(list);
+  const canRoute = availability.isAvailable && Boolean(ownerUsername && ids.slug);
 
   return {
     name: list.name || "",
@@ -251,10 +267,14 @@ export function normalizeList(list) {
       slug: ids.slug,
     },
     user: {
-      username,
-      name: user.name || "",
+      username: ownerUsername,
+      name: ownerDisplayName,
     },
+    ownerUsername,
+    ownerDisplayName,
     url,
+    canOpen: canRoute,
+    canPreview: canRoute,
     availabilityStatus: availability.status,
     isAvailable: availability.isAvailable,
     isExportable: availability.isExportable,
@@ -353,7 +373,7 @@ function getListAvailability(list) {
 }
 
 function getListUsername(list) {
-  return list?.user?.username || list?.user?.ids?.slug || "";
+  return getRouteUsername(list);
 }
 
 function normalizeAvailabilityStatus(status) {

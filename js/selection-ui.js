@@ -49,7 +49,7 @@ export function createSelectionUi({ selection, onClearSelection, onOpenNuvioExpo
       listCell.append(title);
 
       const userCell = document.createElement("td");
-      userCell.textContent = result.user?.username ? `@${result.user.username}` : "n/a";
+      userCell.textContent = getOwnerLabel(result);
 
       const idCell = document.createElement("td");
       const idButton = document.createElement("button");
@@ -104,6 +104,11 @@ export function createSelectionUi({ selection, onClearSelection, onOpenNuvioExpo
     isOpen,
     render,
   };
+}
+
+function getOwnerLabel(result) {
+  const owner = result?.ownerDisplayName || result?.user?.name || result?.ownerUsername || result?.user?.username || "";
+  return owner ? `@${owner}` : "n/a";
 }
 
 function flashButton(button) {

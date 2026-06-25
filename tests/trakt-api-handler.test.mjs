@@ -29,6 +29,8 @@ try {
   await testResolveListUrl();
   await testResolveNumericListIdFromSearch();
   await testResolveNumericListIdFromUrlMode();
+  await testDisplayNameOwnerUsesRouteSlug();
+  await testNumericValidRouteUnavailableRemainsExportable();
   await testMissingNumericListId();
   await testListItems();
   await testListItemsWithoutPosters();
@@ -693,6 +695,87 @@ async function testResolveNumericListIdFromUrlMode() {
   assert.equal(body.results[0].ids.trakt, 33753562);
   assert.equal(body.results[0].like_count, 12);
   assert.equal(body.quickUsers[0].likeCount, 12);
+}
+
+async function testDisplayNameOwnerUsesRouteSlug() {
+  const calls = mockFetch(({ url }) => {
+    if (url.pathname === "/lists/6652017") {
+      assert.equal(url.searchParams.get("extended"), "full");
+      return jsonResponse({
+        name: "Attenborough Documentaries",
+        privacy: "public",
+        item_count: 93,
+        like_count: null,
+        updated_at: "2026-06-23T17:37:14Z",
+        ids: {
+          trakt: 6652017,
+          slug: "attenborough-documentaries",
+        },
+        user: {
+          username: "Hammers Lists",
+          name: "Hammers lists",
+          ids: {
+            slug: "hammers-lists",
+          },
+        },
+      });
+    }
+    if (isListLikesPath(url, 6652017)) return jsonResponse([], paginationHeaders(818, 1, 1));
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=search&q=6652017", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 2);
+  assert.equal(body.results[0].ids.trakt, 6652017);
+  assert.equal(body.results[0].user.username, "hammers-lists");
+  assert.equal(body.results[0].user.name, "Hammers lists");
+  assert.equal(body.results[0].ownerUsername, "hammers-lists");
+  assert.equal(body.results[0].ownerDisplayName, "Hammers lists");
+  assert.equal(body.results[0].url, "https://trakt.tv/users/hammers-lists/lists/attenborough-documentaries");
+  assert.equal(body.results[0].canOpen, true);
+  assert.equal(body.results[0].canPreview, true);
+  assert.equal(body.results[0].isExportable, true);
+}
+
+async function testNumericValidRouteUnavailableRemainsExportable() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/6652018") {
+      assert.equal(url.searchParams.get("extended"), "full");
+      return jsonResponse({
+        name: "Route Missing",
+        privacy: "public",
+        item_count: 10,
+        like_count: 2,
+        updated_at: "2026-06-23T17:37:14Z",
+        ids: {
+          trakt: 6652018,
+          slug: "route-missing",
+        },
+        user: {
+          username: "Display Owner",
+          name: "Display Owner",
+        },
+      });
+    }
+    if (isListLikesPath(url, 6652018)) return jsonResponse([], paginationHeaders(2, 1, 1));
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=url&q=6652018", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].ids.trakt, 6652018);
+  assert.equal(body.results[0].isExportable, true);
+  assert.equal(body.results[0].availabilityStatus, "available");
+  assert.equal(body.results[0].ownerDisplayName, "Display Owner");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].url, "");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
 }
 
 async function testMissingNumericListId() {
