@@ -244,14 +244,12 @@ export function normalizeList(list) {
   if (!list) return null;
 
   const ids = list.ids || {};
-  const user = list.user || {};
-  const ownerUsername = getRouteUsername(list);
-  const ownerDisplayName = getOwnerDisplayName(list);
-  const url = ownerUsername && ids.slug
+  const availability = getListAvailability(list);
+  const ownerUsername = availability.status === "available" ? getRouteUsername(list) : "";
+  const ownerDisplayName = getAvailabilityOwnerDisplayName(availability.status, getOwnerDisplayName(list));
+  const url = availability.isAvailable && ownerUsername && ids.slug
     ? `${TRAKT_WEB_BASE}/users/${encodeURIComponent(ownerUsername)}/lists/${encodeURIComponent(ids.slug)}`
     : "";
-
-  const availability = getListAvailability(list);
   const canRoute = availability.isAvailable && Boolean(ownerUsername && ids.slug);
 
   return {
@@ -280,6 +278,12 @@ export function normalizeList(list) {
     isExportable: availability.isExportable,
     availabilityMessage: availability.message,
   };
+}
+
+function getAvailabilityOwnerDisplayName(status, fallback) {
+  if (status === "unavailable") return "Owner unavailable";
+  if (status === "unverified") return "Owner unverified";
+  return fallback;
 }
 
 export function normalizeGlobalListEntry(entry) {

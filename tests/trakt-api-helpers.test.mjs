@@ -161,6 +161,8 @@ assert.equal(normalizedWithoutOwnerSlug.url, "");
 assert.equal(normalizedWithoutOwnerSlug.availabilityStatus, "unverified");
 assert.equal(normalizedWithoutOwnerSlug.isExportable, false);
 assert.equal(normalizedWithoutOwnerSlug.availabilityMessage, "Could not verify public status");
+assert.equal(normalizedWithoutOwnerSlug.ownerUsername, "");
+assert.equal(normalizedWithoutOwnerSlug.ownerDisplayName, "Owner unverified");
 assert.equal(normalizedWithoutOwnerSlug.canOpen, false);
 assert.equal(normalizedWithoutOwnerSlug.canPreview, false);
 
@@ -188,6 +190,11 @@ const unavailable = normalizeList(withListAvailability(list({ name: "Gone", trak
 assert.equal(unavailable.availabilityStatus, "unavailable");
 assert.equal(unavailable.isAvailable, false);
 assert.equal(unavailable.isExportable, false);
+assert.equal(unavailable.ownerUsername, "");
+assert.equal(unavailable.ownerDisplayName, "Owner unavailable");
+assert.equal(unavailable.url, "");
+assert.equal(unavailable.canOpen, false);
+assert.equal(unavailable.canPreview, false);
 
 const globalEntry = normalizeGlobalListEntry({
   like_count: "11",

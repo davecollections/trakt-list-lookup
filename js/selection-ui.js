@@ -107,6 +107,12 @@ export function createSelectionUi({ selection, onClearSelection, onOpenNuvioExpo
 }
 
 function getOwnerLabel(result) {
+  const status = String(result?.availabilityStatus || "available").toLowerCase();
+  if (status === "unavailable") return "Owner unavailable";
+  if (status === "unverified") return "Owner unverified";
+  if (result?.isAvailable === false) return "Owner unavailable";
+  if (result?.isExportable === false) return "Owner unverified";
+
   const owner = result?.ownerDisplayName || result?.user?.name || result?.ownerUsername || result?.user?.username || "";
   return owner ? `@${owner}` : "n/a";
 }

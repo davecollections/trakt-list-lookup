@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { onRequestGet } from "../functions/api/trakt.js";
+import { enrichListsWithLikeCounts } from "../functions/lib/trakt-client.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -13,11 +14,14 @@ try {
   await testPopularPaginationAllowsPosterSamples();
   await testAuthoritativeLikeCountsReplacePayloadCounts();
   await testLikeCountFallbackKeepsPayloadCount();
+  await testLikeCountTransientFailureIsQuietAndExportable();
+  await testLikeCountTimeoutFallsBackQuickly();
   await testNormalRowsDoNotValidateDetails();
   await testPopularUnavailableSuspiciousResult();
   await testKeywordSuspiciousLikes404Validation();
   await testSuspiciousDetailSuccessRepairsResult();
   await testSuspiciousDetailSuccessItems404Unavailable();
+  await testSuspiciousDetailSuccessItems503Unverified();
   await testNon404AvailabilityFailureIsUnverified();
   await testSortedQuickUsersUseEnrichedLikeCounts();
   await testQuickUsersFromSampledPages();
@@ -196,6 +200,76 @@ async function testLikeCountFallbackKeepsPayloadCount() {
   assert.equal(body.results[0].like_count, 46);
 }
 
+async function testLikeCountTransientFailureIsQuietAndExportable() {
+  const { result: response, events } = await withCapturedConsole(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname === "/lists/popular") {
+        return jsonResponse([list({
+          name: "Known Valid",
+          slug: "known-valid",
+          username: "valid_user",
+          trakt: 11150552,
+          likes: 7,
+        })]);
+      }
+      if (isListLikesPath(url, 11150552)) {
+        return new Response(JSON.stringify({ error: "upstream timeout" }), {
+          status: 504,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].ids.trakt, 11150552);
+  assert.equal(body.results[0].like_count, 7);
+  assert.equal(body.results[0].availabilityStatus, "available");
+  assert.equal(body.results[0].isAvailable, true);
+  assert.equal(body.results[0].isExportable, true);
+  assert.equal(body.results[0].url, "https://trakt.tv/users/valid_user/lists/known-valid");
+  assert.deepEqual(events, []);
+}
+
+async function testLikeCountTimeoutFallsBackQuickly() {
+  const { result: lists, events } = await withCapturedConsole(async () => {
+    mockFetch(({ url, init }) => {
+      if (isListLikesPath(url, 11150552)) {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => resolve(jsonResponse([], paginationHeaders(7, 1, 1))), 50);
+          init.signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            const error = new Error("Aborted");
+            error.name = "AbortError";
+            reject(error);
+          }, { once: true });
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return enrichListsWithLikeCounts([
+      list({
+        name: "Known Valid",
+        slug: "known-valid",
+        username: "valid_user",
+        trakt: 11150552,
+        likes: 7,
+      }),
+    ], env().TRAKT_CLIENT_ID, { likeTimeoutMs: 5 });
+  });
+
+  assert.equal(lists[0].like_count, 7);
+  assert.equal(lists[0]._availabilitySignals?.likesNotFound, undefined);
+  assert.deepEqual(events, []);
+}
+
 async function testNormalRowsDoNotValidateDetails() {
   const normalIds = new Set([2142753, 300, 301, 302]);
   const calls = mockFetch(({ url }) => {
@@ -264,6 +338,12 @@ async function testPopularUnavailableSuspiciousResult() {
   assert.equal(body.results[0].isExportable, false);
   assert.equal(body.results[0].availabilityMessage, "Unavailable or not public");
   assert.equal(body.results[0].url, "");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].ownerDisplayName, "Owner unavailable");
+  assert.equal(body.results[0].user.username, "");
+  assert.equal(body.results[0].user.name, "Owner unavailable");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
   assert.deepEqual(body.quickUsers, []);
   assert.ok(!calls.some((call) => call.url.pathname === "/lists/805686"));
 }
@@ -302,6 +382,9 @@ async function testKeywordSuspiciousLikes404Validation() {
   assert.deepEqual(body.results.map((result) => result.ids.trakt), [3469590, 825398, 3339599]);
   assert.deepEqual(body.results.map((result) => result.availabilityStatus), ["unavailable", "unavailable", "unavailable"]);
   assert.deepEqual(body.results.map((result) => result.isExportable), [false, false, false]);
+  assert.deepEqual(body.results.map((result) => result.ownerDisplayName), ["Owner unavailable", "Owner unavailable", "Owner unavailable"]);
+  assert.deepEqual(body.results.map((result) => result.canOpen), [false, false, false]);
+  assert.deepEqual(body.results.map((result) => result.canPreview), [false, false, false]);
   assert.equal(calls.filter((call) => [...suspiciousIds].some((id) => isListLikesPath(call.url, id))).length, 3);
   assert.equal(calls.filter((call) => suspiciousIds.has(Number(call.url.pathname.replace("/lists/", "")))).length, 0);
 }
@@ -388,11 +471,72 @@ async function testSuspiciousDetailSuccessItems404Unavailable() {
 
   assert.equal(response.status, 200);
   assert.equal(body.results[0].ids.trakt, 825398);
-  assert.equal(body.results[0].user.username, "Trakt");
+  assert.equal(body.results[0].user.username, "");
+  assert.equal(body.results[0].user.name, "Owner unavailable");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].ownerDisplayName, "Owner unavailable");
   assert.equal(body.results[0].availabilityStatus, "unavailable");
   assert.equal(body.results[0].isAvailable, false);
   assert.equal(body.results[0].isExportable, false);
   assert.equal(body.results[0].availabilityMessage, "Unavailable or not public");
+  assert.equal(body.results[0].url, "");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
+}
+
+async function testSuspiciousDetailSuccessItems503Unverified() {
+  const response = await withMutedConsole(async () => {
+    mockFetch(({ url }) => {
+      if (url.pathname === "/lists/popular") {
+        return jsonResponse([{
+          name: "Maybe Public",
+          ids: {
+            trakt: 3339599,
+          },
+          user: {
+            username: "unknown",
+          },
+        }], paginationHeaders(1, 1));
+      }
+      if (isListLikesPath(url, 3339599)) {
+        return jsonResponse([], paginationHeaders(12, 1, 1));
+      }
+      if (url.pathname === "/lists/3339599") {
+        return jsonResponse(list({
+          name: "Maybe Public",
+          slug: "maybe-public",
+          username: "public_owner",
+          trakt: 3339599,
+          likes: 12,
+          items: 44,
+        }));
+      }
+      if (url.pathname === "/users/public_owner/lists/maybe-public/items") {
+        return new Response(JSON.stringify({ error: "Busy" }), {
+          status: 503,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      }
+      throw new Error(`Unexpected path ${url.pathname}`);
+    });
+
+    return callHandler("https://example.test/api/trakt?mode=popular", env());
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].ids.trakt, 3339599);
+  assert.equal(body.results[0].availabilityStatus, "unverified");
+  assert.equal(body.results[0].isAvailable, false);
+  assert.equal(body.results[0].isExportable, false);
+  assert.equal(body.results[0].availabilityMessage, "Could not verify public status");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].ownerDisplayName, "Owner unverified");
+  assert.equal(body.results[0].url, "");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
 }
 
 async function testNon404AvailabilityFailureIsUnverified() {
@@ -432,6 +576,10 @@ async function testNon404AvailabilityFailureIsUnverified() {
   assert.equal(body.results[0].isAvailable, false);
   assert.equal(body.results[0].isExportable, false);
   assert.equal(body.results[0].availabilityMessage, "Could not verify public status");
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].ownerDisplayName, "Owner unverified");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, false);
 }
 
 async function testSortedQuickUsersUseEnrichedLikeCounts() {
@@ -947,6 +1095,23 @@ async function withMutedConsole(callback) {
   console.warn = () => {};
   try {
     return await callback();
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+}
+
+async function withCapturedConsole(callback) {
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  const events = [];
+  console.error = (...args) => events.push(["error", ...args]);
+  console.warn = (...args) => events.push(["warn", ...args]);
+  try {
+    return {
+      result: await callback(),
+      events,
+    };
   } finally {
     console.error = originalError;
     console.warn = originalWarn;

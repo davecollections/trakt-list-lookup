@@ -54,7 +54,6 @@ export function createResultsView({
       const node = template.content.cloneNode(true);
       const card = node.querySelector(".result-card");
       const title = result.name || "Untitled list";
-      const owner = result.ownerDisplayName || result.user?.name || result.ownerUsername || result.user?.username || "unknown";
       const url = result.url || "";
       const availability = getResultAvailability(result);
 
@@ -62,7 +61,7 @@ export function createResultsView({
       card.dataset.availabilityStatus = availability.status;
       card.dataset.sampleKey = getPosterSampleKey(result);
       const ownerButton = node.querySelector(".result-owner");
-      ownerButton.textContent = `@${owner}`;
+      ownerButton.textContent = getOwnerLabel(result, availability);
       ownerButton.disabled = !hasRouteUsername(result);
       if (hasRouteUsername(result)) {
         ownerButton.addEventListener("click", () => onLoadUserLists(getRouteUsername(result)));
@@ -338,6 +337,14 @@ function getAvailabilityStatus(result) {
   const status = String(result?.availabilityStatus || "available").toLowerCase();
   if (status === "unavailable" || status === "unverified") return status;
   return "available";
+}
+
+function getOwnerLabel(result, availability = getResultAvailability(result)) {
+  if (availability.status === "unavailable") return "Owner unavailable";
+  if (availability.status === "unverified") return "Owner unverified";
+
+  const owner = result?.ownerDisplayName || result?.user?.name || result?.ownerUsername || result?.user?.username || "";
+  return owner ? `@${owner}` : "Owner unavailable";
 }
 
 function getRouteUsername(result) {
