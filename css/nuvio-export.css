@@ -300,6 +300,47 @@
   margin: 0 10px;
 }
 
+.nuvio-export-status {
+  display: grid;
+  gap: 5px;
+  margin: 10px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, #2ea44f 44%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, #2ea44f 10%, transparent);
+}
+
+.nuvio-export-status.is-warning {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border));
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.nuvio-export-status.is-error {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.nuvio-export-status strong {
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.nuvio-export-status ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nuvio-export-status li {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .nuvio-list-mapping {
   display: grid;
   gap: 6px;

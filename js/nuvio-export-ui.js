@@ -29,6 +29,9 @@ export function createNuvioExportUi({ selection }) {
   const listMapping = document.querySelector("#nuvio-list-mapping");
   const output = document.querySelector("#nuvio-output");
   const outputSummary = document.querySelector("#nuvio-output-summary");
+  const exportStatus = document.querySelector("#nuvio-export-status");
+  const exportStatusTitle = document.querySelector("#nuvio-export-status-title");
+  const exportStatusList = document.querySelector("#nuvio-export-status-list");
   const previewJsonButton = document.querySelector("#preview-nuvio-json");
   const copyButton = document.querySelector("#copy-nuvio-json");
   const downloadButton = document.querySelector("#download-nuvio-json");
@@ -151,6 +154,7 @@ export function createNuvioExportUi({ selection }) {
       output.value = `Could not build JSON: ${error.message}`;
       outputSummary.textContent = "Needs attention";
       exportSummary.textContent = "Fix the highlighted export settings before copying.";
+      renderExportStatus(null);
       setJsonActionsDisabled(true);
     }
   }
@@ -165,12 +169,14 @@ export function createNuvioExportUi({ selection }) {
       output.value = payload.json;
       outputSummary.textContent = getOutputSummaryText(payload);
       updateExportSummary(payload);
+      renderExportStatus(payload);
       setJsonActionsDisabled(false);
     } catch (error) {
       latestPayload = null;
       output.value = `Could not build JSON: ${error.message}`;
       outputSummary.textContent = "Needs attention";
       exportSummary.textContent = "Fix the highlighted export settings before copying.";
+      renderExportStatus(null);
       setJsonActionsDisabled(true);
     }
   }
@@ -212,78 +218,51 @@ export function createNuvioExportUi({ selection }) {
     const coverUrl = getCoverUrl();
     const existingCount = getExistingCollections().length;
     const collectionCount = payload.report.collectionCount;
-    const reportText = getExportReportText(payload.report);
     let summary;
 
     if (mode === "split") {
       const splitCount = getSplitGroups().size;
       summary = `${formatNumber(selectedCount)} list${selectedCount === 1 ? "" : "s"} will become ${formatNumber(splitCount)} new collection${splitCount === 1 ? "" : "s"}${coverUrl ? " with a cover URL" : ""}.`;
-      exportSummary.textContent = `${summary}${reportText}`;
+      exportSummary.textContent = summary;
       return;
     }
 
     if (mode === "existing") {
       summary = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added to one existing collection.`;
-      exportSummary.textContent = `${summary}${reportText}`;
+      exportSummary.textContent = summary;
       return;
     }
 
     if (mode === "mapped") {
       const mappedCollections = new Set(selection.mappedAssignments.values());
       summary = `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} mapped across ${formatNumber(mappedCollections.size || existingCount)} existing collection${(mappedCollections.size || existingCount) === 1 ? "" : "s"}.`;
-      exportSummary.textContent = `${summary}${reportText}`;
+      exportSummary.textContent = summary;
       return;
     }
 
     summary = existingCount
       ? `${formatNumber(selectedCount)} folder${selectedCount === 1 ? "" : "s"} will be added as one new collection. Output contains ${formatNumber(collectionCount)} total collections.`
       : `${formatNumber(selectedCount)} selected list${selectedCount === 1 ? "" : "s"} will be exported as folders in one collection${coverUrl ? " with a cover URL" : ""}.`;
-    exportSummary.textContent = `${summary}${reportText}`;
+    exportSummary.textContent = summary;
   }
 
   function getOutputSummaryText(payload) {
-    const report = payload.report || {};
-    const details = [`${formatNumber(payload.json.length)} chars`];
-
-    if (report.idFixCount) {
-      details.push(`${formatNumber(report.idFixCount)} ID fix${report.idFixCount === 1 ? "" : "es"}`);
-    }
-
-    if (report.duplicateSourceFolderCount) {
-      details.push(`${formatNumber(report.duplicateSourceFolderCount)} duplicate folder${report.duplicateSourceFolderCount === 1 ? "" : "s"} skipped`);
-    }
-
-    if (report.skippedUnavailableListCount) {
-      details.push(`${formatNumber(report.skippedUnavailableListCount)} unavailable list${report.skippedUnavailableListCount === 1 ? "" : "s"} skipped`);
-    }
-
-    if (report.warningCount) {
-      details.push(`${formatNumber(report.warningCount)} validation warning${report.warningCount === 1 ? "" : "s"}`);
-    }
-
-    return details.join("; ");
+    return `${formatNumber(payload.json.length)} chars`;
   }
 
-  function getExportReportText(report) {
-    const messages = [];
+  function renderExportStatus(payload) {
+    const status = getNuvioExportStatusModel(payload);
+    exportStatus.classList.toggle("is-warning", status.tone === "warning");
+    exportStatus.classList.toggle("is-error", status.tone === "error");
+    exportStatus.classList.toggle("is-success", status.tone === "success");
+    exportStatusTitle.textContent = status.title;
+    exportStatusList.textContent = "";
 
-    if (report.duplicateSourceFolderCount) {
-      messages.push(`${formatNumber(report.duplicateSourceFolderCount)} duplicate source folder${report.duplicateSourceFolderCount === 1 ? " was" : "s were"} skipped because ${report.duplicateSourceFolderCount === 1 ? "it already exists" : "they already exist"} or would duplicate existing output.`);
+    for (const message of status.messages) {
+      const item = document.createElement("li");
+      item.textContent = message;
+      exportStatusList.append(item);
     }
-
-    if (report.skippedUnavailableListCount) {
-      messages.push(`${formatNumber(report.skippedUnavailableListCount)} unavailable or unverified selected list${report.skippedUnavailableListCount === 1 ? " was" : "s were"} skipped.`);
-    }
-
-    if (report.idFixCount) {
-      messages.push(`${formatNumber(report.idFixCount)} missing or duplicate ID${report.idFixCount === 1 ? " was" : "s were"} repaired.`);
-    }
-
-    if (report.warningCount) {
-      messages.push(`${formatNumber(report.warningCount)} validation warning${report.warningCount === 1 ? "" : "s"} found.`);
-    }
-
-    return messages.length ? ` ${messages.join(" ")}` : "";
   }
 
   function getLatestPayload() {
@@ -623,4 +602,67 @@ function flashButton(button) {
   window.setTimeout(() => {
     button.textContent = original;
   }, 900);
+}
+
+export function getNuvioExportStatusModel(payload) {
+  if (!payload) {
+    return {
+      tone: "error",
+      title: "Export cannot be generated yet",
+      messages: ["Fix the highlighted export settings before copying or downloading."],
+    };
+  }
+
+  const report = payload.report || {};
+  const messages = [];
+  const hasWarnings = Boolean(
+    report.duplicateSourceFolderCount
+      || report.skippedUnavailableListCount
+      || report.idFixCount
+      || report.warningCount,
+  );
+  const hasExportableFolders = Number(report.folderCount) > 0;
+
+  messages.push(hasExportableFolders
+    ? `Output contains ${formatCount(report.folderCount, "folder", "folders")}.`
+    : "No exportable folders will be included.");
+
+  if (report.duplicateSourceFolderCount) {
+    messages.push(`${formatStatusLabel(report.duplicateSourceFolderCount, "Already-existing Trakt list skipped", "Already-existing Trakt lists skipped")}: ${formatCount(report.duplicateSourceFolderCount, "selected list already exists", "selected lists already exist")} or would duplicate existing output.`);
+  }
+
+  if (report.skippedUnavailableListCount) {
+    messages.push(`${formatStatusLabel(report.skippedUnavailableListCount, "Unavailable or unverified selected list skipped", "Unavailable or unverified selected lists skipped")}: ${formatCount(report.skippedUnavailableListCount, "selected list was not included", "selected lists were not included")}.`);
+  }
+
+  if (report.idFixCount) {
+    messages.push(`IDs repaired: ${formatCount(report.idFixCount, "missing or duplicate collection/folder ID", "missing or duplicate collection/folder IDs")} repaired.`);
+  }
+
+  if (report.warningCount) {
+    messages.push(`Some warnings were found, but your export is still valid. ${formatCount(report.warningCount, "JSON structure warning", "JSON structure warnings")} found.`);
+  }
+
+  if (!hasExportableFolders) {
+    return {
+      tone: "error",
+      title: "Export cannot be generated yet",
+      messages,
+    };
+  }
+
+  return {
+    tone: hasWarnings ? "warning" : "success",
+    title: hasWarnings ? "Export ready with warnings" : "Export ready",
+    messages,
+  };
+}
+
+function formatCount(count, singular, plural) {
+  const value = Number(count) || 0;
+  return `${formatNumber(value)} ${value === 1 ? singular : plural}`;
+}
+
+function formatStatusLabel(count, singular, plural) {
+  return Number(count) === 1 ? singular : plural;
 }
