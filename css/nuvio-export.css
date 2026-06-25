@@ -1,5 +1,6 @@
 .nuvio-dialog {
   width: min(860px, 100%);
+  background: color-mix(in srgb, var(--bg) 86%, var(--panel));
 }
 
 .nuvio-header-actions {
