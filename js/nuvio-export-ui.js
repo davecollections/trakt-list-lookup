@@ -128,7 +128,7 @@ export function createNuvioExportUi({ selection }) {
 
   function open() {
     if (!selection.size) return;
-    count.textContent = `${formatNumber(selection.size)} selected`;
+    count.textContent = getSelectedListCountText(selection.size);
     update();
     refreshFolderImages();
     openModal(modal, {
@@ -290,7 +290,7 @@ export function createNuvioExportUi({ selection }) {
     }
 
     const safeUrl = getCoverUrl();
-    coverStatus.textContent = safeUrl ? "Cover URL will be included." : "Use a valid https:// URL.";
+    coverStatus.textContent = safeUrl ? "Hero/backdrop image URL will be included." : "Use a valid https:// URL.";
     coverStatus.classList.toggle("invalid", !safeUrl);
   }
 
@@ -471,7 +471,7 @@ export function createNuvioExportUi({ selection }) {
       return;
     }
     if (mode === "cover") {
-      folderImageStatus.textContent = getCoverUrl() ? "Folder covers will use the collection cover URL." : "Add a cover URL to apply it to folders.";
+      folderImageStatus.textContent = getCoverUrl() ? "Folder covers will use the hero/backdrop image URL." : "Add a hero/backdrop image URL to apply it to folders.";
       return;
     }
 
@@ -547,6 +547,7 @@ export function createNuvioExportUi({ selection }) {
     }
 
     listMapping.textContent = "";
+    appendMappingHeader(listMapping, "Selected list", "Destination collection");
     getSelectedListsForExport().forEach((result) => {
       const row = document.createElement("label");
       row.className = "nuvio-map-row";
@@ -571,6 +572,7 @@ export function createNuvioExportUi({ selection }) {
     }
 
     splitMapping.textContent = "";
+    appendMappingHeader(splitMapping, "Selected list", "New collection name");
     getSelectedListsForExport().forEach((result) => {
       const row = document.createElement("label");
       row.className = "nuvio-map-row";
@@ -587,6 +589,20 @@ export function createNuvioExportUi({ selection }) {
       row.append(title, input);
       splitMapping.append(row);
     });
+  }
+
+  function appendMappingHeader(container, leftLabel, rightLabel) {
+    const header = document.createElement("div");
+    header.className = "nuvio-map-header";
+
+    const left = document.createElement("span");
+    left.textContent = leftLabel;
+
+    const right = document.createElement("span");
+    right.textContent = rightLabel;
+
+    header.append(left, right);
+    container.append(header);
   }
 
   function getSplitGroups() {
@@ -897,14 +913,19 @@ export function getNuvioDestinationCopy({ existingCollectionCount = 0 } = {}) {
       ? `${formatCount(count, "imported collection", "imported collections")} detected.`
       : "Create a new Nuvio collection from selected lists.",
     newDescription: hasExistingJson
-      ? "Keep imported collections and add selected lists as a new collection."
-      : "Add selected lists as folders in one new collection.",
+      ? "Keep imported collections and add selected lists beside them."
+      : "Selected lists become one new collection.",
     splitDescription: hasExistingJson
-      ? "Keep imported collections and add grouped selected lists as new collections."
-      : "Group selected lists into multiple new collections.",
-    existingDescription: "Add selected lists to the chosen imported collection. Already-existing Trakt lists may be skipped.",
-    mappedDescription: "Choose an imported collection for each selected list. Already-existing Trakt lists may be skipped.",
+      ? "Keep imported collections and add grouped lists beside them."
+      : "Group selected lists into named new collections.",
+    existingDescription: "Add selected lists to one imported collection. Existing Trakt lists may be skipped.",
+    mappedDescription: "Choose an imported collection for each selected list. Existing Trakt lists may be skipped.",
   };
+}
+
+export function getSelectedListCountText(count) {
+  const value = Number(count) || 0;
+  return `${formatNumber(value)} list${value === 1 ? "" : "s"} selected`;
 }
 
 export function getNuvioExportStatusModel(payload, context = {}) {
