@@ -266,11 +266,12 @@
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .nuvio-folder-artwork-modes {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: 5px;
   align-items: center;
@@ -312,7 +313,19 @@
   min-width: 0;
 }
 
+.nuvio-custom-cover-field {
+  flex: 1 1 260px;
+  max-width: 460px;
+}
+
+.nuvio-custom-cover-field input {
+  min-height: 28px;
+  padding: 0 9px;
+  font-size: 0.76rem;
+}
+
 .nuvio-folder-artwork-row .ghost-button {
+  flex: 0 0 auto;
   min-height: 28px;
   padding: 0 10px;
   font-size: 0.72rem;
@@ -809,6 +822,11 @@
   .nuvio-folder-artwork-preview.is-poster {
     width: 96px;
     max-width: 96px;
+  }
+
+  .nuvio-custom-cover-field {
+    flex-basis: 100%;
+    max-width: none;
   }
 
   .nuvio-modal-actions {

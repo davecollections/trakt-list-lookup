@@ -617,11 +617,11 @@ export function createNuvioExportUi({ selection }) {
 
       const field = document.createElement("label");
       field.className = "nuvio-custom-cover-field";
-      field.textContent = "Cover image URL";
 
       const input = document.createElement("input");
       input.type = "url";
-      input.placeholder = "https://...";
+      input.placeholder = "Cover image URL";
+      input.setAttribute("aria-label", "Cover image URL");
       input.dataset.folderCoverKey = key;
       input.value = getFolderArtworkChoice(key).url || row.dataset.defaultCoverUrl;
 
@@ -635,9 +635,9 @@ export function createNuvioExportUi({ selection }) {
 
       const actions = document.createElement("div");
       actions.className = "nuvio-folder-artwork-actions";
-      actions.append(modeGroup, clearButton);
+      actions.append(modeGroup, field, clearButton);
 
-      body.append(details, actions, field);
+      body.append(details, actions);
       row.append(preview, body);
       list.append(row);
       syncFolderArtworkRow(row, key);
