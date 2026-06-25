@@ -1,7 +1,7 @@
 import { formatNumber, slugifyFilename } from "./formatting.js";
 import { canFetchListItems, fetchFirstPosterUrl } from "./list-item-cache.js";
 import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
-import { buildNuvioExportPayload, getListSelectionKey, getSafeHttpsUrl, sortNuvioLists } from "./nuvio-export.js";
+import { buildNuvioExportPayload, getListSelectionKey, getSafeHttpsUrl, normalizeNuvioImageUrl, sortNuvioLists } from "./nuvio-export.js";
 
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
@@ -9,7 +9,6 @@ const MAX_EXISTING_JSON_BYTES = 2 * 1024 * 1024;
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const DEFAULT_MERGE_MODE = "new";
 const DEFAULT_SORT_MODE = "title-asc";
-const DEFAULT_FOLDER_IMAGE_MODE = "auto";
 const DEFAULT_FOLDER_TILE_SHAPE = "LANDSCAPE";
 const DEFAULT_FOLDER_TITLE_MODE = "hide";
 const FOLDER_ARTWORK_MODE_DEFAULT = "default";
@@ -26,9 +25,8 @@ export function createNuvioExportUi({ selection }) {
   const coverUrlInput = document.querySelector("#nuvio-cover-url");
   const coverStatus = document.querySelector("#nuvio-cover-status");
   const sortModeSelect = document.querySelector("#nuvio-sort-mode");
-  const folderImageModeSelect = document.querySelector("#nuvio-folder-image-mode");
-  const folderTileShapeSelect = document.querySelector("#nuvio-folder-tile-shape");
-  const folderTitleModeSelect = document.querySelector("#nuvio-folder-title-mode");
+  const folderTileShapeButtons = [...document.querySelectorAll("[data-folder-tile-shape]")];
+  const folderTitleModeButtons = [...document.querySelectorAll("[data-folder-title-mode]")];
   const folderImageStatus = document.querySelector("#nuvio-folder-image-status");
   const folderArtworkOverrides = document.querySelector("#nuvio-folder-artwork-overrides");
   const existingJsonInput = document.querySelector("#nuvio-existing-json");
@@ -72,6 +70,8 @@ export function createNuvioExportUi({ selection }) {
   let folderImageRequestId = 0;
   let latestPayload = null;
   let selectedArtworkSignature = "";
+  let folderTileShape = DEFAULT_FOLDER_TILE_SHAPE;
+  let folderTitleMode = DEFAULT_FOLDER_TITLE_MODE;
 
   closeButton.addEventListener("click", close);
   copyButton.addEventListener("click", copyJson);
@@ -82,11 +82,19 @@ export function createNuvioExportUi({ selection }) {
   collectionNameInput.addEventListener("input", update);
   coverUrlInput.addEventListener("input", update);
   sortModeSelect.addEventListener("change", update);
-  folderTileShapeSelect.addEventListener("change", update);
-  folderTitleModeSelect.addEventListener("change", update);
-  folderImageModeSelect.addEventListener("change", () => {
-    update();
-    refreshFolderImages();
+  folderTileShapeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      folderTileShape = button.dataset.folderTileShape || DEFAULT_FOLDER_TILE_SHAPE;
+      syncFolderDisplayButtons();
+      update();
+    });
+  });
+  folderTitleModeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      folderTitleMode = button.dataset.folderTitleMode || DEFAULT_FOLDER_TITLE_MODE;
+      syncFolderDisplayButtons();
+      update();
+    });
   });
   existingJsonInput.addEventListener("input", () => {
     updatePastedJsonSource();
@@ -130,6 +138,16 @@ export function createNuvioExportUi({ selection }) {
     if (input) input.value = "";
     syncFolderArtworkRow(row, key);
     refreshGeneratedOutput();
+  });
+  folderArtworkOverrides.addEventListener("focusin", (event) => {
+    const input = event.target.closest("input[data-folder-cover-key]");
+    if (!input || !input.value || input.dataset.selectedOnFocus === "true") return;
+    input.dataset.selectedOnFocus = "true";
+    window.setTimeout(() => input.select(), 0);
+  });
+  folderArtworkOverrides.addEventListener("focusout", (event) => {
+    const input = event.target.closest("input[data-folder-cover-key]");
+    if (input) delete input.dataset.selectedOnFocus;
   });
   targetCollectionSelect.addEventListener("change", refreshGeneratedOutput);
   splitMapping.addEventListener("input", (event) => {
@@ -241,8 +259,8 @@ export function createNuvioExportUi({ selection }) {
       coverUrl: coverUrlInput.value,
       folderCoverUrl: getFolderCoverFallbackUrl(),
       folderImages: getFolderImageObject(),
-      folderTileShape: folderTileShapeSelect.value,
-      hideFolderTitles: folderTitleModeSelect.value !== "show",
+      folderTileShape,
+      hideFolderTitles: folderTitleMode !== "show",
       sortMode: sortModeSelect.value,
       splitAssignments: selection.splitAssignmentObject(),
       mappedAssignments: selection.mappedAssignmentObject(),
@@ -512,41 +530,15 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function updateFolderImageStatus(isLoading = false) {
-    const mode = folderImageModeSelect.value;
-    const overrideCount = countCustomFolderArtworkChoices();
-    const noneCount = countNoneFolderArtworkChoices();
-    if (mode === "none") {
-      folderImageStatus.textContent = overrideCount || noneCount
-        ? `${formatNumber(overrideCount)} custom cover${overrideCount === 1 ? "" : "s"} set. ${formatNumber(noneCount)} folder${noneCount === 1 ? "" : "s"} set to no cover.`
-        : "Folder image fields will be blank.";
-      return;
-    }
-    if (mode === "cover") {
-      if (overrideCount || noneCount) {
-        folderImageStatus.textContent = getCoverUrl()
-          ? `${formatNumber(overrideCount)} custom cover${overrideCount === 1 ? "" : "s"} set. ${formatNumber(noneCount)} folder${noneCount === 1 ? "" : "s"} set to no cover. Others use the hero/backdrop image URL.`
-          : `${formatNumber(overrideCount)} custom cover${overrideCount === 1 ? "" : "s"} set. ${formatNumber(noneCount)} folder${noneCount === 1 ? "" : "s"} set to no cover. Add a hero/backdrop image URL for the others.`;
-        return;
-      }
-      folderImageStatus.textContent = getCoverUrl() ? "Folder covers will use the hero/backdrop image URL." : "Add a hero/backdrop image URL to apply it to folders.";
-      return;
-    }
-
     if (isLoading) {
       folderImageStatus.textContent = "Finding list poster images...";
       return;
     }
 
     const selected = getSelectedListsForExport();
-    const found = selected.filter((result) => {
-      const key = getListSelectionKey(result);
-      const choice = getFolderArtworkChoice(key);
-      if (choice.mode === FOLDER_ARTWORK_MODE_NONE) return false;
-      if (choice.mode === FOLDER_ARTWORK_MODE_CUSTOM) return Boolean(choice.url);
-      return Boolean(folderImageCache.get(key));
-    }).length;
+    const found = selected.filter((result) => folderImageCache.get(getListSelectionKey(result))).length;
     folderImageStatus.textContent = selected.length
-      ? `${formatNumber(found)}/${formatNumber(selected.length)} folder images found.`
+      ? `${formatNumber(found)}/${formatNumber(selected.length)} auto poster images found.`
       : "";
   }
 
@@ -560,11 +552,7 @@ export function createNuvioExportUi({ selection }) {
 
     const title = document.createElement("strong");
     title.textContent = "Folder artwork overrides";
-
-    const help = document.createElement("small");
-    help.textContent = "Optional custom cover image URLs for generated folders.";
-
-    heading.append(title, help);
+    heading.append(title);
     folderArtworkOverrides.append(heading);
 
     if (!selected.length) {
@@ -680,17 +668,15 @@ export function createNuvioExportUi({ selection }) {
     if (customInput && customInput.value !== customUrl) customInput.value = customUrl;
     if (customField) customField.hidden = mode !== FOLDER_ARTWORK_MODE_CUSTOM;
     if (status) status.textContent = getFolderArtworkStatus(mode, defaultUrl, defaultSource);
-    if (clearButton) clearButton.hidden = mode === FOLDER_ARTWORK_MODE_DEFAULT && !choice.url;
+    if (clearButton) clearButton.hidden = mode !== FOLDER_ARTWORK_MODE_CUSTOM;
     if (preview) setFolderArtworkPreview(preview, previewUrl);
   }
 
   function setFolderArtworkPreview(preview, url) {
     preview.textContent = "";
-    const safeUrl = getSafeHttpsUrl(url);
+    const safeUrl = normalizeNuvioImageUrl(url);
     if (!safeUrl) {
-      const placeholder = document.createElement("span");
-      placeholder.textContent = "No image";
-      preview.append(placeholder);
+      appendFolderArtworkPlaceholder(preview);
       return;
     }
 
@@ -698,7 +684,18 @@ export function createNuvioExportUi({ selection }) {
     image.src = safeUrl;
     image.alt = "";
     image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", () => {
+      preview.textContent = "";
+      appendFolderArtworkPlaceholder(preview);
+    }, { once: true });
     preview.append(image);
+  }
+
+  function appendFolderArtworkPlaceholder(preview) {
+    const placeholder = document.createElement("span");
+    placeholder.textContent = "No image";
+    preview.append(placeholder);
   }
 
   function getFolderArtworkPreviewUrl(mode, customUrl, defaultUrl) {
@@ -708,17 +705,10 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function getEffectiveDefaultFolderArtwork(result) {
-    if (folderImageModeSelect.value === "auto") {
-      const autoPoster = getSafeHttpsUrl(folderImageCache.get(getListSelectionKey(result)));
-      if (autoPoster) return { url: autoPoster, source: "auto" };
-      const fallbackCover = getCoverUrl();
-      return { url: fallbackCover, source: fallbackCover ? "cover" : "none" };
-    }
-    if (folderImageModeSelect.value === "cover") {
-      const fallbackCover = getCoverUrl();
-      return { url: fallbackCover, source: fallbackCover ? "cover" : "none" };
-    }
-    return { url: "", source: "none" };
+    const autoPoster = normalizeNuvioImageUrl(folderImageCache.get(getListSelectionKey(result)));
+    if (autoPoster) return { url: autoPoster, source: "auto" };
+    const fallbackCover = getCoverUrl();
+    return { url: fallbackCover, source: fallbackCover ? "cover" : "none" };
   }
 
   function getFolderArtworkStatus(mode, defaultUrl, defaultSource) {
@@ -764,24 +754,6 @@ export function createNuvioExportUi({ selection }) {
       mode: stored?.mode || FOLDER_ARTWORK_MODE_DEFAULT,
       url: String(stored?.url || "").trim(),
     };
-  }
-
-  function countCustomFolderArtworkChoices() {
-    const selectedKeys = new Set(getSelectedListsForExport().map((result) => getListSelectionKey(result)).filter(Boolean));
-    let count = 0;
-    for (const [key, choice] of folderArtworkChoices.entries()) {
-      if (selectedKeys.has(key) && choice.mode === FOLDER_ARTWORK_MODE_CUSTOM) count += 1;
-    }
-    return count;
-  }
-
-  function countNoneFolderArtworkChoices() {
-    const selectedKeys = new Set(getSelectedListsForExport().map((result) => getListSelectionKey(result)).filter(Boolean));
-    let count = 0;
-    for (const [key, choice] of folderArtworkChoices.entries()) {
-      if (selectedKeys.has(key) && choice.mode === FOLDER_ARTWORK_MODE_NONE) count += 1;
-    }
-    return count;
   }
 
   function pruneFolderImageOverrides(selected) {
@@ -949,9 +921,9 @@ export function createNuvioExportUi({ selection }) {
     collectionNameInput.value = "";
     coverUrlInput.value = "";
     sortModeSelect.value = DEFAULT_SORT_MODE;
-    folderImageModeSelect.value = DEFAULT_FOLDER_IMAGE_MODE;
-    folderTileShapeSelect.value = DEFAULT_FOLDER_TILE_SHAPE;
-    folderTitleModeSelect.value = DEFAULT_FOLDER_TITLE_MODE;
+    folderTileShape = DEFAULT_FOLDER_TILE_SHAPE;
+    folderTitleMode = DEFAULT_FOLDER_TITLE_MODE;
+    syncFolderDisplayButtons();
     existingJsonInput.value = "";
     existingFileInput.value = "";
     importPastePanel.hidden = true;
@@ -976,12 +948,24 @@ export function createNuvioExportUi({ selection }) {
     if (radio) radio.checked = true;
   }
 
+  function syncFolderDisplayButtons() {
+    folderTileShapeButtons.forEach((button) => {
+      const isActive = button.dataset.folderTileShape === folderTileShape;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+    folderTitleModeButtons.forEach((button) => {
+      const isActive = button.dataset.folderTitleMode === folderTitleMode;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+  }
+
   function getCoverUrl() {
     return getSafeHttpsUrl(coverUrlInput.value);
   }
 
   function getFolderCoverFallbackUrl() {
-    if (folderImageModeSelect.value === "none") return "";
     return getCoverUrl();
   }
 
@@ -992,7 +976,6 @@ export function createNuvioExportUi({ selection }) {
       const choice = getFolderArtworkChoice(key);
       if (choice.mode === FOLDER_ARTWORK_MODE_NONE) return [[key, ""]];
       if (choice.mode === FOLDER_ARTWORK_MODE_CUSTOM) return [[key, choice.url]];
-      if (folderImageModeSelect.value !== "auto") return [];
       const autoPoster = folderImageCache.get(key) || "";
       return autoPoster ? [[key, autoPoster]] : [];
     }));
@@ -1000,13 +983,6 @@ export function createNuvioExportUi({ selection }) {
 
   async function refreshFolderImages() {
     const requestId = ++folderImageRequestId;
-    if (folderImageModeSelect.value !== "auto") {
-      updateFolderImageStatus();
-      renderFolderArtworkOverrides();
-      refreshGeneratedOutput();
-      return;
-    }
-
     const selectedLists = getSelectedListsForExport();
     const missing = selectedLists.filter((result) => {
       const key = getListSelectionKey(result);

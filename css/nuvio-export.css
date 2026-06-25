@@ -144,6 +144,28 @@
   align-content: start;
 }
 
+.nuvio-artwork-summary,
+.nuvio-artwork-control {
+  display: grid;
+  grid-template-rows: auto minmax(28px, auto) minmax(13px, auto);
+  gap: 4px;
+  align-content: start;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.nuvio-artwork-summary {
+  grid-template-rows: auto minmax(13px, auto);
+}
+
+.nuvio-artwork-summary strong,
+.nuvio-artwork-control strong {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .nuvio-folder-artwork-overrides {
   display: grid;
   gap: 8px;
@@ -243,6 +265,13 @@
 }
 
 .nuvio-folder-artwork-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.nuvio-segmented-control {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;

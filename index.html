@@ -282,31 +282,26 @@
               <h3>Artwork defaults</h3>
             </div>
             <div class="nuvio-field-grid nuvio-artwork-grid">
-              <label>
-                Folder images
-                <select id="nuvio-folder-image-mode">
-                  <option value="auto" selected>Auto from list posters</option>
-                  <option value="cover">Use hero/backdrop image URL</option>
-                  <option value="none">No folder images</option>
-                </select>
+              <div class="nuvio-artwork-summary">
+                <strong>Auto poster images</strong>
                 <small id="nuvio-folder-image-status" class="field-status"></small>
-              </label>
-              <label>
-                Folder tile shape
-                <select id="nuvio-folder-tile-shape">
-                  <option value="LANDSCAPE" selected>Landscape</option>
-                  <option value="POSTER">Poster</option>
-                </select>
+              </div>
+              <div class="nuvio-artwork-control">
+                <strong>Folder tile shape</strong>
+                <div class="nuvio-segmented-control" aria-label="Folder tile shape">
+                  <button type="button" class="nuvio-mode-pill is-active" data-folder-tile-shape="LANDSCAPE" aria-pressed="true">Landscape</button>
+                  <button type="button" class="nuvio-mode-pill" data-folder-tile-shape="POSTER" aria-pressed="false">Poster</button>
+                </div>
                 <small class="field-status">Applies to newly generated folders.</small>
-              </label>
-              <label>
-                Folder titles
-                <select id="nuvio-folder-title-mode">
-                  <option value="hide" selected>Hide</option>
-                  <option value="show">Show</option>
-                </select>
+              </div>
+              <div class="nuvio-artwork-control">
+                <strong>Folder titles</strong>
+                <div class="nuvio-segmented-control" aria-label="Folder titles">
+                  <button type="button" class="nuvio-mode-pill" data-folder-title-mode="show" aria-pressed="false">Show</button>
+                  <button type="button" class="nuvio-mode-pill is-active" data-folder-title-mode="hide" aria-pressed="true">Hide</button>
+                </div>
                 <small class="field-status">Controls titles on generated folder tiles.</small>
-              </label>
+              </div>
             </div>
             <div id="nuvio-folder-artwork-overrides" class="nuvio-folder-artwork-overrides" aria-live="polite"></div>
           </section>

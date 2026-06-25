@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildNuvioExport, buildNuvioExportPayload, createNuvioIdFactory, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
+import { buildNuvioExport, buildNuvioExportPayload, createNuvioIdFactory, getSafeHttpsUrl, normalizeNuvioImageUrl, sortNuvioLists } from "../js/nuvio-export.js";
 import {
   countImportedSelectedTraktListDuplicates,
   createNuvioImportSource,
@@ -31,6 +31,11 @@ const nuvioUiJs = readFileSync(new URL("../js/nuvio-export-ui.js", import.meta.u
 assert.equal(getSafeHttpsUrl("http://example.com/cover.jpg"), "");
 assert.equal(getSafeHttpsUrl("not a url"), "");
 assert.equal(getSafeHttpsUrl("https://example.com/cover.jpg"), "https://example.com/cover.jpg");
+assert.equal(normalizeNuvioImageUrl("https://example.com/cover.jpg"), "https://example.com/cover.jpg");
+assert.equal(
+  normalizeNuvioImageUrl("https://github.com/davecollections/nuvio-assets/blob/main/assets/collection%20covers/based_on/Comics.jpg?raw=true"),
+  "https://raw.githubusercontent.com/davecollections/nuvio-assets/main/assets/collection%20covers/based_on/Comics.jpg",
+);
 assert.deepEqual(sortNuvioLists(lists, "likes-desc").map((item) => item.name), ["More Comedy", "Horror Finds", "Comedy Nights"]);
 assert.equal(getSelectedListCountText(1), "1 list selected");
 assert.equal(getSelectedListCountText(3), "3 lists selected");
@@ -45,13 +50,19 @@ assert.match(indexHtml, /Hero\/backdrop image URL/);
 assert.match(indexHtml, /Folder order/);
 assert.match(indexHtml, /Sorts generated folders, not the titles inside Trakt lists\./);
 assert.match(indexHtml, /Artwork defaults/);
-assert.match(indexHtml, /Auto from list posters/);
+assert.match(indexHtml, /Auto poster images/);
+assert.doesNotMatch(indexHtml, /id="nuvio-folder-image-mode"/);
+assert.doesNotMatch(indexHtml, /Folder images/);
+assert.match(nuvioUiJs, /auto poster images found/);
 assert.match(indexHtml, /Folder tile shape/);
-assert.match(indexHtml, /<option value="POSTER">Poster<\/option>/);
+assert.match(indexHtml, /data-folder-tile-shape="LANDSCAPE"/);
+assert.match(indexHtml, /data-folder-tile-shape="POSTER"/);
 assert.match(indexHtml, /Folder titles/);
-assert.match(indexHtml, /<option value="show">Show<\/option>/);
+assert.match(indexHtml, /data-folder-title-mode="show"/);
+assert.match(indexHtml, /data-folder-title-mode="hide"/);
 assert.match(indexHtml, /id="nuvio-folder-artwork-overrides"/);
 assert.match(nuvioUiJs, /Folder artwork overrides/);
+assert.doesNotMatch(nuvioUiJs, /Optional custom cover image URLs for generated folders\./);
 assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_DEFAULT, "Default"/);
 assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_NONE, "None"/);
 assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_CUSTOM, "Custom"/);
@@ -59,6 +70,8 @@ assert.match(nuvioUiJs, /Cover image URL/);
 assert.match(nuvioUiJs, /clearButton\.textContent = "Clear"/);
 assert.match(nuvioUiJs, /setFolderArtworkChoice\(input\.dataset\.folderCoverKey, FOLDER_ARTWORK_MODE_CUSTOM, input\.value\)/);
 assert.match(nuvioUiJs, /folderArtworkChoices\.clear\(\)/);
+assert.match(nuvioUiJs, /input\.select\(\)/);
+assert.match(nuvioUiJs, /image\.addEventListener\("error"/);
 assert.match(indexHtml, /New collection/);
 assert.match(indexHtml, /Split into new collections/);
 assert.match(indexHtml, /Add to imported collection/);
@@ -270,6 +283,16 @@ const customCoverExport = buildNuvioExport({
 assert.equal(customCoverExport[0].folders[0].coverImageUrl, "https://example.com/custom-comedy.jpg");
 assert.equal(customCoverExport[0].folders[1].coverImageUrl, "https://example.com/custom-horror.jpg");
 assert.equal(customCoverExport[0].folders[2].coverImageUrl, "https://example.com/collection.jpg");
+
+nextId = 0;
+const githubCoverExport = buildNuvioExport({
+  lists,
+  folderImages: {
+    101: "https://github.com/davecollections/nuvio-assets/blob/main/assets/collection%20covers/based_on/Comics.jpg?raw=true",
+  },
+  createId,
+});
+assert.equal(githubCoverExport[0].folders[0].coverImageUrl, "https://raw.githubusercontent.com/davecollections/nuvio-assets/main/assets/collection%20covers/based_on/Comics.jpg");
 
 nextId = 0;
 const noCoverChoiceExport = buildNuvioExport({

@@ -113,6 +113,13 @@ export function getSafeHttpsUrl(value) {
   }
 }
 
+export function normalizeNuvioImageUrl(value) {
+  const safeUrl = getSafeHttpsUrl(value);
+  if (!safeUrl) return "";
+  const githubRawUrl = getGithubRawImageUrl(safeUrl);
+  return githubRawUrl || safeUrl;
+}
+
 export function getListSelectionKey(result) {
   return result?.ids?.trakt ? String(result.ids.trakt) : result?.url || "";
 }
@@ -449,8 +456,32 @@ function createNuvioFolder(result, coverUrl, folderDisplayOptions, createId) {
 
 function getFolderCoverUrl(result, folderImages, fallbackCoverUrl) {
   const key = getListSelectionKey(result);
-  if (Object.prototype.hasOwnProperty.call(folderImages || {}, key)) return String(folderImages[key] || "").trim();
+  if (Object.prototype.hasOwnProperty.call(folderImages || {}, key)) return normalizeNuvioImageUrl(folderImages[key]);
   return fallbackCoverUrl;
+}
+
+function getGithubRawImageUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.hostname.toLowerCase() !== "github.com") return "";
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length < 5 || parts[2] !== "blob") return "";
+    const filename = parts.at(-1) || "";
+    if (!/\.(avif|gif|jpe?g|png|webp)$/i.test(filename)) return "";
+    const [owner, repo, , branch, ...pathParts] = parts;
+    const rawPath = [owner, repo, branch, ...pathParts].map(encodeUrlPathPart).join("/");
+    return `https://raw.githubusercontent.com/${rawPath}`;
+  } catch {
+    return "";
+  }
+}
+
+function encodeUrlPathPart(value) {
+  try {
+    return encodeURIComponent(decodeURIComponent(value));
+  } catch {
+    return encodeURIComponent(value);
+  }
 }
 
 function getNuvioFolderTileShape(value) {
