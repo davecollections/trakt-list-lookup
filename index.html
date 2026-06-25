@@ -237,48 +237,56 @@
       <section class="modal-dialog nuvio-dialog" role="dialog" aria-modal="true" aria-labelledby="nuvio-title">
         <div class="modal-header">
           <div>
-            <p id="nuvio-count" class="result-owner"></p>
             <h2 id="nuvio-title">Create Nuvio JSON</h2>
+            <p id="nuvio-count" class="result-owner"></p>
           </div>
-          <button id="nuvio-close" type="button" class="ghost-button">Close</button>
-        </div>
-
-        <div class="nuvio-utility-row">
-          <button id="reset-nuvio-export" type="button" class="ghost-button">Reset export form</button>
+          <div class="nuvio-header-actions">
+            <button id="reset-nuvio-export" type="button" class="ghost-button">Reset export form</button>
+            <button id="nuvio-close" type="button" class="ghost-button nuvio-close-button" aria-label="Close Nuvio export">X</button>
+          </div>
         </div>
 
         <div class="nuvio-grid">
           <section class="nuvio-panel nuvio-wide">
             <div class="nuvio-panel-heading">
-              <h3>Collection setup</h3>
-              <p id="nuvio-export-summary">Selected lists will be exported as Trakt folders.</p>
+              <h3>Collection details</h3>
             </div>
             <div class="nuvio-field-grid">
               <label>
                 Collection name
                 <input id="nuvio-collection-name" type="text" placeholder="My Collection">
+                <small class="field-status" aria-hidden="true"></small>
               </label>
               <label>
-                Cover image URL
+                Hero/backdrop image URL
                 <input id="nuvio-cover-url" type="url" placeholder="https://...">
                 <small id="nuvio-cover-status" class="field-status"></small>
               </label>
               <label>
-                List order
+                Folder order
                 <select id="nuvio-sort-mode">
-                  <option value="title-asc" selected>Title A-Z</option>
-                  <option value="title-desc">Title Z-A</option>
+                  <option value="title-asc" selected>Folder title A-Z</option>
+                  <option value="title-desc">Folder title Z-A</option>
                   <option value="selected">Selection order</option>
                   <option value="items-desc">Most items</option>
                   <option value="likes-desc">Most likes</option>
                   <option value="updated-desc">Recently updated</option>
                 </select>
+                <small class="field-status">Sorts generated folders, not the titles inside Trakt lists.</small>
               </label>
+            </div>
+          </section>
+
+          <section class="nuvio-panel nuvio-wide">
+            <div class="nuvio-panel-heading">
+              <h3>Artwork defaults</h3>
+            </div>
+            <div class="nuvio-field-grid nuvio-artwork-grid">
               <label>
                 Folder images
                 <select id="nuvio-folder-image-mode">
                   <option value="auto" selected>Auto from list posters</option>
-                  <option value="cover">Use collection cover URL</option>
+                  <option value="cover">Use hero/backdrop image URL</option>
                   <option value="none">No folder images</option>
                 </select>
                 <small id="nuvio-folder-image-status" class="field-status"></small>
@@ -316,47 +324,48 @@
           <div id="nuvio-merge-options" class="nuvio-wide nuvio-panel nuvio-merge-options" hidden>
             <div class="nuvio-panel-heading">
               <h3>Destination</h3>
-              <p id="nuvio-existing-summary"></p>
+              <p id="nuvio-existing-summary" hidden></p>
             </div>
             <div class="nuvio-option-grid">
               <label class="radio-label">
                 <input type="radio" name="nuvio-merge-mode" value="new" checked>
                 <span>
                   <strong>New collection</strong>
-                  <small id="nuvio-new-mode-description">Add selected lists as folders in one new collection.</small>
+                  <small id="nuvio-new-mode-description">Create one new collection from the selected lists.</small>
                 </span>
               </label>
               <label class="radio-label split-option">
                 <input type="radio" name="nuvio-merge-mode" value="split">
                 <span>
-                  <strong>Split into collections</strong>
-                  <small id="nuvio-split-mode-description">Group selected lists into multiple new collections.</small>
+                  <strong>Split into new collections</strong>
+                  <small id="nuvio-split-mode-description">Create separate new collections from the selected lists.</small>
                 </span>
               </label>
               <label class="radio-label existing-json-option">
                 <input type="radio" name="nuvio-merge-mode" value="existing">
                 <span>
-                  <strong>Add to existing</strong>
-                  <small id="nuvio-existing-mode-description">Add selected lists to the chosen imported collection.</small>
+                  <strong>Add to imported collection</strong>
+                  <small id="nuvio-existing-mode-description">Add all selected lists to one imported collection. Existing Trakt lists may be skipped.</small>
                 </span>
               </label>
               <label class="radio-label existing-json-option">
                 <input type="radio" name="nuvio-merge-mode" value="mapped">
                 <span>
-                  <strong>Map per list</strong>
-                  <small id="nuvio-mapped-mode-description">Choose an imported collection for each selected list.</small>
+                  <strong>Choose destination per list</strong>
+                  <small id="nuvio-mapped-mode-description">Choose an imported collection for each selected list. Existing Trakt lists may be skipped.</small>
                 </span>
               </label>
             </div>
             <div id="nuvio-split-mapping" class="nuvio-list-mapping compact-mapping" hidden></div>
             <label class="existing-json-option nuvio-target-field">
-              Existing collection
+              Add selected lists to
               <select id="nuvio-target-collection" disabled></select>
             </label>
             <div id="nuvio-list-mapping" class="nuvio-list-mapping" hidden></div>
           </div>
 
           <section class="nuvio-wide export-status-panel">
+            <p id="nuvio-export-summary" class="nuvio-export-summary" hidden>Selected lists will be exported as Trakt folders.</p>
             <div id="nuvio-export-status" class="nuvio-export-status" role="status" aria-live="polite">
               <strong id="nuvio-export-status-title">Export ready</strong>
               <ul id="nuvio-export-status-list"></ul>

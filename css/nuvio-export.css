@@ -2,6 +2,25 @@
   width: min(860px, 100%);
 }
 
+.nuvio-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.nuvio-close-button {
+  display: inline-grid;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  place-items: center;
+  padding: 0;
+  font-size: 0.88rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .nuvio-help-dialog,
 .nuvio-import-manage-dialog {
   width: min(760px, 100%);
@@ -22,15 +41,16 @@
 
 .nuvio-help-button,
 .modal-actions .nuvio-help-button {
-  width: 30px;
-  min-width: 30px;
-  min-height: 30px;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: transparent;
+  background: color-mix(in srgb, var(--soft) 72%, transparent);
   color: var(--muted);
-  font-size: 0.86rem;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--soft) 42%, transparent);
+  font-size: 0.92rem;
   font-weight: 900;
   line-height: 1;
 }
@@ -38,7 +58,7 @@
 .nuvio-help-button:hover,
 .modal-actions .nuvio-help-button:hover {
   border-color: color-mix(in srgb, #6366f1 36%, var(--border));
-  background: color-mix(in srgb, #6366f1 7%, transparent);
+  background: color-mix(in srgb, var(--soft) 88%, var(--panel));
   color: var(--text);
 }
 
@@ -90,8 +110,10 @@
   gap: 10px;
   align-items: baseline;
   justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 9px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--soft) 36%, var(--border));
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--soft) 52%, transparent);
 }
 
 .nuvio-panel-heading h3 {
@@ -114,6 +136,15 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(190px, 0.75fr);
   gap: 9px;
   padding: 10px;
+}
+
+.nuvio-field-grid label {
+  grid-template-rows: auto minmax(34px, auto) minmax(13px, auto);
+  align-content: start;
+}
+
+.nuvio-artwork-grid {
+  grid-template-columns: minmax(220px, 0.45fr);
 }
 
 .nuvio-merge-options {
@@ -262,7 +293,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 9px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--soft) 36%, var(--border));
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--soft) 52%, transparent);
   cursor: pointer;
   color: var(--text);
   font-size: 0.82rem;
@@ -292,8 +326,8 @@
 .nuvio-import-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-end;
+  gap: 6px;
+  align-items: center;
 }
 
 .nuvio-import-controls .ghost-button,
@@ -444,6 +478,27 @@
   display: none;
 }
 
+.nuvio-map-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
+  gap: 8px;
+  padding: 0 8px 2px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.nuvio-map-help {
+  margin: 0;
+  padding: 0 8px 2px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .nuvio-map-row {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
   align-items: center;
@@ -451,6 +506,13 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.nuvio-map-row input,
+.nuvio-map-row select {
+  border-color: color-mix(in srgb, var(--soft) 54%, var(--border));
+  background: color-mix(in srgb, var(--soft) 58%, var(--panel));
+  font-weight: 750;
 }
 
 .nuvio-map-row span {
@@ -519,6 +581,11 @@
 }
 
 @media (max-width: 720px) {
+  .nuvio-header-actions {
+    align-items: flex-end;
+    flex-direction: column-reverse;
+  }
+
   .nuvio-utility-row,
   .nuvio-import-help-grid {
     grid-template-columns: 1fr;
@@ -535,6 +602,7 @@
   .nuvio-panel-heading,
   .nuvio-field-grid,
   .nuvio-option-grid,
+  .nuvio-map-header,
   .nuvio-map-row {
     grid-template-columns: 1fr;
   }

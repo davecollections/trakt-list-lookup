@@ -8,6 +8,7 @@ import {
   getNuvioExportStatusModel,
   getNuvioImportState,
   getNuvioImportSummary,
+  getSelectedListCountText,
   removeNuvioImportSource,
 } from "../js/nuvio-export-ui.js";
 
@@ -25,15 +26,31 @@ const fiveLists = [
 let nextId = 0;
 const createId = (prefix) => `${prefix}-${++nextId}`;
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const nuvioUiJs = readFileSync(new URL("../js/nuvio-export-ui.js", import.meta.url), "utf8");
 
 assert.equal(getSafeHttpsUrl("http://example.com/cover.jpg"), "");
 assert.equal(getSafeHttpsUrl("not a url"), "");
 assert.equal(getSafeHttpsUrl("https://example.com/cover.jpg"), "https://example.com/cover.jpg");
 assert.deepEqual(sortNuvioLists(lists, "likes-desc").map((item) => item.name), ["More Comedy", "Horror Finds", "Comedy Nights"]);
+assert.equal(getSelectedListCountText(1), "1 list selected");
+assert.equal(getSelectedListCountText(3), "3 lists selected");
 assert.ok(!indexHtml.includes("id=\"preview-nuvio-json\""));
 assert.ok(!indexHtml.includes("id=\"json-preview-modal\""));
 assert.ok(!indexHtml.includes("Export preview"));
 assert.match(indexHtml, /id="nuvio-output"[^>]*readonly[^>]*aria-readonly="true"[^>]*hidden/);
+assert.match(indexHtml, /id="nuvio-close"[^>]*aria-label="Close Nuvio export"[^>]*>X</);
+assert.match(indexHtml, /<h2 id="nuvio-title">Create Nuvio JSON<\/h2>\s*<p id="nuvio-count" class="result-owner"><\/p>/);
+assert.match(indexHtml, /Collection details/);
+assert.match(indexHtml, /Hero\/backdrop image URL/);
+assert.match(indexHtml, /Folder order/);
+assert.match(indexHtml, /Sorts generated folders, not the titles inside Trakt lists\./);
+assert.match(indexHtml, /Artwork defaults/);
+assert.match(indexHtml, /Auto from list posters/);
+assert.match(indexHtml, /New collection/);
+assert.match(indexHtml, /Split into new collections/);
+assert.match(indexHtml, /Add to imported collection/);
+assert.match(indexHtml, /Choose destination per list/);
+assert.match(indexHtml, /Add selected lists to/);
 assert.match(indexHtml, /id="nuvio-existing-json"[^>]*placeholder="Paste an existing Nuvio JSON array to append into it\."/);
 assert.doesNotMatch(indexHtml, /id="nuvio-existing-json"[^>]*readonly/);
 assert.match(indexHtml, /id="nuvio-existing-file"[^>]*multiple/);
@@ -44,6 +61,9 @@ assert.match(indexHtml, /id="toggle-nuvio-paste"[^>]*>Paste JSON instead</);
 assert.match(indexHtml, /id="nuvio-paste-panel"[^>]*hidden/);
 assert.match(indexHtml, /id="nuvio-import-manage-title"[^>]*>Manage imported JSON</);
 assert.match(indexHtml, /id="open-nuvio-import-help"[^>]*aria-label="Open Nuvio import help"[^>]*>\?/);
+assert.match(nuvioUiJs, /appendMappingHeader\(listMapping, "Selected list", "Destination collection"\)/);
+assert.match(nuvioUiJs, /appendMappingHeader\(splitMapping, "Selected list", "New collection name"\)/);
+assert.match(nuvioUiJs, /Reuse the same name to group lists into one collection\./);
 
 const importedOne = createNuvioImportSource({
   id: "source-a",
@@ -134,13 +154,15 @@ assert.ok(freshPayloadStatus.messages.includes("Output contains 3 folders."));
 
 const noExistingDestinationCopy = getNuvioDestinationCopy();
 assert.equal(noExistingDestinationCopy.summary, "Create a new Nuvio collection from selected lists.");
-assert.equal(noExistingDestinationCopy.newDescription, "Add selected lists as folders in one new collection.");
+assert.equal(noExistingDestinationCopy.newDescription, "Create one new collection from the selected lists.");
+assert.equal(noExistingDestinationCopy.splitDescription, "Create separate new collections from the selected lists.");
 
 const importedDestinationCopy = getNuvioDestinationCopy({ existingCollectionCount: 2 });
 assert.equal(importedDestinationCopy.summary, "2 imported collections detected.");
-assert.equal(importedDestinationCopy.newDescription, "Keep imported collections and add selected lists as a new collection.");
-assert.equal(importedDestinationCopy.existingDescription, "Add selected lists to the chosen imported collection. Already-existing Trakt lists may be skipped.");
-assert.equal(importedDestinationCopy.mappedDescription, "Choose an imported collection for each selected list. Already-existing Trakt lists may be skipped.");
+assert.equal(importedDestinationCopy.newDescription, "Create one new collection alongside imported collections.");
+assert.equal(importedDestinationCopy.splitDescription, "Create separate new collections alongside imported collections.");
+assert.equal(importedDestinationCopy.existingDescription, "Add all selected lists to one imported collection. Existing Trakt lists may be skipped.");
+assert.equal(importedDestinationCopy.mappedDescription, "Choose an imported collection for each selected list. Existing Trakt lists may be skipped.");
 
 const mixedCommunityCollection = {
   id: "community-import",
