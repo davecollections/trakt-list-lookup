@@ -27,15 +27,21 @@ let nextId = 0;
 const createId = (prefix) => `${prefix}-${++nextId}`;
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const nuvioUiJs = readFileSync(new URL("../js/nuvio-export-ui.js", import.meta.url), "utf8");
+const headersText = readFileSync(new URL("../_headers", import.meta.url), "utf8");
+const appHeadersBlock = headersText.split(/\r?\n\r?\n/).find((block) => block.startsWith("/*"));
+const directCustomCoverUrl = "https://static.vecteezy.com/system/resources/previews/024/741/466/original/baby-elephant-clipart-vector.jpg";
 
 assert.equal(getSafeHttpsUrl("http://example.com/cover.jpg"), "");
 assert.equal(getSafeHttpsUrl("not a url"), "");
 assert.equal(getSafeHttpsUrl("https://example.com/cover.jpg"), "https://example.com/cover.jpg");
+assert.equal(normalizeNuvioImageUrl(directCustomCoverUrl), directCustomCoverUrl);
 assert.equal(normalizeNuvioImageUrl("https://example.com/cover.jpg"), "https://example.com/cover.jpg");
 assert.equal(
   normalizeNuvioImageUrl("https://github.com/davecollections/nuvio-assets/blob/main/assets/collection%20covers/based_on/Comics.jpg?raw=true"),
   "https://raw.githubusercontent.com/davecollections/nuvio-assets/main/assets/collection%20covers/based_on/Comics.jpg",
 );
+assert.ok(appHeadersBlock);
+assert.match(appHeadersBlock, /img-src 'self' data: https:;/);
 assert.deepEqual(sortNuvioLists(lists, "likes-desc").map((item) => item.name), ["More Comedy", "Horror Finds", "Comedy Nights"]);
 assert.equal(getSelectedListCountText(1), "1 list selected");
 assert.equal(getSelectedListCountText(3), "3 lists selected");
@@ -75,10 +81,13 @@ assert.match(nuvioUiJs, /body\.append\(details, actions\)/);
 assert.match(nuvioUiJs, /setFolderArtworkChoice\(input\.dataset\.folderCoverKey, FOLDER_ARTWORK_MODE_CUSTOM, input\.value\)/);
 assert.match(nuvioUiJs, /folderArtworkChoices\.clear\(\)/);
 assert.match(nuvioUiJs, /input\.select\(\)/);
+assert.match(nuvioUiJs, /setFolderArtworkPreview\(preview, previewUrl\)/);
+assert.match(nuvioUiJs, /const safeUrl = normalizeNuvioImageUrl\(url\)/);
 assert.match(nuvioUiJs, /image\.addEventListener\("error"/);
 assert.match(nuvioUiJs, /preview\.dataset\.previewRequestId/);
 assert.match(nuvioUiJs, /preview\.dataset\.previewRequestId !== previewRequestId/);
 assert.match(nuvioUiJs, /image\.referrerPolicy = "no-referrer"/);
+assert.match(nuvioUiJs, /if \(mode === FOLDER_ARTWORK_MODE_CUSTOM\) return customUrl/);
 assert.match(nuvioUiJs, /syncFolderArtworkPreviewShape/);
 assert.match(nuvioUiJs, /classList\.toggle\("is-poster", folderTileShape === "POSTER"\)/);
 assert.match(indexHtml, /New collection/);
@@ -284,12 +293,12 @@ const customCoverExport = buildNuvioExport({
   collectionName: "Custom Covers",
   coverUrl: "https://example.com/collection.jpg",
   folderImages: {
-    101: "https://example.com/custom-comedy.jpg",
+    101: directCustomCoverUrl,
     102: "https://example.com/custom-horror.jpg",
   },
   createId,
 });
-assert.equal(customCoverExport[0].folders[0].coverImageUrl, "https://example.com/custom-comedy.jpg");
+assert.equal(customCoverExport[0].folders[0].coverImageUrl, directCustomCoverUrl);
 assert.equal(customCoverExport[0].folders[1].coverImageUrl, "https://example.com/custom-horror.jpg");
 assert.equal(customCoverExport[0].folders[2].coverImageUrl, "https://example.com/collection.jpg");
 
