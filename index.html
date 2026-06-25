@@ -291,17 +291,24 @@
               <span>Existing Nuvio JSON</span>
               <small>Optional</small>
             </summary>
-            <div class="nuvio-source-fields">
-              <label>
-                Paste existing Nuvio JSON
-                <textarea id="nuvio-existing-json" rows="5" placeholder="Paste an existing Nuvio JSON array to append into it."></textarea>
-              </label>
+            <div class="nuvio-import-body">
+              <p id="nuvio-import-summary" class="nuvio-import-summary">No imported JSON</p>
+              <div class="nuvio-import-controls">
               <label class="nuvio-file-field">
                 Upload existing Nuvio JSON
-                <input id="nuvio-existing-file" type="file" accept="application/json,.json">
-                <span class="nuvio-file-button">Choose JSON file</span>
-                <small id="nuvio-file-status" class="field-status">No file selected</small>
+                  <input id="nuvio-existing-file" type="file" accept="application/json,.json" multiple>
+                  <span class="nuvio-file-button">Choose JSON files</span>
               </label>
+                <button id="manage-nuvio-imports" type="button" class="ghost-button" disabled>Manage files</button>
+                <button id="clear-nuvio-imports" type="button" class="ghost-button" hidden>Clear imported JSON</button>
+                <button id="toggle-nuvio-paste" type="button" class="ghost-button">Paste JSON instead</button>
+              </div>
+              <div id="nuvio-paste-panel" class="nuvio-paste-panel" hidden>
+                <label>
+                  Paste raw JSON
+                  <textarea id="nuvio-existing-json" rows="5" placeholder="Paste an existing Nuvio JSON array to append into it."></textarea>
+                </label>
+              </div>
             </div>
             <small id="nuvio-existing-status" class="field-status nuvio-existing-status"></small>
           </details>
@@ -365,6 +372,20 @@
             <button id="download-nuvio-json" type="button" class="ghost-button">Download JSON</button>
           </div>
         </div>
+      </section>
+    </div>
+
+    <div id="nuvio-import-manage-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-nuvio-import-manage></div>
+      <section class="modal-dialog nuvio-import-manage-dialog" role="dialog" aria-modal="true" aria-labelledby="nuvio-import-manage-title">
+        <div class="modal-header">
+          <div>
+            <p id="nuvio-import-manage-count" class="result-owner">No imported JSON</p>
+            <h2 id="nuvio-import-manage-title">Manage imported JSON</h2>
+          </div>
+          <button id="nuvio-import-manage-close" type="button" class="ghost-button">Close</button>
+        </div>
+        <div id="nuvio-import-source-list" class="nuvio-import-source-list"></div>
       </section>
     </div>
 

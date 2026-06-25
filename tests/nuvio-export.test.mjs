@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildNuvioExport, buildNuvioExportPayload, createNuvioIdFactory, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
-import { countImportedSelectedTraktListDuplicates, getNuvioDestinationCopy, getNuvioExportStatusModel } from "../js/nuvio-export-ui.js";
+import {
+  countImportedSelectedTraktListDuplicates,
+  createNuvioImportSource,
+  getNuvioDestinationCopy,
+  getNuvioExportStatusModel,
+  getNuvioImportState,
+  getNuvioImportSummary,
+  removeNuvioImportSource,
+} from "../js/nuvio-export-ui.js";
 
 const lists = [
   list("Comedy Nights", 101),
@@ -28,7 +36,55 @@ assert.ok(!indexHtml.includes("Export preview"));
 assert.match(indexHtml, /id="nuvio-output"[^>]*readonly[^>]*aria-readonly="true"[^>]*hidden/);
 assert.match(indexHtml, /id="nuvio-existing-json"[^>]*placeholder="Paste an existing Nuvio JSON array to append into it\."/);
 assert.doesNotMatch(indexHtml, /id="nuvio-existing-json"[^>]*readonly/);
+assert.match(indexHtml, /id="nuvio-existing-file"[^>]*multiple/);
+assert.match(indexHtml, /id="nuvio-import-summary"[^>]*>No imported JSON</);
+assert.match(indexHtml, /id="manage-nuvio-imports"[^>]*>Manage files</);
+assert.match(indexHtml, /id="clear-nuvio-imports"[^>]*>Clear imported JSON</);
+assert.match(indexHtml, /id="toggle-nuvio-paste"[^>]*>Paste JSON instead</);
+assert.match(indexHtml, /id="nuvio-paste-panel"[^>]*hidden/);
+assert.match(indexHtml, /id="nuvio-import-manage-title"[^>]*>Manage imported JSON</);
 assert.match(indexHtml, /id="open-nuvio-import-help"[^>]*aria-label="Open Nuvio import help"[^>]*>\?/);
+
+const importedOne = createNuvioImportSource({
+  id: "source-a",
+  key: "file:a",
+  type: "file",
+  label: "very-long-existing-nuvio-json-filename-that-should-not-appear-inline.json",
+  text: JSON.stringify([{ id: "existing-a", title: "Existing A", folders: [{ id: "folder-a", title: "Folder A", sources: [] }] }]),
+});
+const importedTwo = createNuvioImportSource({
+  id: "source-b",
+  key: "file:b",
+  type: "file",
+  label: "other.json",
+  text: JSON.stringify([
+    { id: "existing-b", title: "Existing B", folders: [{ id: "folder-b", title: "Folder B", sources: [] }] },
+    { id: "existing-c", title: "Existing C", folders: [{ id: "folder-c", title: "Folder C", sources: [] }] },
+  ]),
+});
+const importedPaste = createNuvioImportSource({
+  id: "pasted-json",
+  key: "pasted-json",
+  type: "paste",
+  label: "Pasted JSON",
+  text: JSON.stringify([{ id: "pasted", title: "Pasted", folders: [] }]),
+});
+const invalidImport = createNuvioImportSource({
+  id: "source-bad",
+  key: "file:bad",
+  type: "file",
+  label: "bad.json",
+  text: "not json",
+});
+assert.equal(getNuvioImportSummary([]), "No imported JSON");
+assert.equal(getNuvioImportState([importedOne]).message, "1 file imported · 1 collection · 1 folder");
+assert.ok(!getNuvioImportState([importedOne]).message.includes(importedOne.label));
+assert.equal(getNuvioImportState([importedOne, importedTwo]).message, "2 files imported · 3 collections · 3 folders");
+assert.equal(getNuvioImportState([importedPaste]).message, "Pasted JSON imported · 1 collection · 0 folders");
+assert.equal(getNuvioImportState([importedOne, importedPaste]).message, "2 imports added · 2 collections · 1 folder");
+assert.equal(getNuvioImportState([importedOne, invalidImport]).message, "2 files imported · 1 needs attention");
+assert.match(getNuvioImportState([importedOne, invalidImport]).error, /Remove or fix imported JSON/);
+assert.deepEqual(removeNuvioImportSource([importedOne, importedTwo], "source-a").map((source) => source.id), ["source-b"]);
 
 nextId = 0;
 const defaultNamePayload = buildNuvioExportPayload({
@@ -85,6 +141,42 @@ assert.equal(importedDestinationCopy.summary, "2 imported collections detected."
 assert.equal(importedDestinationCopy.newDescription, "Keep imported collections and add selected lists as a new collection.");
 assert.equal(importedDestinationCopy.existingDescription, "Add selected lists to the chosen imported collection. Already-existing Trakt lists may be skipped.");
 assert.equal(importedDestinationCopy.mappedDescription, "Choose an imported collection for each selected list. Already-existing Trakt lists may be skipped.");
+
+const mixedCommunityCollection = {
+  id: "community-import",
+  title: "Community Import",
+  community: true,
+  titleLogoUrl: "https://example.com/logo.png",
+  folders: [
+    {
+      id: "mixed-folder",
+      title: "Mixed Sources",
+      coverImageUrl: "https://example.com/folder.jpg",
+      sources: [
+        { provider: "tmdb", type: "DISCOVER", mediaType: "MOVIE", query: { with_genres: "878" } },
+        { provider: "trakt", mediaType: "TV", traktListId: 777 },
+      ],
+    },
+  ],
+};
+const mixedImportSource = createNuvioImportSource({
+  id: "mixed",
+  key: "file:mixed",
+  type: "file",
+  label: "mixed-community.json",
+  text: JSON.stringify([mixedCommunityCollection]),
+});
+nextId = 0;
+const mixedImportPayload = buildNuvioExportPayload({
+  lists: [list("New Trakt List", 7777)],
+  existing: getNuvioImportState([mixedImportSource]).collections,
+  mode: "new",
+  createId,
+});
+assert.equal(mixedImportPayload.collections[0].community, true);
+assert.equal(mixedImportPayload.collections[0].titleLogoUrl, "https://example.com/logo.png");
+assert.equal(mixedImportPayload.collections[0].folders[0].sources[0].provider, "tmdb");
+assert.equal(mixedImportPayload.collections[0].folders[0].sources[1].provider, "trakt");
 
 nextId = 0;
 const seriesExport = buildNuvioExport({

@@ -2,7 +2,8 @@
   width: min(860px, 100%);
 }
 
-.nuvio-help-dialog {
+.nuvio-help-dialog,
+.nuvio-import-manage-dialog {
   width: min(760px, 100%);
 }
 
@@ -274,11 +275,35 @@
   text-transform: uppercase;
 }
 
-.nuvio-source-fields {
+.nuvio-import-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.45fr);
-  gap: 10px;
+  gap: 8px;
   padding: 0 10px 10px;
+}
+
+.nuvio-import-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.nuvio-import-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.nuvio-import-controls .ghost-button,
+.nuvio-import-controls .nuvio-file-button {
+  min-height: 34px;
+}
+
+.nuvio-paste-panel {
+  display: grid;
+  gap: 6px;
 }
 
 .nuvio-existing-status {
@@ -314,6 +339,48 @@
 .nuvio-file-field:focus-within .nuvio-file-button,
 .nuvio-file-button:hover {
   border-color: color-mix(in srgb, #6366f1 46%, var(--border));
+}
+
+.nuvio-import-source-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(420px, 60vh);
+  overflow: auto;
+}
+
+.nuvio-import-source-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.nuvio-import-source-row strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nuvio-import-source-row small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.nuvio-import-source-row small.invalid {
+  color: var(--accent);
 }
 
 .nuvio-target-field {
@@ -468,9 +535,17 @@
   .nuvio-panel-heading,
   .nuvio-field-grid,
   .nuvio-option-grid,
-  .nuvio-source-fields,
   .nuvio-map-row {
     grid-template-columns: 1fr;
+  }
+
+  .nuvio-import-controls,
+  .nuvio-import-source-row {
+    grid-template-columns: 1fr;
+  }
+
+  .nuvio-import-controls {
+    display: grid;
   }
 
   .nuvio-panel-heading {
