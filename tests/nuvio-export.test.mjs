@@ -55,7 +55,8 @@ assert.match(indexHtml, /<h2 id="nuvio-title">Create Nuvio JSON<\/h2>\s*<p id="n
 assert.match(indexHtml, /Need help\? <a href="https:\/\/github\.com\/davecollections\/trakt-list-lookup#readme"[^>]*>Read the project guide<\/a>\./);
 assert.match(indexHtml, /href="https:\/\/github\.com\/davecollections\/trakt-list-lookup\/issues"[^>]*>Feedback \/ report an issue<\/a>/);
 assert.match(indexHtml, /href="https:\/\/davecollections\.github\.io\/tmdb-id-lookup\/"[^>]*>Related tool: TMDB ID Lookup<\/a>/);
-assert.match(indexHtml, /This product uses the TMDB API but is not endorsed or certified by TMDB\./);
+assert.match(indexHtml, /Find public Trakt lists and create Nuvio-compatible JSON exports\./);
+assert.match(indexHtml, /Not affiliated with Trakt, Nuvio, or TMDB\. Poster previews may use TMDB data where available; this product uses the TMDB API but is not endorsed or certified by TMDB\./);
 assert.match(indexHtml, /Collection details/);
 assert.match(indexHtml, /Hero\/backdrop image URL/);
 assert.match(indexHtml, /Folder order/);
