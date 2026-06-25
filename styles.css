@@ -772,6 +772,12 @@ a:focus-visible {
   display: none;
 }
 
+.result-counts[hidden],
+.result-likes[hidden],
+.updated-line[hidden] {
+  display: none;
+}
+
 .trakt-symbol-img {
   display: block;
   width: 20px;

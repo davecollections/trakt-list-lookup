@@ -55,6 +55,7 @@ export function createResultsView({
       const card = node.querySelector(".result-card");
       const title = result.name || "Untitled list";
       const availability = getResultAvailability(result);
+      const displayState = getResultDisplayState(result);
 
       card.id = `result-${index + 1}`;
       card.dataset.availabilityStatus = availability.status;
@@ -73,12 +74,20 @@ export function createResultsView({
       availabilityBadge.title = availability.message;
       const fullDescription = cleanDescription(result.description);
       const readMoreButton = node.querySelector(".read-more-button");
-      readMoreButton.hidden = !hasDescription(result.description);
-      readMoreButton.addEventListener("click", () => onOpenDescription(result, fullDescription));
+      readMoreButton.hidden = !displayState.showDescription;
+      if (displayState.showDescription) {
+        readMoreButton.addEventListener("click", () => onOpenDescription(result, fullDescription));
+      }
       node.querySelector(".trakt-id-button").textContent = result.ids?.trakt || "n/a";
-      node.querySelector(".items").textContent = formatNumber(result.item_count);
-      node.querySelector(".likes").textContent = formatNumber(result.like_count);
-      node.querySelector(".updated").textContent = formatDate(result.updated_at);
+      const itemCount = node.querySelector(".result-counts");
+      itemCount.hidden = !displayState.showTrustedMetadata;
+      itemCount.querySelector(".items").textContent = displayState.showTrustedMetadata ? formatNumber(result.item_count) : "";
+      const likes = node.querySelector(".result-likes");
+      likes.hidden = !displayState.showTrustedMetadata;
+      likes.querySelector(".likes").textContent = displayState.showTrustedMetadata ? formatNumber(result.like_count) : "";
+      const updated = node.querySelector(".updated-line");
+      updated.hidden = !displayState.showTrustedMetadata;
+      updated.querySelector(".updated").textContent = displayState.showTrustedMetadata ? formatDate(result.updated_at) : "";
 
       const openLink = node.querySelector(".open-link");
       const openAction = getResultOpenAction(result);
@@ -326,6 +335,17 @@ export function getResultOpenAction(result) {
   return {
     hidden: !canOpen,
     href: canOpen ? href : "",
+  };
+}
+
+export function getResultDisplayState(result) {
+  const availability = getResultAvailability(result);
+  const showTrustedMetadata = availability.status === "available";
+  return {
+    showDescription: showTrustedMetadata && hasDescription(result?.description),
+    showTrustedMetadata,
+    showTitle: true,
+    showTraktId: true,
   };
 }
 
