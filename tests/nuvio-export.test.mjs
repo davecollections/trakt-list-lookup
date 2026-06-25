@@ -46,6 +46,11 @@ assert.match(indexHtml, /Folder order/);
 assert.match(indexHtml, /Sorts generated folders, not the titles inside Trakt lists\./);
 assert.match(indexHtml, /Artwork defaults/);
 assert.match(indexHtml, /Auto from list posters/);
+assert.match(indexHtml, /id="nuvio-folder-artwork-overrides"/);
+assert.match(nuvioUiJs, /Folder artwork overrides/);
+assert.match(nuvioUiJs, /Cover image URL/);
+assert.match(nuvioUiJs, /Clear custom cover/);
+assert.match(nuvioUiJs, /folderImageOverrides\.clear\(\)/);
 assert.match(indexHtml, /New collection/);
 assert.match(indexHtml, /Split into new collections/);
 assert.match(indexHtml, /Add to imported collection/);
@@ -241,6 +246,22 @@ const imageExport = buildNuvioExport({
 assert.equal(imageExport[0].backdropImageUrl, "https://example.com/collection.jpg");
 assert.equal(imageExport[0].folders[0].coverImageUrl, "https://image.tmdb.org/t/p/w342/demo.jpg");
 assert.equal(imageExport[0].folders[1].coverImageUrl, "https://example.com/collection.jpg");
+assert.equal("id" in imageExport[0].folders[0].sources[0], false);
+
+nextId = 0;
+const customCoverExport = buildNuvioExport({
+  lists,
+  collectionName: "Custom Covers",
+  coverUrl: "https://example.com/collection.jpg",
+  folderImages: {
+    101: "https://example.com/custom-comedy.jpg",
+    102: "https://example.com/custom-horror.jpg",
+  },
+  createId,
+});
+assert.equal(customCoverExport[0].folders[0].coverImageUrl, "https://example.com/custom-comedy.jpg");
+assert.equal(customCoverExport[0].folders[1].coverImageUrl, "https://example.com/custom-horror.jpg");
+assert.equal(customCoverExport[0].folders[2].coverImageUrl, "https://example.com/collection.jpg");
 
 nextId = 0;
 const noFolderImageExport = buildNuvioExport({
@@ -286,6 +307,22 @@ assert.equal(splitExport[0].folders.length, 2);
 assert.equal(splitExport[1].folders.length, 1);
 
 nextId = 0;
+const splitArtworkExport = buildNuvioExport({
+  lists,
+  mode: "split",
+  splitAssignments: {
+    101: "Comedy",
+    102: "Horror",
+    103: "Comedy",
+  },
+  folderImages: {
+    102: "https://example.com/custom-horror.jpg",
+  },
+  createId,
+});
+assert.equal(splitArtworkExport[1].folders[0].coverImageUrl, "https://example.com/custom-horror.jpg");
+
+nextId = 0;
 const existing = [
   { id: "collection-a", title: "A", folders: [] },
   { id: "collection-b", title: "B", folders: [] },
@@ -306,6 +343,23 @@ assert.equal(mappedExport[0].folders.length, 2);
 assert.equal(mappedExport[1].folders.length, 1);
 
 nextId = 0;
+const mappedArtworkExport = buildNuvioExport({
+  lists,
+  existing,
+  mode: "mapped",
+  mappedAssignments: {
+    101: "collection-a",
+    102: "collection-b",
+    103: "collection-a",
+  },
+  folderImages: {
+    102: "https://example.com/custom-horror.jpg",
+  },
+  createId,
+});
+assert.equal(mappedArtworkExport[1].folders[0].coverImageUrl, "https://example.com/custom-horror.jpg");
+
+nextId = 0;
 const existingWithDuplicate = [
   {
     id: "collection-a",
@@ -314,6 +368,7 @@ const existingWithDuplicate = [
       {
         id: "existing-folder",
         title: "Already Added",
+        coverImageUrl: "https://example.com/existing-artwork.jpg",
         sources: [
           {
             provider: "trakt",
@@ -330,10 +385,16 @@ const duplicateSafeExport = buildNuvioExport({
   existing: existingWithDuplicate,
   mode: "existing",
   targetCollectionKey: "collection-a",
+  folderImages: {
+    101: "https://example.com/should-not-overwrite.jpg",
+    102: "https://example.com/new-horror.jpg",
+  },
   createId,
 });
 assert.equal(duplicateSafeExport[0].folders.length, 2);
 assert.deepEqual(duplicateSafeExport[0].folders.map((folder) => folder.title), ["Already Added", "Horror Finds"]);
+assert.equal(duplicateSafeExport[0].folders[0].coverImageUrl, "https://example.com/existing-artwork.jpg");
+assert.equal(duplicateSafeExport[0].folders[1].coverImageUrl, "https://example.com/new-horror.jpg");
 
 nextId = 0;
 const duplicateSafePayload = buildNuvioExportPayload({
