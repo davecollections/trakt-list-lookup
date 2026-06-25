@@ -17,6 +17,7 @@ try {
   await testPopularUnavailableSuspiciousResult();
   await testKeywordSuspiciousLikes404Validation();
   await testSuspiciousDetailSuccessRepairsResult();
+  await testSuspiciousDetailSuccessItems404Unavailable();
   await testNon404AvailabilityFailureIsUnverified();
   await testSortedQuickUsersUseEnrichedLikeCounts();
   await testQuickUsersFromSampledPages();
@@ -262,7 +263,7 @@ async function testPopularUnavailableSuspiciousResult() {
   assert.equal(body.results[0].availabilityMessage, "Unavailable or not public");
   assert.equal(body.results[0].url, "");
   assert.deepEqual(body.quickUsers, []);
-  assert.ok(calls.some((call) => call.url.pathname === "/lists/805686"));
+  assert.ok(!calls.some((call) => call.url.pathname === "/lists/805686"));
 }
 
 async function testKeywordSuspiciousLikes404Validation() {
@@ -299,7 +300,8 @@ async function testKeywordSuspiciousLikes404Validation() {
   assert.deepEqual(body.results.map((result) => result.ids.trakt), [3469590, 825398, 3339599]);
   assert.deepEqual(body.results.map((result) => result.availabilityStatus), ["unavailable", "unavailable", "unavailable"]);
   assert.deepEqual(body.results.map((result) => result.isExportable), [false, false, false]);
-  assert.equal(calls.filter((call) => suspiciousIds.has(Number(call.url.pathname.replace("/lists/", "")))).length, 3);
+  assert.equal(calls.filter((call) => [...suspiciousIds].some((id) => isListLikesPath(call.url, id))).length, 3);
+  assert.equal(calls.filter((call) => suspiciousIds.has(Number(call.url.pathname.replace("/lists/", "")))).length, 0);
 }
 
 async function testSuspiciousDetailSuccessRepairsResult() {
@@ -316,7 +318,7 @@ async function testSuspiciousDetailSuccessRepairsResult() {
       }], paginationHeaders(1, 1));
     }
     if (isListLikesPath(url, 825398)) {
-      return jsonErrorResponse(404);
+      return jsonResponse([], paginationHeaders(12, 1, 1));
     }
     if (url.pathname === "/lists/825398") {
       return jsonResponse(list({
@@ -327,6 +329,9 @@ async function testSuspiciousDetailSuccessRepairsResult() {
         likes: 12,
         items: 44,
       }));
+    }
+    if (url.pathname === "/users/public_owner/lists/repaired-list/items") {
+      return jsonResponse([], paginationHeaders(44, 1, 1));
     }
     throw new Error(`Unexpected path ${url.pathname}`);
   });
@@ -344,6 +349,50 @@ async function testSuspiciousDetailSuccessRepairsResult() {
   assert.equal(body.results[0].isExportable, true);
 }
 
+async function testSuspiciousDetailSuccessItems404Unavailable() {
+  mockFetch(({ url }) => {
+    if (url.pathname === "/lists/popular") {
+      return jsonResponse([{
+        name: "Apocalyptic and Post-Apocalyptic Movies",
+        ids: {
+          trakt: 825398,
+        },
+        user: {
+          username: "unknown",
+        },
+      }], paginationHeaders(1, 1));
+    }
+    if (isListLikesPath(url, 825398)) {
+      return jsonResponse([], paginationHeaders(12, 1, 1));
+    }
+    if (url.pathname === "/lists/825398") {
+      return jsonResponse(list({
+        name: "Apocalyptic and Post-Apocalyptic Movies",
+        slug: "apocalyptic-and-post-apocalyptic-movies",
+        username: "Trakt",
+        trakt: 825398,
+        likes: 12,
+        items: 44,
+      }));
+    }
+    if (url.pathname === "/users/Trakt/lists/apocalyptic-and-post-apocalyptic-movies/items") {
+      return jsonErrorResponse(404);
+    }
+    throw new Error(`Unexpected path ${url.pathname}`);
+  });
+
+  const response = await callHandler("https://example.test/api/trakt?mode=popular", env());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.results[0].ids.trakt, 825398);
+  assert.equal(body.results[0].user.username, "Trakt");
+  assert.equal(body.results[0].availabilityStatus, "unavailable");
+  assert.equal(body.results[0].isAvailable, false);
+  assert.equal(body.results[0].isExportable, false);
+  assert.equal(body.results[0].availabilityMessage, "Unavailable or not public");
+}
+
 async function testNon404AvailabilityFailureIsUnverified() {
   const response = await withMutedConsole(async () => {
     mockFetch(({ url }) => {
@@ -359,7 +408,7 @@ async function testNon404AvailabilityFailureIsUnverified() {
         }], paginationHeaders(1, 1));
       }
       if (isListLikesPath(url, 3339599)) {
-        return jsonErrorResponse(404);
+        return jsonResponse([], paginationHeaders(2, 1, 1));
       }
       if (url.pathname === "/lists/3339599") {
         return new Response(JSON.stringify({ error: "Busy" }), {
@@ -593,12 +642,7 @@ async function testResolveNumericListIdFromSearch() {
         }));
       }
       if (isListLikesPath(url, 33753562)) {
-        return new Response(JSON.stringify({ error: "Not found" }), {
-          status: 404,
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-          },
-        });
+        return jsonResponse([], paginationHeaders(9, 1, 1));
       }
       throw new Error(`Unexpected path ${url.pathname}`);
     });

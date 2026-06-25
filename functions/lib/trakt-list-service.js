@@ -32,6 +32,7 @@ const QUICK_USER_SAMPLE_LIMIT = 250;
 const QUICK_USER_FETCH_LIMIT = 50;
 const QUICK_USER_LIMIT = 6;
 const AVAILABILITY_VALIDATION_CONCURRENCY = 4;
+const AVAILABILITY_ITEM_LIMIT = 1;
 const CURATED_USER_FALLBACKS = ["snoak", "extreme_one"];
 
 export async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
@@ -180,6 +181,10 @@ export async function validateListAvailability(lists, clientId) {
       return withListAvailability(list, "unavailable", "Unavailable or not public");
     }
 
+    if (list._availabilitySignals?.likesNotFound) {
+      return withListAvailability(list, "unavailable", "Unavailable or not public");
+    }
+
     if (!shouldValidateListAvailability(list)) {
       return list.availabilityStatus ? list : withListAvailability(list, "available");
     }
@@ -189,6 +194,11 @@ export async function validateListAvailability(lists, clientId) {
       const merged = mergeListDetail(list, detail.data);
       if (isNonPublicList(merged)) {
         return withListAvailability(merged, "unavailable", "Unavailable or not public");
+      }
+
+      const itemsAvailability = await verifyListItemsAvailability(merged, clientId);
+      if (itemsAvailability.status !== "available") {
+        return withListAvailability(merged, itemsAvailability.status, itemsAvailability.message);
       }
       return withListAvailability(merged, "available");
     } catch (error) {
@@ -408,6 +418,48 @@ async function getFilteredUserLists(username, filter, clientId) {
 function fetchListDetailById(id, clientId, { quietNotFound = false } = {}) {
   const quietStatuses = quietNotFound ? [404] : [];
   return traktFetch(`/lists/${encodeURIComponent(id)}?extended=full`, clientId, { quietStatuses });
+}
+
+async function verifyListItemsAvailability(list, clientId) {
+  const username = list?.user?.username || list?.user?.ids?.slug || "";
+  const slug = list?.ids?.slug || "";
+  if (!username || isUnknownOwner(username) || !slug || !isSafePathSegment(username) || !isSafePathSegment(slug)) {
+    return {
+      status: "unverified",
+      message: "Could not verify public status",
+    };
+  }
+
+  const params = new URLSearchParams({
+    page: "1",
+    limit: String(AVAILABILITY_ITEM_LIMIT),
+    extended: "full",
+  });
+
+  try {
+    await traktFetch(`/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}/items?${params.toString()}`, clientId, { quietStatuses: [404] });
+    return {
+      status: "available",
+      message: "",
+    };
+  } catch (error) {
+    if (error.status === 404) {
+      return {
+        status: "unavailable",
+        message: "Unavailable or not public",
+      };
+    }
+
+    console.warn("Could not verify Trakt list items", {
+      id: list?.ids?.trakt,
+      status: error.status,
+      message: error.message,
+    });
+    return {
+      status: "unverified",
+      message: "Could not verify public status",
+    };
+  }
 }
 
 function mergeListDetail(list, detail) {
