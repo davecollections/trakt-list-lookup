@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { buildNuvioExport, buildNuvioExportPayload, createNuvioIdFactory, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
-import { getNuvioExportStatusModel } from "../js/nuvio-export-ui.js";
+import { countImportedSelectedTraktListDuplicates, getNuvioExportStatusModel } from "../js/nuvio-export-ui.js";
 
 const lists = [
   list("Comedy Nights", 101),
@@ -201,6 +201,58 @@ const duplicateSafeStatus = getNuvioExportStatusModel(duplicateSafePayload);
 assert.equal(duplicateSafeStatus.title, "Export ready with warnings");
 assert.equal(duplicateSafeStatus.tone, "warning");
 assert.ok(duplicateSafeStatus.messages.includes("Already-existing Trakt list skipped: 1 selected list already exists or would duplicate existing output."));
+
+nextId = 0;
+const existingWithTwoDuplicateTraktLists = [
+  {
+    id: "collection-a",
+    title: "A",
+    folders: [
+      {
+        id: "existing-folder-a",
+        title: "Already Added A",
+        sources: [
+          {
+            provider: "trakt",
+            mediaType: "MOVIE",
+            traktListId: 101,
+          },
+        ],
+      },
+      {
+        id: "existing-folder-b",
+        title: "Already Added B",
+        sources: [
+          {
+            provider: "trakt",
+            mediaType: "MOVIE",
+            traktListId: 102,
+          },
+        ],
+      },
+    ],
+  },
+];
+nextId = 0;
+const newCollectionWithImportedDuplicatesPayload = buildNuvioExportPayload({
+  lists: [list("Comedy Nights", 101), list("Horror Finds", 102)],
+  existing: existingWithTwoDuplicateTraktLists,
+  mode: "new",
+  createId,
+});
+const importedDuplicateCount = countImportedSelectedTraktListDuplicates(existingWithTwoDuplicateTraktLists, [
+  list("Comedy Nights", 101),
+  list("Horror Finds", 102),
+]);
+assert.equal(importedDuplicateCount, 2);
+assert.equal(newCollectionWithImportedDuplicatesPayload.report.duplicateSourceFolderCount, 0);
+assert.equal(newCollectionWithImportedDuplicatesPayload.collections.length, 2);
+const importedDuplicateStatus = getNuvioExportStatusModel(newCollectionWithImportedDuplicatesPayload, {
+  importedDuplicateListCount: importedDuplicateCount,
+});
+assert.equal(importedDuplicateStatus.title, "Export ready with warnings");
+assert.ok(importedDuplicateStatus.messages.includes("2 selected Trakt lists already exist in the imported JSON and will be added again in the new collection."));
+assert.ok(!importedDuplicateStatus.messages.some((message) => message.includes("skipped")));
 
 nextId = 0;
 const duplicateSafeMappedExport = buildNuvioExport({

@@ -251,7 +251,7 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function renderExportStatus(payload) {
-    const status = getNuvioExportStatusModel(payload);
+    const status = getNuvioExportStatusModel(payload, getExportStatusContext());
     exportStatus.classList.toggle("is-warning", status.tone === "warning");
     exportStatus.classList.toggle("is-error", status.tone === "error");
     exportStatus.classList.toggle("is-success", status.tone === "success");
@@ -263,6 +263,13 @@ export function createNuvioExportUi({ selection }) {
       item.textContent = message;
       exportStatusList.append(item);
     }
+  }
+
+  function getExportStatusContext() {
+    if (getMergeMode() !== "new") return {};
+    return {
+      importedDuplicateListCount: countImportedSelectedTraktListDuplicates(getExistingCollections(), getSelectedListsForExport()),
+    };
   }
 
   function getLatestPayload() {
@@ -604,7 +611,7 @@ function flashButton(button) {
   }, 900);
 }
 
-export function getNuvioExportStatusModel(payload) {
+export function getNuvioExportStatusModel(payload, context = {}) {
   if (!payload) {
     return {
       tone: "error",
@@ -615,8 +622,10 @@ export function getNuvioExportStatusModel(payload) {
 
   const report = payload.report || {};
   const messages = [];
+  const importedDuplicateListCount = Number(context.importedDuplicateListCount) || 0;
   const hasWarnings = Boolean(
-    report.duplicateSourceFolderCount
+    importedDuplicateListCount
+      || report.duplicateSourceFolderCount
       || report.skippedUnavailableListCount
       || report.idFixCount
       || report.warningCount,
@@ -626,6 +635,10 @@ export function getNuvioExportStatusModel(payload) {
   messages.push(hasExportableFolders
     ? `Output contains ${formatCount(report.folderCount, "folder", "folders")}.`
     : "No exportable folders will be included.");
+
+  if (importedDuplicateListCount) {
+    messages.push(formatImportedDuplicateListWarning(importedDuplicateListCount));
+  }
 
   if (report.duplicateSourceFolderCount) {
     messages.push(`${formatStatusLabel(report.duplicateSourceFolderCount, "Already-existing Trakt list skipped", "Already-existing Trakt lists skipped")}: ${formatCount(report.duplicateSourceFolderCount, "selected list already exists", "selected lists already exist")} or would duplicate existing output.`);
@@ -665,4 +678,49 @@ function formatCount(count, singular, plural) {
 
 function formatStatusLabel(count, singular, plural) {
   return Number(count) === 1 ? singular : plural;
+}
+
+function formatImportedDuplicateListWarning(count) {
+  const value = Number(count) || 0;
+  return value === 1
+    ? "1 selected Trakt list already exists in the imported JSON and will be added again in the new collection."
+    : `${formatNumber(value)} selected Trakt lists already exist in the imported JSON and will be added again in the new collection.`;
+}
+
+export function countImportedSelectedTraktListDuplicates(collections, selectedLists) {
+  const importedIds = getImportedTraktListIds(collections);
+  const countedIds = new Set();
+  let count = 0;
+
+  for (const list of selectedLists || []) {
+    const id = getNormalizedTraktListId(list?.ids?.trakt);
+    if (!id || countedIds.has(id) || !importedIds.has(id)) continue;
+    countedIds.add(id);
+    count += 1;
+  }
+
+  return count;
+}
+
+function getImportedTraktListIds(collections) {
+  const ids = new Set();
+
+  for (const collection of collections || []) {
+    const folders = Array.isArray(collection?.folders) ? collection.folders : [];
+    for (const folder of folders) {
+      const sources = Array.isArray(folder?.sources) ? folder.sources : [];
+      for (const source of sources) {
+        if (source?.provider !== "trakt") continue;
+        const id = getNormalizedTraktListId(source.traktListId);
+        if (id) ids.add(id);
+      }
+    }
+  }
+
+  return ids;
+}
+
+function getNormalizedTraktListId(value) {
+  const id = Number(value);
+  return Number.isFinite(id) && id > 0 ? String(id) : "";
 }
