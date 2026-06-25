@@ -44,6 +44,8 @@ assert.equal(
 );
 assert.ok(appHeadersBlock);
 assert.match(appHeadersBlock, /img-src 'self' data: https:;/);
+assert.match(appHeadersBlock, /script-src 'self' https:\/\/gc\.zgo\.at;/);
+assert.match(appHeadersBlock, /connect-src 'self' https:\/\/trakt-list-lookup\.goatcounter\.com;/);
 assert.doesNotMatch(robotsText, /Disallow:\s*\/\s*$/m);
 assert.match(robotsText, /Allow:\s*\/\s*$/m);
 assert.match(robotsText, /Sitemap: https:\/\/trakt-list-lookup\.pages\.dev\/sitemap\.xml/);
@@ -60,6 +62,7 @@ assert.match(indexHtml, /id="reset-nuvio-export"[^>]*title="Clears export settin
 assert.match(indexHtml, /<meta name="description" content="Find public Trakt lists and create Nuvio-compatible JSON exports\.">/);
 assert.match(indexHtml, /<meta name="robots" content="index, follow">/);
 assert.match(indexHtml, /<link rel="canonical" href="https:\/\/trakt-list-lookup\.pages\.dev\/">/);
+assert.match(indexHtml, /<script data-goatcounter="https:\/\/trakt-list-lookup\.goatcounter\.com\/count" async src="https:\/\/gc\.zgo\.at\/count\.js"><\/script>/);
 assert.match(indexHtml, /<h2 id="nuvio-title">Create Nuvio JSON<\/h2>\s*<p id="nuvio-count" class="result-owner"><\/p>/);
 assert.match(indexHtml, /Need help\? <a href="https:\/\/github\.com\/davecollections\/trakt-list-lookup#readme"[^>]*>Read the project guide<\/a>\./);
 assert.match(indexHtml, /href="https:\/\/github\.com\/davecollections\/trakt-list-lookup\/issues"[^>]*>Feedback \/ report an issue<\/a>/);
