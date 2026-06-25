@@ -52,9 +52,9 @@ const resultsView = createResultsView({
 });
 
 const placeholders = {
-  search: "Search public lists by title or description",
+  search: "Search public lists by title, description, or Trakt list ID",
   user: "Enter a username, or username plus keywords",
-  url: "Paste a Trakt list URL",
+  url: "Paste a Trakt list URL or numeric list ID",
   popular: "No search text needed",
   trending: "No search text needed",
 };
@@ -141,7 +141,7 @@ form.addEventListener("submit", async (event) => {
   const mode = getMode();
   const query = queryInput.value.trim();
   if (!query && !isDiscoveryMode(mode)) {
-    setStatus("Enter a keyword, username, or Trakt list URL.", true);
+    setStatus("Enter a keyword, username, Trakt list ID, or Trakt list URL.", true);
     queryInput.focus();
     return;
   }

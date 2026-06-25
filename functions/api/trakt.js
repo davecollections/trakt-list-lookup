@@ -6,6 +6,7 @@ import {
   normalizeListItem,
   normalizeSort,
   normalizeSortOrder,
+  parseTraktListId,
 } from "../lib/trakt-api-helpers.js";
 import { getPublicErrorMessage, json } from "../lib/http-response.js";
 import { checkRateLimit } from "../lib/rate-limit.js";
@@ -15,6 +16,7 @@ import {
   getQuickUsersForPayload,
   getSortedLists,
   getUserLists,
+  resolveListId,
   resolveListUrl,
   searchLists,
 } from "../lib/trakt-list-service.js";
@@ -79,8 +81,11 @@ export async function onRequestGet({ request, env }) {
       return json({ error: `Search query is too long. Keep it under ${MAX_QUERY_LENGTH} characters.` }, 400);
     }
 
+    const directListId = getDirectListId(mode, query);
     let payload;
-    if (sort && mode !== "url") {
+    if (directListId) {
+      payload = await resolveListId(directListId, clientId);
+    } else if (sort && mode !== "url") {
       payload = await getSortedLists(mode, query, page, resultLimit, sort, order, clientId);
     } else if (mode === "search") {
       payload = await searchLists(query, page, resultLimit, clientId);
@@ -94,10 +99,10 @@ export async function onRequestGet({ request, env }) {
       return json({ error: "Unsupported search mode." }, 400);
     }
 
-    const lists = sort && mode !== "url"
+    const lists = sort && mode !== "url" && !directListId
       ? payload.data
       : await enrichListsWithLikeCounts(payload.data, clientId);
-    const quickUsersPayload = mode === "url"
+    const quickUsersPayload = mode === "url" || directListId
       ? { ...payload, quickUserLists: lists }
       : payload;
     const quickUsers = await getQuickUsers(mode, query, quickUsersPayload, clientId);
@@ -117,6 +122,11 @@ export async function onRequestGet({ request, env }) {
 
 function isGlobalListMode(mode) {
   return mode === "popular" || mode === "trending";
+}
+
+function getDirectListId(mode, query) {
+  if (mode !== "search" && mode !== "url") return "";
+  return parseTraktListId(query);
 }
 
 function shouldIncludePosters(url) {
