@@ -652,7 +652,7 @@ export function createNuvioExportUi({ selection }) {
     const mode = choice.mode;
     const defaultUrl = row.dataset.defaultCoverUrl || "";
     const defaultSource = row.dataset.defaultCoverSource || "none";
-    const customUrl = choice.url || defaultUrl;
+    const customUrl = mode === FOLDER_ARTWORK_MODE_CUSTOM ? choice.url : choice.url || defaultUrl;
     const status = row.querySelector("[data-folder-artwork-status]");
     const clearButton = row.querySelector("[data-clear-folder-cover]");
     const preview = row.querySelector("[data-folder-artwork-preview]");
@@ -682,6 +682,8 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function setFolderArtworkPreview(preview, url) {
+    const previewRequestId = String((Number(preview.dataset.previewRequestId) || 0) + 1);
+    preview.dataset.previewRequestId = previewRequestId;
     preview.textContent = "";
     const safeUrl = normalizeNuvioImageUrl(url);
     if (!safeUrl) {
@@ -690,14 +692,16 @@ export function createNuvioExportUi({ selection }) {
     }
 
     const image = document.createElement("img");
-    image.src = safeUrl;
     image.alt = "";
     image.loading = "lazy";
     image.referrerPolicy = "no-referrer";
+    image.decoding = "async";
     image.addEventListener("error", () => {
+      if (preview.dataset.previewRequestId !== previewRequestId) return;
       preview.textContent = "";
       appendFolderArtworkPlaceholder(preview);
     }, { once: true });
+    image.src = safeUrl;
     preview.append(image);
   }
 

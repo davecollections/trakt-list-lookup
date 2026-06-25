@@ -72,6 +72,9 @@ assert.match(nuvioUiJs, /setFolderArtworkChoice\(input\.dataset\.folderCoverKey,
 assert.match(nuvioUiJs, /folderArtworkChoices\.clear\(\)/);
 assert.match(nuvioUiJs, /input\.select\(\)/);
 assert.match(nuvioUiJs, /image\.addEventListener\("error"/);
+assert.match(nuvioUiJs, /preview\.dataset\.previewRequestId/);
+assert.match(nuvioUiJs, /preview\.dataset\.previewRequestId !== previewRequestId/);
+assert.match(nuvioUiJs, /image\.referrerPolicy = "no-referrer"/);
 assert.match(nuvioUiJs, /syncFolderArtworkPreviewShape/);
 assert.match(nuvioUiJs, /classList\.toggle\("is-poster", folderTileShape === "POSTER"\)/);
 assert.match(indexHtml, /New collection/);
