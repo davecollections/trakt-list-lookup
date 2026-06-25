@@ -237,8 +237,8 @@
       <section class="modal-dialog nuvio-dialog" role="dialog" aria-modal="true" aria-labelledby="nuvio-title">
         <div class="modal-header">
           <div>
-            <p id="nuvio-count" class="result-owner"></p>
             <h2 id="nuvio-title">Create Nuvio JSON</h2>
+            <p id="nuvio-count" class="result-owner"></p>
           </div>
           <div class="nuvio-header-actions">
             <button id="reset-nuvio-export" type="button" class="ghost-button">Reset export form</button>
@@ -255,6 +255,7 @@
               <label>
                 Collection name
                 <input id="nuvio-collection-name" type="text" placeholder="My Collection">
+                <small class="field-status" aria-hidden="true"></small>
               </label>
               <label>
                 Hero/backdrop image URL
@@ -330,14 +331,14 @@
                 <input type="radio" name="nuvio-merge-mode" value="new" checked>
                 <span>
                   <strong>New collection</strong>
-                  <small id="nuvio-new-mode-description">Selected lists become one new collection.</small>
+                  <small id="nuvio-new-mode-description">Create one new collection from the selected lists.</small>
                 </span>
               </label>
               <label class="radio-label split-option">
                 <input type="radio" name="nuvio-merge-mode" value="split">
                 <span>
                   <strong>Split into new collections</strong>
-                  <small id="nuvio-split-mode-description">Group selected lists into named new collections.</small>
+                  <small id="nuvio-split-mode-description">Create separate new collections from the selected lists.</small>
                 </span>
               </label>
               <label class="radio-label existing-json-option">

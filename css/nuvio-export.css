@@ -41,23 +41,24 @@
 
 .nuvio-help-button,
 .modal-actions .nuvio-help-button {
-  width: 30px;
-  min-width: 30px;
-  min-height: 30px;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.86rem;
+  background: color-mix(in srgb, #6366f1 8%, var(--panel));
+  color: color-mix(in srgb, #6366f1 58%, var(--muted));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #6366f1 8%, transparent);
+  font-size: 0.92rem;
   font-weight: 900;
   line-height: 1;
 }
 
 .nuvio-help-button:hover,
 .modal-actions .nuvio-help-button:hover {
-  border-color: color-mix(in srgb, #6366f1 36%, var(--border));
-  background: color-mix(in srgb, #6366f1 7%, transparent);
+  border-color: color-mix(in srgb, #6366f1 50%, var(--border));
+  background: color-mix(in srgb, #6366f1 13%, var(--panel));
   color: var(--text);
 }
 
@@ -109,8 +110,10 @@
   gap: 10px;
   align-items: baseline;
   justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 9px 11px;
+  border-bottom: 1px solid color-mix(in srgb, #6366f1 18%, var(--border));
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, #6366f1 7%, transparent);
 }
 
 .nuvio-panel-heading h3 {
@@ -133,6 +136,11 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(190px, 0.75fr);
   gap: 9px;
   padding: 10px;
+}
+
+.nuvio-field-grid label {
+  grid-template-rows: auto minmax(34px, auto) minmax(13px, auto);
+  align-content: start;
 }
 
 .nuvio-artwork-grid {
@@ -285,7 +293,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 9px 11px;
+  border-bottom: 1px solid color-mix(in srgb, #6366f1 18%, var(--border));
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, #6366f1 7%, transparent);
   cursor: pointer;
   color: var(--text);
   font-size: 0.82rem;
@@ -315,8 +326,8 @@
 .nuvio-import-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-end;
+  gap: 6px;
+  align-items: center;
 }
 
 .nuvio-import-controls .ghost-button,
@@ -479,6 +490,15 @@
   text-transform: uppercase;
 }
 
+.nuvio-map-help {
+  margin: 0;
+  padding: 0 8px 2px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .nuvio-map-row {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
   align-items: center;
@@ -486,6 +506,13 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.nuvio-map-row input,
+.nuvio-map-row select {
+  border-color: color-mix(in srgb, #6366f1 24%, var(--border));
+  background: color-mix(in srgb, #6366f1 6%, var(--panel));
+  font-weight: 750;
 }
 
 .nuvio-map-row span {

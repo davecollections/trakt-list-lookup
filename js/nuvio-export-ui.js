@@ -572,6 +572,10 @@ export function createNuvioExportUi({ selection }) {
     }
 
     splitMapping.textContent = "";
+    const help = document.createElement("p");
+    help.className = "nuvio-map-help";
+    help.textContent = "Reuse the same name to group lists into one collection.";
+    splitMapping.append(help);
     appendMappingHeader(splitMapping, "Selected list", "New collection name");
     getSelectedListsForExport().forEach((result) => {
       const row = document.createElement("label");
@@ -913,11 +917,11 @@ export function getNuvioDestinationCopy({ existingCollectionCount = 0 } = {}) {
       ? `${formatCount(count, "imported collection", "imported collections")} detected.`
       : "Create a new Nuvio collection from selected lists.",
     newDescription: hasExistingJson
-      ? "Keep imported collections and add selected lists beside them."
-      : "Selected lists become one new collection.",
+      ? "Create one new collection alongside imported collections."
+      : "Create one new collection from the selected lists.",
     splitDescription: hasExistingJson
-      ? "Keep imported collections and add grouped lists beside them."
-      : "Group selected lists into named new collections.",
+      ? "Create separate new collections alongside imported collections."
+      : "Create separate new collections from the selected lists.",
     existingDescription: "Add selected lists to one imported collection. Existing Trakt lists may be skipped.",
     mappedDescription: "Choose an imported collection for each selected list. Existing Trakt lists may be skipped.",
   };
