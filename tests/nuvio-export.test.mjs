@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildNuvioExport, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
+import { buildNuvioExport, buildNuvioExportPayload, createNuvioIdFactory, getSafeHttpsUrl, sortNuvioLists } from "../js/nuvio-export.js";
 
 const lists = [
   list("Comedy Nights", 101),
@@ -33,6 +33,19 @@ assert.equal(freshExport[0].folders.length, 3);
 assert.equal(freshExport[0].folders[0].sources[0].provider, "trakt");
 assert.equal(freshExport[0].backdropImageUrl, "https://example.com/cover.jpg");
 assert.equal(freshExport[0].folders[0].sources[0].mediaType, "MOVIE");
+
+nextId = 0;
+const freshPayload = buildNuvioExportPayload({
+  lists,
+  collectionName: "Trakt Picks",
+  createId,
+});
+assert.ok(freshPayload.json.endsWith("\n"));
+assert.deepEqual(JSON.parse(freshPayload.json), freshPayload.collections);
+assert.equal(freshPayload.report.collectionCount, 1);
+assert.equal(freshPayload.report.folderCount, 3);
+assert.equal(freshPayload.report.idFixCount, 0);
+assert.equal(freshPayload.report.warningCount, 0);
 
 nextId = 0;
 const seriesExport = buildNuvioExport({
@@ -170,6 +183,17 @@ assert.equal(duplicateSafeExport[0].folders.length, 2);
 assert.deepEqual(duplicateSafeExport[0].folders.map((folder) => folder.title), ["Already Added", "Horror Finds"]);
 
 nextId = 0;
+const duplicateSafePayload = buildNuvioExportPayload({
+  lists: [list("Comedy Nights", 101), list("Horror Finds", 102)],
+  existing: existingWithDuplicate,
+  mode: "existing",
+  targetCollectionKey: "collection-a",
+  createId,
+});
+assert.equal(duplicateSafePayload.collections[0].folders.length, 2);
+assert.equal(duplicateSafePayload.report.duplicateSourceFolderCount, 1);
+
+nextId = 0;
 const duplicateSafeMappedExport = buildNuvioExport({
   lists,
   existing: [
@@ -187,6 +211,71 @@ const duplicateSafeMappedExport = buildNuvioExport({
 assert.deepEqual(duplicateSafeMappedExport[0].folders.map((folder) => folder.title), ["Already Added", "More Comedy"]);
 assert.deepEqual(duplicateSafeMappedExport[1].folders.map((folder) => folder.title), ["Horror Finds"]);
 
+const collidingFactory = createNuvioIdFactory([], (prefix) => `${prefix}-same`);
+const collidingIds = [
+  collidingFactory.create("collection"),
+  collidingFactory.create("folder"),
+  collidingFactory.create("folder"),
+  collidingFactory.create("folder"),
+];
+assert.equal(new Set(collidingIds).size, collidingIds.length);
+
+const collidingPayload = buildNuvioExportPayload({
+  lists: [list("Comedy Nights", 101), list("Horror Finds", 102)],
+  createId: (prefix) => `${prefix}-same`,
+});
+assert.equal(new Set(getOutputIds(collidingPayload.collections)).size, getOutputIds(collidingPayload.collections).length);
+
+nextId = 0;
+const existingWithBadIds = [
+  {
+    id: "keep-collection",
+    title: "Keep",
+    folders: [
+      { id: "keep-folder", title: "Keep Folder", sources: [] },
+      { id: "keep-folder", title: "Duplicate Folder", sources: [] },
+      { title: "Missing Folder", sources: [] },
+    ],
+  },
+  {
+    id: "keep-collection",
+    title: "Duplicate Collection",
+    folders: [],
+  },
+  {
+    title: "Missing Collection",
+    folders: [],
+  },
+];
+const originalBadIdsJson = JSON.stringify(existingWithBadIds);
+const repairedPayload = buildNuvioExportPayload({
+  lists: [],
+  existing: existingWithBadIds,
+  mode: "split",
+  createId,
+});
+assert.equal(JSON.stringify(existingWithBadIds), originalBadIdsJson);
+assert.equal(repairedPayload.collections[0].id, "keep-collection");
+assert.equal(repairedPayload.collections[0].folders[0].id, "keep-folder");
+assert.notEqual(repairedPayload.collections[0].folders[1].id, "keep-folder");
+assert.ok(repairedPayload.collections[0].folders[2].id);
+assert.notEqual(repairedPayload.collections[1].id, "keep-collection");
+assert.ok(repairedPayload.collections[2].id);
+assert.equal(new Set(getOutputIds(repairedPayload.collections)).size, getOutputIds(repairedPayload.collections).length);
+assert.equal(repairedPayload.report.duplicateCollectionIdsFixed, 1);
+assert.equal(repairedPayload.report.missingCollectionIdsFixed, 1);
+assert.equal(repairedPayload.report.duplicateFolderIdsFixed, 1);
+assert.equal(repairedPayload.report.missingFolderIdsFixed, 1);
+assert.equal(repairedPayload.report.idFixCount, 4);
+assert.ok(repairedPayload.report.warningCount > 0);
+
+nextId = 0;
+const warningPayload = buildNuvioExportPayload({
+  lists: [{ name: "Missing Trakt ID", ids: {}, user: { username: "demo" } }],
+  createId,
+});
+assert.ok(warningPayload.report.warnings.includes("Trakt source missing list ID."));
+
 function list(name, traktId) {
   return {
     name,
@@ -201,4 +290,15 @@ function list(name, traktId) {
       username: "demo",
     },
   };
+}
+
+function getOutputIds(collections) {
+  const ids = [];
+  for (const collection of collections) {
+    ids.push(collection.id);
+    for (const folder of collection.folders || []) {
+      ids.push(folder.id);
+    }
+  }
+  return ids;
 }
