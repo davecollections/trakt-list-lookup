@@ -922,7 +922,7 @@ export function getNuvioDestinationCopy({ existingCollectionCount = 0 } = {}) {
     splitDescription: hasExistingJson
       ? "Create separate new collections alongside imported collections."
       : "Create separate new collections from the selected lists.",
-    existingDescription: "Add selected lists to one imported collection. Existing Trakt lists may be skipped.",
+    existingDescription: "Add all selected lists to one imported collection. Existing Trakt lists may be skipped.",
     mappedDescription: "Choose an imported collection for each selected list. Existing Trakt lists may be skipped.",
   };
 }

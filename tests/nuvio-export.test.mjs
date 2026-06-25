@@ -50,7 +50,7 @@ assert.match(indexHtml, /New collection/);
 assert.match(indexHtml, /Split into new collections/);
 assert.match(indexHtml, /Add to imported collection/);
 assert.match(indexHtml, /Choose destination per list/);
-assert.match(indexHtml, /Choose imported collection/);
+assert.match(indexHtml, /Add selected lists to/);
 assert.match(indexHtml, /id="nuvio-existing-json"[^>]*placeholder="Paste an existing Nuvio JSON array to append into it\."/);
 assert.doesNotMatch(indexHtml, /id="nuvio-existing-json"[^>]*readonly/);
 assert.match(indexHtml, /id="nuvio-existing-file"[^>]*multiple/);
@@ -161,7 +161,7 @@ const importedDestinationCopy = getNuvioDestinationCopy({ existingCollectionCoun
 assert.equal(importedDestinationCopy.summary, "2 imported collections detected.");
 assert.equal(importedDestinationCopy.newDescription, "Create one new collection alongside imported collections.");
 assert.equal(importedDestinationCopy.splitDescription, "Create separate new collections alongside imported collections.");
-assert.equal(importedDestinationCopy.existingDescription, "Add selected lists to one imported collection. Existing Trakt lists may be skipped.");
+assert.equal(importedDestinationCopy.existingDescription, "Add all selected lists to one imported collection. Existing Trakt lists may be skipped.");
 assert.equal(importedDestinationCopy.mappedDescription, "Choose an imported collection for each selected list. Existing Trakt lists may be skipped.");
 
 const mixedCommunityCollection = {
