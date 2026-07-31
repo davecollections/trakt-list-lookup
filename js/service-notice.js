@@ -10,8 +10,8 @@ export function showTraktApiServiceNotice() {
   notice.setAttribute("role", "alert");
   notice.setAttribute("aria-labelledby", `${NOTICE_ID}-title`);
   notice.innerHTML = `
-    <strong id="${NOTICE_ID}-title">Temporary service notice</strong>
-    <span>Trakt lookups are currently unavailable due to a known Trakt API issue. The problem is being investigated and a fix is in progress.</span>
+    <strong id="${NOTICE_ID}-title">Trakt API access change</strong>
+    <span>Trakt has changed the access requirements for the API used by this tool. List lookups are temporarily unavailable while the new VIP subscription requirement is assessed.</span>
     <a href="${ISSUE_URL}" target="_blank" rel="noopener noreferrer">View issue #17</a>
   `;
 
