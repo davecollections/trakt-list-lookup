@@ -8,158 +8,67 @@
     <link rel="canonical" href="https://trakt-list-lookup.pages.dev/">
     <title>Trakt List Lookup — Currently unavailable</title>
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./css/status-page.css">
     <script data-goatcounter="https://trakt-list-lookup.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-    <style>
-      .status-shell {
-        width: min(760px, calc(100% - 32px));
-        min-height: 100vh;
-        margin: 0 auto;
-        padding: clamp(32px, 8vw, 88px) 0 32px;
-        display: flex;
-        flex-direction: column;
-      }
-
-      .status-card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        box-shadow: var(--shadow);
-        padding: clamp(24px, 5vw, 44px);
-      }
-
-      .status-top {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 20px;
-      }
-
-      .status-card h1 {
-        max-width: 620px;
-        margin-top: 4px;
-      }
-
-      .status-lead {
-        margin-top: 22px;
-        color: var(--text);
-        font-size: 1.05rem;
-        line-height: 1.65;
-      }
-
-      .status-copy {
-        margin-top: 16px;
-        color: var(--muted);
-        line-height: 1.65;
-      }
-
-      .interest-panel {
-        margin-top: 30px;
-        padding-top: 28px;
-        border-top: 1px solid var(--border);
-      }
-
-      .interest-panel h2 {
-        font-size: 1.2rem;
-      }
-
-      .interest-panel p {
-        margin-top: 10px;
-        color: var(--muted);
-        line-height: 1.65;
-      }
-
-      .status-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 20px;
-      }
-
-      .primary-link,
-      .secondary-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 42px;
-        padding: 0 16px;
-        border-radius: 8px;
-        font-weight: 700;
-        text-decoration: none;
-      }
-
-      .primary-link {
-        background: var(--button-bg);
-        color: #fff;
-      }
-
-      .primary-link:hover {
-        background: var(--button-bg-hover);
-      }
-
-      .secondary-link {
-        border: 1px solid var(--border);
-        background: var(--soft);
-        color: var(--text);
-      }
-
-      .status-footer {
-        margin-top: auto;
-        padding-top: 26px;
-        color: var(--muted);
-        font-size: 0.86rem;
-        line-height: 1.55;
-      }
-
-      .status-footer a {
-        color: var(--accent);
-        font-weight: 700;
-        text-decoration: none;
-      }
-
-      @media (max-width: 560px) {
-        .status-top {
-          align-items: center;
-        }
-
-        .status-actions {
-          display: grid;
-        }
-
-        .primary-link,
-        .secondary-link {
-          width: 100%;
-        }
-      }
-    </style>
   </head>
-  <body>
+  <body class="status-page">
+    <div class="status-backdrop" aria-hidden="true">
+      <div class="status-backdrop-content">
+        <section class="status-ghost-panel status-ghost-search">
+          <div class="status-ghost-title"></div>
+          <div class="status-ghost-subtitle"></div>
+          <div class="status-ghost-tabs">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="status-ghost-query">
+            <span></span><span></span><span></span>
+          </div>
+        </section>
+
+        <section class="status-ghost-panel status-ghost-results">
+          <div class="status-ghost-results-heading"></div>
+          <div class="status-ghost-row"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="status-ghost-row"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="status-ghost-row"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </section>
+      </div>
+    </div>
+    <div class="status-scrim" aria-hidden="true"></div>
+
     <main class="status-shell">
       <section class="status-card" aria-labelledby="page-title">
-        <div class="status-top">
-          <div>
-            <p class="eyebrow">Trakt List Lookup</p>
-            <h1 id="page-title">This tool is currently unavailable</h1>
+        <div class="status-card-accent"></div>
+        <div class="status-card-body">
+          <div class="status-top">
+            <div>
+              <div class="status-brand">
+                <img src="./assets/trakt.ico" alt="">
+                <span>Trakt List Lookup</span>
+              </div>
+              <span class="status-badge">Service paused</span>
+              <h1 id="page-title">This tool is currently unavailable</h1>
+            </div>
+            <button id="theme-toggle" type="button" class="theme-toggle" aria-label="Switch to dark mode"></button>
           </div>
-          <button id="theme-toggle" type="button" class="theme-toggle" aria-label="Switch to dark mode"></button>
-        </div>
 
-        <p class="status-lead">
-          Trakt has changed the requirements for developer API access, and creating new API applications now requires a Trakt VIP subscription.
-        </p>
-
-        <p class="status-copy">
-          Because of this, Trakt List Lookup is currently unavailable while I decide whether there is enough interest to justify reinstating and maintaining the service under the new requirements.
-        </p>
-
-        <div class="interest-panel">
-          <h2>Did you find this tool useful?</h2>
-          <p>
-            If you used Trakt List Lookup and would like to see it return, please let me know on GitHub. Your feedback will help me understand how many people were using the tool and whether it is worth bringing back.
+          <p class="status-lead">
+            Trakt has changed the requirements for developer API access, and creating new API applications now requires a Trakt VIP subscription.
           </p>
 
-          <div class="status-actions">
-            <a class="primary-link" href="https://github.com/davecollections/trakt-list-lookup/issues/new?template=request-return.yml" target="_blank" rel="noopener noreferrer">I'd like the tool to return</a>
-            <a class="secondary-link" href="https://github.com/davecollections/trakt-list-lookup" target="_blank" rel="noopener noreferrer">View the project on GitHub</a>
+          <p class="status-copy">
+            Because of this, Trakt List Lookup is currently unavailable while I decide whether there is enough interest to justify reinstating and maintaining the service under the new requirements.
+          </p>
+
+          <div class="interest-panel">
+            <h2>Did you find this tool useful?</h2>
+            <p>
+              If you used Trakt List Lookup and would like to see it return, please let me know on GitHub. Your feedback will help me understand how many people were using the tool and whether it is worth bringing back.
+            </p>
+
+            <div class="status-actions">
+              <a class="primary-link" href="https://github.com/davecollections/trakt-list-lookup/issues/new?template=request-return.yml" target="_blank" rel="noopener noreferrer">I'd like the tool to return</a>
+              <a class="secondary-link" href="https://github.com/davecollections/trakt-list-lookup" target="_blank" rel="noopener noreferrer">View the project on GitHub</a>
+            </div>
           </div>
         </div>
       </section>
@@ -169,24 +78,6 @@
       </footer>
     </main>
 
-    <script>
-      const root = document.documentElement;
-      const toggle = document.getElementById('theme-toggle');
-      const storedTheme = localStorage.getItem('theme');
-      const preferredDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-      function applyTheme(theme) {
-        root.dataset.theme = theme;
-        toggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-      }
-
-      applyTheme(storedTheme || (preferredDark ? 'dark' : 'light'));
-
-      toggle.addEventListener('click', () => {
-        const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
-        localStorage.setItem('theme', nextTheme);
-        applyTheme(nextTheme);
-      });
-    </script>
+    <script src="./js/status-page.js"></script>
   </body>
 </html>
