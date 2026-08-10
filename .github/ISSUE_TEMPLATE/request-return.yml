@@ -1,5 +1,5 @@
 name: Request Trakt List Lookup to return
-description: Let me know if you used the tool and would like to see it reinstated.
+description: Let me know if you used the tool, or would like to use it if it returns.
 title: "[Interest] Bring back Trakt List Lookup"
 body:
   - type: markdown
@@ -9,18 +9,20 @@ body:
 
         These responses will help me decide whether there is enough interest to justify reinstating and maintaining the tool.
 
-  - type: checkboxes
-    id: used-tool
+  - type: dropdown
+    id: interest-type
     attributes:
-      label: Did you use Trakt List Lookup?
+      label: Which best describes you?
       options:
-        - label: I used the tool and would like to see it return.
-          required: true
+        - I used the tool and would like to see it return.
+        - I didn't use it before, but I'd like to use it if it returns.
+    validations:
+      required: true
 
   - type: checkboxes
     id: useful-features
     attributes:
-      label: What did you find useful?
+      label: What would you find useful?
       description: Optional — select any that apply.
       options:
         - label: Searching public Trakt lists by keyword
@@ -34,5 +36,5 @@ body:
     id: comments
     attributes:
       label: Anything else you'd like to add?
-      description: Optional — a short note about how you used the tool or why you'd like it back is helpful.
-      placeholder: I mainly used it to...
+      description: Optional — a short note about how you used the tool, or how you would use it, is helpful.
+      placeholder: I mainly used it to... / I'd mainly use it to...
