@@ -155,7 +155,6 @@ export function shouldValidateListAvailability(list) {
 export function isListAvailabilitySuspicious(list) {
   if (!list?.ids?.trakt) return true;
   if (isNonPublicList(list)) return true;
-  if (list._availabilitySignals?.likesNotFound) return true;
 
   const username = getListUsername(list);
   if (!username || isUnknownOwner(username)) return true;
