@@ -7,6 +7,7 @@ try {
   await testMissingClientId();
   await testMissingQuery();
   await testApiSecurityAndCacheHeaders();
+  await testSuccessfulResponsesUseEdgeCache();
   await testRateLimit();
   await testPopularUsesSingleTraktRequestAndCurrentLikesField();
   await testKeywordSearchUsesDocumentedSearchEndpointOnly();
@@ -57,6 +58,55 @@ async function testApiSecurityAndCacheHeaders() {
   assert.match(response.headers.get("Content-Security-Policy"), /default-src 'none'/);
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
   assert.match(response.headers.get("Cache-Control"), /s-maxage=300/);
+}
+
+async function testSuccessfulResponsesUseEdgeCache() {
+  const originalCaches = globalThis.caches;
+  const store = new Map();
+  globalThis.caches = {
+    default: {
+      async match(request) {
+        return store.get(request.url)?.clone() || null;
+      },
+      async put(request, response) {
+        store.set(request.url, response.clone());
+      },
+    },
+  };
+
+  try {
+    const calls = mockFetch(({ url }) => {
+      assert.equal(url.pathname, "/lists/popular");
+      return jsonResponse([
+        {
+          like_count: 4,
+          comment_count: 0,
+          list: list({
+            trakt: 150,
+            slug: "cached-list",
+            username: "cache_user",
+            likes: 4,
+          }),
+        },
+      ], paginationHeaders(1, 1, 5));
+    });
+
+    const url = "https://example.test/api/trakt?mode=popular&page=1&limit=5";
+    const first = await callHandler(url, env(), { "CF-Connecting-IP": "203.0.113.120" });
+    const second = await callHandler(url, env(), { "CF-Connecting-IP": "203.0.113.120" });
+    const secondBody = await second.json();
+
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(calls.length, 1);
+    assert.equal(secondBody.results[0].ids.trakt, 150);
+  } finally {
+    if (originalCaches === undefined) {
+      delete globalThis.caches;
+    } else {
+      globalThis.caches = originalCaches;
+    }
+  }
 }
 
 async function testRateLimit() {
