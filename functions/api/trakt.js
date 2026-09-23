@@ -22,7 +22,6 @@ import {
   validateListAvailability,
 } from "../lib/trakt-list-service.js";
 import {
-  enrichListsWithLikeCounts,
   getListItems,
   getTraktClientId,
 } from "../lib/trakt-client.js";
@@ -104,10 +103,7 @@ export async function onRequestGet({ request, env }) {
     const quickUsersPromise = mode !== "url" && !directListId
       ? getQuickUsers(mode, query, payload, clientId)
       : null;
-    const enrichedLists = sort && mode !== "url" && !directListId
-      ? payload.data
-      : await enrichListsWithLikeCounts(payload.data, clientId);
-    const lists = await validateListAvailability(enrichedLists, clientId);
+    const lists = await validateListAvailability(payload.data, clientId);
     const quickUsersPayload = mode === "url" || directListId
       ? { ...payload, quickUserLists: lists }
       : payload;
@@ -124,7 +120,10 @@ export async function onRequestGet({ request, env }) {
     return json(responsePayload, 200, true);
   } catch (error) {
     const status = error.status || 502;
-    return json({ error: getPublicErrorMessage(error, status) }, status);
+    const headers = status === 429 && error.retryAfter
+      ? { "Retry-After": error.retryAfter }
+      : {};
+    return json({ error: getPublicErrorMessage(error, status) }, status, false, headers);
   }
 }
 
