@@ -34,7 +34,7 @@ const MAX_QUERY_LENGTH = 220;
 const SORT_REQUEST_COST = 8;
 const QUICK_USERS_TIMEOUT_MS = 1200;
 
-export async function onRequestGet({ request, env }) {
+export async function onRequestGet({ request, env, waitUntil }) {
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode") || "search";
   const sort = normalizeSort(url.searchParams.get("sort"));
@@ -53,6 +53,9 @@ export async function onRequestGet({ request, env }) {
     return json({ error: "TRAKT_CLIENT_ID is not configured in Cloudflare." }, 500);
   }
 
+  const cached = await getCachedApiResponse(request);
+  if (cached) return cached;
+
   try {
     if (mode === "items") {
       const username = (url.searchParams.get("user") || "").trim();
@@ -69,10 +72,10 @@ export async function onRequestGet({ request, env }) {
       const items = shouldIncludePosters(url)
         ? await enrichItemsWithTmdbPosters(payload.data.map(normalizeListItem).filter(Boolean), env)
         : payload.data.map(normalizeListItem).filter(Boolean);
-      return json({
+      return cacheSuccessfulApiResponse(request, json({
         items,
         pagination: payload.pagination,
-      }, 200, true);
+      }, 200, true), waitUntil);
     }
 
     if (!query && !isGlobalListMode(mode)) {
@@ -117,7 +120,7 @@ export async function onRequestGet({ request, env }) {
     };
     if (quickUsers) responsePayload.quickUsers = quickUsers;
 
-    return json(responsePayload, 200, true);
+    return cacheSuccessfulApiResponse(request, json(responsePayload, 200, true), waitUntil);
   } catch (error) {
     const status = error.status || 502;
     const headers = status === 429 && error.retryAfter
@@ -125,6 +128,45 @@ export async function onRequestGet({ request, env }) {
       : {};
     return json({ error: getPublicErrorMessage(error, status) }, status, false, headers);
   }
+}
+
+async function getCachedApiResponse(request) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return null;
+
+  try {
+    return await cache.match(getCacheKey(request));
+  } catch (error) {
+    console.warn("Could not read Trakt API response cache", {
+      message: error.message,
+    });
+    return null;
+  }
+}
+
+async function cacheSuccessfulApiResponse(request, response, waitUntil) {
+  const cache = globalThis.caches?.default;
+  if (!cache || !response.ok) return response;
+
+  const write = cache.put(getCacheKey(request), response.clone()).catch((error) => {
+    console.warn("Could not write Trakt API response cache", {
+      message: error.message,
+    });
+  });
+
+  if (typeof waitUntil === "function") {
+    waitUntil(write);
+  } else {
+    await write;
+  }
+
+  return response;
+}
+
+function getCacheKey(request) {
+  return new Request(request.url, {
+    method: "GET",
+  });
 }
 
 function isGlobalListMode(mode) {
