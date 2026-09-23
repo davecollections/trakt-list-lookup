@@ -309,9 +309,10 @@ async function getFilteredUserLists(username, filter, clientId) {
   let scannedItems = 0;
 
   while (page <= pageCount && scannedItems < USER_FILTER_MAX_ITEMS && results.length < RESULT_LIMIT) {
+    const fetchLimit = Math.min(USER_FILTER_FETCH_LIMIT, USER_FILTER_MAX_ITEMS - scannedItems);
     const params = new URLSearchParams({
       page: String(page),
-      limit: String(USER_FILTER_FETCH_LIMIT),
+      limit: String(fetchLimit),
     });
     const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
     pageCount = Math.min(
