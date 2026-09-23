@@ -8,6 +8,7 @@ import {
   listMatchesTerms,
   mapWithConcurrency,
   normalizeGlobalListEntry,
+  normalizeListMetrics,
   normalizeSearchText,
   parseTraktListId,
   parseTraktListUrl,
@@ -19,19 +20,14 @@ import {
   sortLists,
   withListAvailability,
 } from "./trakt-api-helpers.js";
-import {
-  enrichListsWithLikeCounts,
-  traktFetch,
-} from "./trakt-client.js";
+import { traktFetch } from "./trakt-client.js";
 
 const MAX_PAGE = 25;
-const USER_FILTER_LIMIT = 100;
+const USER_FILTER_FETCH_LIMIT = 100;
+const USER_FILTER_MAX_ITEMS = 250;
 const SORT_FETCH_LIMIT = 50;
 const SORT_MAX_ITEMS = 250;
-const QUICK_USER_SAMPLE_LIMIT = 250;
-const QUICK_USER_FETCH_LIMIT = 50;
 const QUICK_USER_LIMIT = 6;
-const QUICK_USER_PAGE_CONCURRENCY = 3;
 const AVAILABILITY_VALIDATION_CONCURRENCY = 4;
 const AVAILABILITY_ITEM_LIMIT = 1;
 const AVAILABILITY_VALIDATION_TIMEOUT_MS = 1000;
@@ -48,7 +44,6 @@ export async function getSortedLists(mode, query, page, limit, sort, order, clie
   }
 
   let lists = pages.flatMap((payload) => payload.data).slice(0, SORT_MAX_ITEMS);
-  lists = await enrichListsWithLikeCounts(lists, clientId);
   lists = sortLists(lists, sort, order);
 
   const start = (page - 1) * limit;
@@ -77,10 +72,11 @@ export async function searchLists(query, page, limit, clientId) {
     query,
     page: String(page),
     limit: String(limit),
-    extended: "full",
   });
   const payload = await traktFetch(`/search/list?${params.toString()}`, clientId);
-  const searchResults = rankSearchResults(payload.data, query).map((item) => item.list).filter(Boolean);
+  const searchResults = rankSearchResults(payload.data, query)
+    .map((item) => normalizeListMetrics(item.list))
+    .filter(Boolean);
   const fallbackResults = page === 1
     ? await getCuratedUserSearchMatches(query, searchResults, clientId)
     : [];
@@ -99,7 +95,6 @@ export async function getGlobalLists(kind, page, limit, clientId) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
-    extended: "full",
   });
   const payload = await traktFetch(`/lists/${kind}?${params.toString()}`, clientId);
   return {
@@ -122,9 +117,12 @@ export async function getUserLists(username, page, limit, clientId) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
-    extended: "full",
   });
-  return traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
+  const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
+  return {
+    ...payload,
+    data: payload.data.map(normalizeListMetrics).filter(Boolean),
+  };
 }
 
 export async function resolveListUrl(value, clientId) {
@@ -139,10 +137,11 @@ export async function resolveListUrl(value, clientId) {
   if (parsed.kind === "user-list") {
     const username = encodeURIComponent(parsed.username);
     const slug = encodeURIComponent(parsed.slug);
-    const payload = await traktFetch(`/users/${username}/lists/${slug}?extended=full`, clientId);
+    const payload = await traktFetch(`/users/${username}/lists/${slug}`, clientId);
+    const list = withListAvailability(normalizeListMetrics(payload.data), "available");
     return {
-      data: [withListAvailability(payload.data, "available")],
-      quickUserLists: [withListAvailability(payload.data, "available")],
+      data: [list],
+      quickUserLists: [list],
       pagination: singleResultPagination(),
     };
   }
@@ -163,8 +162,8 @@ export async function resolveListId(id, clientId) {
   try {
     const payload = await fetchListDetailById(listId, clientId, { quietNotFound: true });
     return {
-      data: [withListAvailability(payload.data, "available")],
-      quickUserLists: [withListAvailability(payload.data, "available")],
+      data: [withListAvailability(normalizeListMetrics(payload.data), "available")],
+      quickUserLists: [withListAvailability(normalizeListMetrics(payload.data), "available")],
       pagination: singleResultPagination(),
     };
   } catch (error) {
@@ -231,35 +230,8 @@ async function validateSuspiciousListAvailability(list, clientId) {
 }
 
 export async function getQuickUsersForPayload(mode, query, payload, clientId) {
-  const lists = payload.quickUserLists || await getQuickUserSampleLists(mode, query, payload, clientId);
+  const lists = payload.quickUserLists || payload.data || [];
   return buildQuickUsers(lists);
-}
-
-async function getQuickUserSampleLists(mode, query, payload, clientId) {
-  if (mode === "url") return [];
-
-  const firstPage = canReuseQuickUserFirstPage(payload)
-    ? payload
-    : await getListPayload(mode, query, 1, QUICK_USER_FETCH_LIMIT, clientId);
-  const pageCount = Math.min(
-    firstPage.pagination?.page_count || 1,
-    Math.ceil(QUICK_USER_SAMPLE_LIMIT / QUICK_USER_FETCH_LIMIT),
-    MAX_PAGE,
-  );
-  const nextPages = [];
-  for (let nextPage = 2; nextPage <= pageCount; nextPage += 1) nextPages.push(nextPage);
-  const pages = [
-    firstPage,
-    ...await mapWithConcurrency(nextPages, QUICK_USER_PAGE_CONCURRENCY, (nextPage) => getListPayload(mode, query, nextPage, QUICK_USER_FETCH_LIMIT, clientId)),
-  ];
-
-  return dedupeLists(pages.flatMap((page) => page.data)).slice(0, QUICK_USER_SAMPLE_LIMIT);
-}
-
-function canReuseQuickUserFirstPage(payload) {
-  return Array.isArray(payload?.data)
-    && (payload.pagination?.page || 1) === 1
-    && (payload.pagination?.page_count || 1) >= 1;
 }
 
 function buildQuickUsers(lists) {
@@ -417,14 +389,33 @@ function rankFallbackLists(lists, terms) {
 
 async function getFilteredUserLists(username, filter, clientId) {
   const safeUsername = encodeURIComponent(username);
-  const params = new URLSearchParams({
-    page: "1",
-    limit: String(USER_FILTER_LIMIT),
-    extended: "full",
-  });
-  const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
   const terms = normalizeSearchText(filter).split(" ").filter(Boolean);
-  const results = payload.data.filter((list) => listMatchesTerms(list, terms));
+  const results = [];
+  let page = 1;
+  let pageCount = 1;
+  let scannedItems = 0;
+
+  while (page <= pageCount && scannedItems < USER_FILTER_MAX_ITEMS && results.length < RESULT_LIMIT) {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(USER_FILTER_FETCH_LIMIT),
+    });
+    const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
+    pageCount = Math.min(
+      payload.pagination?.page_count || 1,
+      Math.ceil(USER_FILTER_MAX_ITEMS / USER_FILTER_FETCH_LIMIT),
+      MAX_PAGE,
+    );
+    scannedItems += payload.data.length;
+
+    for (const rawList of payload.data) {
+      const list = normalizeListMetrics(rawList);
+      if (list && listMatchesTerms(list, terms)) results.push(list);
+      if (results.length >= RESULT_LIMIT) break;
+    }
+
+    page += 1;
+  }
 
   return {
     data: results.slice(0, RESULT_LIMIT),
@@ -439,7 +430,7 @@ async function getFilteredUserLists(username, filter, clientId) {
 
 function fetchListDetailById(id, clientId, { quietNotFound = false, timeoutMs = 0 } = {}) {
   const quietStatuses = quietNotFound ? [404] : [];
-  return traktFetch(`/lists/${encodeURIComponent(id)}?extended=full`, clientId, {
+  return traktFetch(`/lists/${encodeURIComponent(id)}`, clientId, {
     quietStatuses,
     quietNetworkErrors: timeoutMs > 0,
     timeoutMs,
