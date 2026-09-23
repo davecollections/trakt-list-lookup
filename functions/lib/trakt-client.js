@@ -1,13 +1,6 @@
-import {
-  getPagination,
-  mapWithConcurrency,
-  normalizeOptionalCount,
-} from "./trakt-api-helpers.js";
+import { getPagination } from "./trakt-api-helpers.js";
 
 const TRAKT_API_BASE = "https://api.trakt.tv";
-const LIKE_COUNT_CONCURRENCY = 12;
-const LIKE_COUNT_TIMEOUT_MS = 800;
-const TRANSIENT_LIKE_ERROR_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 export function getTraktClientId(env) {
   return String(env.TRAKT_CLIENT_ID || "").trim();
@@ -46,15 +39,21 @@ export async function traktFetch(path, clientId, { quietStatuses = [], timeoutMs
   }
 
   if (!response.ok) {
+    const retryAfter = response.headers.get("retry-after") || "";
+    const rateLimit = response.headers.get("x-ratelimit") || "";
     if (!quietStatuses.includes(response.status)) {
       const body = await safeReadText(response);
       console.error("Trakt API error", {
         status: response.status,
         path,
+        retryAfter,
+        rateLimit,
         body: body.slice(0, 500),
       });
     }
-    throw httpError(getTraktErrorMessage(response.status), response.status);
+    throw httpError(getTraktErrorMessage(response.status), response.status, {
+      retryAfter,
+    });
   }
 
   return {
@@ -72,64 +71,6 @@ export async function getListItems(username, slug, page, limit, clientId) {
     extended: "full",
   });
   return traktFetch(`/users/${safeUsername}/lists/${safeSlug}/items?${params.toString()}`, clientId);
-}
-
-export async function enrichListsWithLikeCounts(lists, clientId, { likeTimeoutMs = LIKE_COUNT_TIMEOUT_MS } = {}) {
-  return mapWithConcurrency(lists, LIKE_COUNT_CONCURRENCY, async (list) => {
-    const likeResult = await getListLikeCount(list, clientId, { timeoutMs: likeTimeoutMs });
-    const withCount = likeResult.count === null ? list : {
-      ...list,
-      like_count: likeResult.count,
-    };
-
-    if (!likeResult.notFound) return withCount;
-
-    return {
-      ...withCount,
-      _availabilitySignals: {
-        ...(withCount?._availabilitySignals || {}),
-        likesNotFound: true,
-      },
-    };
-  });
-}
-
-async function getListLikeCount(list, clientId, { timeoutMs = LIKE_COUNT_TIMEOUT_MS } = {}) {
-  const existingCount = normalizeOptionalCount(list?.like_count);
-  const id = list?.ids?.trakt;
-  if (!id) return { count: existingCount, notFound: false };
-
-  try {
-    const payload = await traktFetch(`/lists/${encodeURIComponent(id)}/likes?page=1&limit=1`, clientId, {
-      quietStatuses: [404, ...TRANSIENT_LIKE_ERROR_STATUSES],
-      quietNetworkErrors: true,
-      timeoutMs,
-    });
-    return {
-      count: normalizeOptionalCount(payload.pagination?.item_count) ?? existingCount,
-      notFound: false,
-    };
-  } catch (error) {
-    if (error.status === 404) {
-      return {
-        count: existingCount,
-        notFound: true,
-      };
-    }
-
-    if (!TRANSIENT_LIKE_ERROR_STATUSES.has(error.status)) {
-      console.warn("Could not fetch Trakt list likes", {
-        id,
-        status: error.status,
-        message: error.message,
-      });
-    }
-
-    return {
-      count: existingCount,
-      notFound: false,
-    };
-  }
 }
 
 function getTraktErrorMessage(status) {
@@ -176,8 +117,9 @@ function isJsonContentType(value) {
   return contentType.includes("application/json") || contentType.includes("+json");
 }
 
-function httpError(message, status) {
+function httpError(message, status, { retryAfter = "" } = {}) {
   const error = new Error(message);
   error.status = status;
+  if (retryAfter) error.retryAfter = retryAfter;
   return error;
 }
