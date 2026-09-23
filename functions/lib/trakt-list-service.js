@@ -183,10 +183,6 @@ export async function validateListAvailability(lists, clientId) {
       return withListAvailability(list, "unavailable", "Unavailable or not public");
     }
 
-    if (list._availabilitySignals?.likesNotFound) {
-      return withListAvailability(list, "unavailable", "Unavailable or not public");
-    }
-
     if (!shouldValidateListAvailability(list)) {
       return list.availabilityStatus ? list : withListAvailability(list, "available");
     }
@@ -457,7 +453,6 @@ async function verifyListItemsAvailability(list, clientId) {
   const params = new URLSearchParams({
     page: "1",
     limit: String(AVAILABILITY_ITEM_LIMIT),
-    extended: "full",
   });
 
   try {
@@ -491,7 +486,7 @@ async function verifyListItemsAvailability(list, clientId) {
 }
 
 function mergeListDetail(list, detail) {
-  const merged = {
+  const merged = normalizeListMetrics({
     ...list,
     ...(detail || {}),
     ids: {
@@ -502,8 +497,7 @@ function mergeListDetail(list, detail) {
       ...(list.user || {}),
       ...(detail?.user || {}),
     },
-    _availabilitySignals: {},
-  };
+  });
 
   if (list.like_count !== undefined) merged.like_count = list.like_count;
   if (list.comment_count !== undefined) merged.comment_count = list.comment_count;
