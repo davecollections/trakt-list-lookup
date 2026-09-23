@@ -15,8 +15,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run tests
-        run: npm test
+      - name: Run Trakt backend tests
+        run: |
+          node tests/trakt-api-handler.test.mjs
+          node tests/trakt-api-helpers.test.mjs
       - name: Check backend syntax
         run: |
           node --check functions/api/trakt.js
