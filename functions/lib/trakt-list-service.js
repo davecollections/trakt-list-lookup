@@ -1,7 +1,5 @@
 import {
   RESULT_LIMIT,
-  dedupeLists,
-  getListKey,
   getRouteUsername,
   isSafePathSegment,
   isNonPublicList,
@@ -14,7 +12,6 @@ import {
   parseTraktListUrl,
   parseUserListQuery,
   rankSearchResults,
-  scoreListSearchMatch,
   shouldValidateListAvailability,
   singleResultPagination,
   sortLists,
@@ -31,7 +28,6 @@ const QUICK_USER_LIMIT = 6;
 const AVAILABILITY_VALIDATION_CONCURRENCY = 4;
 const AVAILABILITY_ITEM_LIMIT = 1;
 const AVAILABILITY_VALIDATION_TIMEOUT_MS = 1000;
-const CURATED_USER_FALLBACKS = ["snoak", "extreme_one"];
 
 export async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
   const fetchLimit = SORT_FETCH_LIMIT;
@@ -74,20 +70,12 @@ export async function searchLists(query, page, limit, clientId) {
     limit: String(limit),
   });
   const payload = await traktFetch(`/search/list?${params.toString()}`, clientId);
-  const searchResults = rankSearchResults(payload.data, query)
+  const data = rankSearchResults(payload.data, query)
     .map((item) => normalizeListMetrics(item.list))
     .filter(Boolean);
-  const fallbackResults = page === 1
-    ? await getCuratedUserSearchMatches(query, searchResults, clientId)
-    : [];
-  const data = dedupeLists([...fallbackResults, ...searchResults]);
   return {
     data,
-    pagination: {
-      ...payload.pagination,
-      item_count: Math.max(payload.pagination?.item_count || 0, data.length),
-      page_count: Math.max(payload.pagination?.page_count || 1, Math.ceil(data.length / limit)),
-    },
+    pagination: payload.pagination,
   };
 }
 
@@ -310,77 +298,6 @@ function getListUrl(list) {
 function normalizeCount(value) {
   const number = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(number) && number > 0 ? number : 0;
-}
-
-async function getCuratedUserSearchMatches(query, existingResults, clientId) {
-  const terms = normalizeSearchText(query).split(" ").filter(Boolean);
-  if (!terms.length) return [];
-
-  const existingKeys = new Set(existingResults.map(getListKey).filter(Boolean));
-  const matches = [];
-
-  for (const fallback of getSearchFallbackUsers(query)) {
-    try {
-      const payload = await getFilteredUserLists(fallback.username, fallback.filter, clientId);
-      payload.data.forEach((list) => {
-        const key = getListKey(list);
-        if (!key || existingKeys.has(key)) return;
-        existingKeys.add(key);
-        matches.push(list);
-      });
-    } catch (error) {
-      console.warn("Curated user fallback failed", {
-        username: fallback.username,
-        message: error.message,
-      });
-    }
-  }
-
-  return rankFallbackLists(matches, terms);
-}
-
-function getSearchFallbackUsers(query) {
-  const seen = new Set();
-  const fallbacks = [
-    ...getExplicitUserHints(query),
-    ...CURATED_USER_FALLBACKS.map((username) => ({ username, filter: query })),
-  ];
-
-  return fallbacks.filter((fallback) => {
-    const key = fallback.username.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function getExplicitUserHints(query) {
-  const tokens = String(query || "").trim().split(/\s+/).filter(Boolean);
-  if (tokens.length < 2) return [];
-
-  return tokens
-    .map((token, index) => getExplicitUserHint(token, tokens, index))
-    .filter(Boolean);
-}
-
-function getExplicitUserHint(token, tokens, index) {
-  const explicit = token.startsWith("@");
-  const username = token
-    .replace(/^@/, "")
-    .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9_.-]+$/g, "");
-  const filter = tokens.filter((_, tokenIndex) => tokenIndex !== index).join(" ");
-
-  if (!username) return "";
-  if (!explicit && !/[_.]/.test(username)) return "";
-  return isSafePathSegment(username) && filter ? { username, filter } : "";
-}
-
-function rankFallbackLists(lists, terms) {
-  return [...lists].sort((a, b) => {
-    const scoreA = scoreListSearchMatch(a, terms, 0);
-    const scoreB = scoreListSearchMatch(b, terms, 0);
-    return scoreB - scoreA;
-  });
 }
 
 async function getFilteredUserLists(username, filter, clientId) {
