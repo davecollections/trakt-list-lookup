@@ -115,7 +115,7 @@
           <span>Preview</span>
           <button type="button" data-sort="title">List</button>
           <span>Trakt ID <small>click to copy</small></span>
-          <button type="button" data-sort="items">Items</button>
+          <button type="button" data-sort="items" title="Trakt item count; unusual lists may include seasons or episodes.">Titles</button>
           <button type="button" data-sort="likes">Likes</button>
           <button type="button" data-sort="updated">Last Updated</button>
           <span>Link</span>
@@ -229,7 +229,7 @@
                 <th>List</th>
                 <th>User</th>
                 <th>Trakt ID</th>
-                <th>Items</th>
+                <th title="Trakt item count; unusual lists may include seasons or episodes.">Titles</th>
                 <th>Likes</th>
                 <th></th>
               </tr>
@@ -276,7 +276,7 @@
                   <option value="title-asc" selected>Folder title A-Z</option>
                   <option value="title-desc">Folder title Z-A</option>
                   <option value="selected">Selection order</option>
-                  <option value="items-desc">Most items</option>
+                  <option value="items-desc">Most titles</option>
                   <option value="likes-desc">Most likes</option>
                   <option value="updated-desc">Recently updated</option>
                 </select>
@@ -453,6 +453,8 @@
         </div>
       </section>
     </div>
+
+    <button id="back-to-top" class="back-to-top" type="button" aria-label="Back to top" title="Back to top" hidden>↑</button>
 
     <script src="./app.js" type="module"></script>
   </body>
