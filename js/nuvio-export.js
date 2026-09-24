@@ -551,20 +551,62 @@ function countMediaDetectionFallbacks(lists, mediaMode, mediaDetections) {
 }
 
 function appendUniqueNuvioFolders(existingFolders, foldersToAdd, report) {
-  const signatures = new Set(existingFolders.map(getNuvioFolderSignature).filter(Boolean));
-  const uniqueFolders = [];
+  const output = [...existingFolders];
 
   for (const folder of foldersToAdd) {
+    const traktListId = getSingleTraktListId(folder);
+    if (traktListId) {
+      const existingIndex = output.findIndex((candidate) => folderContainsTraktListId(candidate, traktListId));
+      if (existingIndex >= 0) {
+        const existingFolder = output[existingIndex];
+        const existingSources = Array.isArray(existingFolder?.sources) ? existingFolder.sources : [];
+        const signatures = new Set(existingSources.map(getNuvioSourceSignature).filter(Boolean));
+        const missingSources = (Array.isArray(folder?.sources) ? folder.sources : [])
+          .filter((source) => {
+            const signature = getNuvioSourceSignature(source);
+            return signature && !signatures.has(signature);
+          });
+
+        if (!missingSources.length) {
+          if (report) report.duplicateSourceFolderCount += 1;
+          continue;
+        }
+
+        output[existingIndex] = {
+          ...existingFolder,
+          sources: [...existingSources, ...missingSources],
+        };
+        if (report) report.mergedTraktSourceCount += missingSources.length;
+        continue;
+      }
+    }
+
     const signature = getNuvioFolderSignature(folder);
-    if (signature && signatures.has(signature)) {
+    if (signature && output.some((candidate) => getNuvioFolderSignature(candidate) === signature)) {
       if (report) report.duplicateSourceFolderCount += 1;
       continue;
     }
-    if (signature) signatures.add(signature);
-    uniqueFolders.push(folder);
+    output.push(folder);
   }
 
-  return [...existingFolders, ...uniqueFolders];
+  return output;
+}
+
+function getSingleTraktListId(folder) {
+  const ids = new Set(
+    (Array.isArray(folder?.sources) ? folder.sources : [])
+      .filter((source) => String(source?.provider || "").toLowerCase() === "trakt")
+      .map((source) => Number(source?.traktListId))
+      .filter((id) => Number.isFinite(id) && id > 0),
+  );
+  return ids.size === 1 ? [...ids][0] : null;
+}
+
+function folderContainsTraktListId(folder, listId) {
+  return (Array.isArray(folder?.sources) ? folder.sources : []).some((source) => (
+    String(source?.provider || "").toLowerCase() === "trakt"
+      && Number(source?.traktListId) === Number(listId)
+  ));
 }
 
 function getNuvioFolderSignature(folder) {
@@ -583,9 +625,9 @@ function getCollectionFolders(collection) {
 function getNuvioSourceSignature(source) {
   if (!source) return "";
 
-  if (source.provider === "trakt" && source.traktListId) {
+  if (String(source.provider || "").toLowerCase() === "trakt" && source.traktListId) {
     return JSON.stringify({
-      mediaType: source.mediaType || "",
+      mediaType: normalizeTraktMediaType(source.mediaType),
       provider: "trakt",
       traktListId: Number(source.traktListId),
     });
@@ -601,11 +643,9 @@ function getNuvioSourceSignature(source) {
   });
 }
 
-function getNuvioMediaType(result) {
-  const value = String(result?.nuvioMediaType || result?.mediaType || "").toUpperCase();
-  if (value === "TV" || value === "SHOW" || value === "SERIES") return "TV";
-  if (value === "MIXED" || value === "UNKNOWN") return "MOVIE";
-  return "MOVIE";
+function normalizeTraktMediaType(value) {
+  const normalized = String(value || "MOVIE").trim().toUpperCase();
+  return normalized === "TV" || normalized === "SHOW" || normalized === "SERIES" ? "TV" : "MOVIE";
 }
 
 function createNuvioId(prefix) {
