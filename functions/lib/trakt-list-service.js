@@ -352,16 +352,8 @@ function fetchListDetailById(id, clientId, { quietNotFound = false, timeoutMs = 
 }
 
 async function verifyListItemsAvailability(list, clientId) {
-  const username = getRouteUsername(list);
-  const slug = list?.ids?.slug || "";
-  if (!username || !slug) {
-    return {
-      status: "available",
-      message: "",
-    };
-  }
-
-  if (!isSafePathSegment(username) || !isSafePathSegment(slug)) {
+  const listId = parseTraktListId(list?.ids?.trakt);
+  if (!listId) {
     return {
       status: "unverified",
       message: "Could not verify public status",
@@ -374,7 +366,7 @@ async function verifyListItemsAvailability(list, clientId) {
   });
 
   try {
-    await traktFetch(`/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}/items?${params.toString()}`, clientId, {
+    await traktFetch(`/lists/${encodeURIComponent(listId)}/items/movie,show,episode,season?${params.toString()}`, clientId, {
       quietStatuses: [404],
       quietNetworkErrors: true,
       timeoutMs: AVAILABILITY_VALIDATION_TIMEOUT_MS,
