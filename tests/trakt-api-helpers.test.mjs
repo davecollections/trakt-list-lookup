@@ -180,7 +180,7 @@ const routeUnavailableButExportable = normalizeList(withListAvailability({
 assert.equal(routeUnavailableButExportable.isExportable, true);
 assert.equal(routeUnavailableButExportable.url, "");
 assert.equal(routeUnavailableButExportable.canOpen, false);
-assert.equal(routeUnavailableButExportable.canPreview, false);
+assert.equal(routeUnavailableButExportable.canPreview, true);
 
 assert.equal(isListAvailabilitySuspicious(list({ username: "unknown", trakt: 789 })), true);
 assert.equal(shouldValidateListAvailability(list({ username: "unknown", trakt: 789 })), true);
