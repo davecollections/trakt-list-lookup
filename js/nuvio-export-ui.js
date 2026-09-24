@@ -1388,6 +1388,7 @@ export function getNuvioExportStatusModel(payload, context = {}) {
   const hasWarnings = Boolean(
     importedDuplicateListCount
       || report.duplicateSourceFolderCount
+      || report.mediaDetectionFallbackCount
       || report.skippedUnavailableListCount
       || report.idFixCount
       || report.warningCount,
@@ -1404,6 +1405,14 @@ export function getNuvioExportStatusModel(payload, context = {}) {
 
   if (report.duplicateSourceFolderCount) {
     messages.push(`${formatStatusLabel(report.duplicateSourceFolderCount, "Already-existing Trakt list skipped", "Already-existing Trakt lists skipped")}: ${formatCount(report.duplicateSourceFolderCount, "selected list already exists", "selected lists already exist")} or would duplicate existing output.`);
+  }
+
+  if (report.mergedTraktSourceCount) {
+    messages.push(`Existing Trakt folders updated: ${formatCount(report.mergedTraktSourceCount, "missing media source added", "missing media sources added")} without replacing existing folder settings.`);
+  }
+
+  if (report.mediaDetectionFallbackCount) {
+    messages.push(`Media detection fallback: ${formatCount(report.mediaDetectionFallbackCount, "selected list could not be classified", "selected lists could not be classified")} as Movies or Series, so Both was used.`);
   }
 
   if (report.skippedUnavailableListCount) {
