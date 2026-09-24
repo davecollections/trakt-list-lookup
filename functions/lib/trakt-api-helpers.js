@@ -270,6 +270,7 @@ export function normalizeList(list) {
     name: list.name || "",
     description: list.description || "",
     privacy: list.privacy || "",
+    share_link: String(list.share_link || "").trim(),
     item_count: list.item_count,
     like_count: getListLikeCount(list),
     comment_count: normalizeOptionalCount(list.comment_count) ?? undefined,
