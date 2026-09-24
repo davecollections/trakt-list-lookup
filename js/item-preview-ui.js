@@ -48,11 +48,9 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
         maxPages: 1,
         requirePoster: false,
       });
-      const posterItems = preview.items;
-      renderItems(modalItemList, posterItems);
-      previewStatus.textContent = posterItems.length
-        ? `Showing the first ${formatNumber(posterItems.length)} title${posterItems.length === 1 ? "" : "s"} from this list.`
-        : "No items found.";
+      const previewItems = preview.items;
+      renderItems(modalItemList, previewItems);
+      previewStatus.textContent = getPreviewStatusText(preview);
     } catch (error) {
       previewStatus.textContent = error.message;
     } finally {
@@ -106,6 +104,17 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
   };
 }
 
+export function getPreviewStatusText(preview) {
+  const shown = Array.isArray(preview?.items) ? preview.items.length : 0;
+  const total = Number(preview?.total || 0);
+
+  if (!shown) return "No items found.";
+  if (total > 0 && total <= shown) {
+    return `Showing ${formatNumber(shown)} of ${formatNumber(total)} title${total === 1 ? "" : "s"} from this list.`;
+  }
+  return `Showing the first ${formatNumber(shown)} title${shown === 1 ? "" : "s"} from this list.`;
+}
+
 function getOwnerLabel(result) {
   const status = String(result?.availabilityStatus || "available").toLowerCase();
   if (status === "unavailable") return "Owner unavailable";
@@ -123,7 +132,7 @@ function renderItems(container, items) {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "item-empty";
-    empty.textContent = "No poster previews available for this list sample.";
+    empty.textContent = "No items found.";
     container.append(empty);
     return;
   }
@@ -140,6 +149,7 @@ function renderItems(container, items) {
       image.src = item.poster;
       image.alt = "";
       image.loading = "lazy";
+      image.decoding = "async";
       posterWrap.append(image);
     } else {
       posterWrap.textContent = "No poster";
