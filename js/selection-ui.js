@@ -65,6 +65,7 @@ export function createSelectionUi({ selection, onClearSelection, onOpenNuvioExpo
 
       const itemsCell = document.createElement("td");
       itemsCell.textContent = formatNumber(result.item_count);
+      itemsCell.title = "Trakt item count; unusual lists may include seasons or episodes.";
 
       const likesCell = document.createElement("td");
       likesCell.textContent = formatNumber(result.like_count);
