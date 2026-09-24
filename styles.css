@@ -1081,25 +1081,6 @@ body.modal-open {
   object-fit: cover;
 }
 
-.preview-rating-badge {
-  position: absolute;
-  left: 50%;
-  bottom: 7px;
-  display: inline-grid;
-  min-width: 34px;
-  min-height: 22px;
-  place-items: center;
-  padding: 0 8px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  background: rgba(10, 12, 16, 0.72);
-  color: white;
-  font-size: 0.72rem;
-  font-weight: 800;
-  line-height: 1;
-  transform: translateX(-50%);
-  backdrop-filter: blur(4px);
-}
 
 .item-empty {
   color: var(--muted);
