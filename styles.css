@@ -121,6 +121,11 @@ input {
   font-size: 0.86rem;
 }
 
+.top-actions {
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 h1,
 h2,
 h3,
@@ -1123,20 +1128,13 @@ body.modal-open {
   gap: 4px;
 }
 
-.site-footer-minimal {
-  display: flex;
-  justify-content: center;
-  padding: 10px 0 4px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
 .about-credits-trigger {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--text);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 750;
@@ -1144,7 +1142,9 @@ body.modal-open {
 
 .about-credits-trigger:hover,
 .about-credits-trigger:focus-visible {
-  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--soft));
+  color: var(--accent-dark);
 }
 
 .about-credits-dialog {
@@ -1583,12 +1583,17 @@ body.modal-open {
   .toolbar-actions,
   .pager,
   .sort-control,
-  .top-actions,
   .site-footer nav,
   .selection-panel,
   .selection-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .top-actions {
+    align-self: flex-end;
+    width: auto;
+    justify-content: flex-end;
   }
 
   .selection-panel {
