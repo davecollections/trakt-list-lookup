@@ -23,6 +23,7 @@ import {
 } from "../lib/trakt-list-service.js";
 import {
   getListItems,
+  getListItemsByRoute,
   getTraktClientId,
 } from "../lib/trakt-client.js";
 
@@ -58,17 +59,29 @@ export async function onRequestGet({ request, env, waitUntil }) {
 
   try {
     if (mode === "items") {
+      const rawListId = (url.searchParams.get("id") || "").trim();
+      const listId = parseTraktListId(rawListId);
       const username = (url.searchParams.get("user") || "").trim();
       const slug = (url.searchParams.get("slug") || "").trim();
       const limit = clampPositiveInteger(url.searchParams.get("limit"), ITEM_LIMIT, MAX_ITEM_LIMIT);
-      if (!username || !slug) {
-        return json({ error: "Missing Trakt username or list slug." }, 400);
-      }
-      if (!isSafePathSegment(username) || !isSafePathSegment(slug)) {
-        return json({ error: "Invalid Trakt username or list slug." }, 400);
+
+      if (rawListId && !listId) {
+        return json({ error: "Invalid Trakt list ID." }, 400);
       }
 
-      const payload = await getListItems(username, slug, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
+      let payload;
+      if (listId) {
+        payload = await getListItems(listId, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
+      } else {
+        if (!username || !slug) {
+          return json({ error: "Missing Trakt list ID or username/list slug." }, 400);
+        }
+        if (!isSafePathSegment(username) || !isSafePathSegment(slug)) {
+          return json({ error: "Invalid Trakt username or list slug." }, 400);
+        }
+        payload = await getListItemsByRoute(username, slug, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
+      }
+
       const items = shouldIncludePosters(url)
         ? await enrichItemsWithTmdbPosters(payload.data.map(normalizeListItem).filter(Boolean), env)
         : payload.data.map(normalizeListItem).filter(Boolean);
