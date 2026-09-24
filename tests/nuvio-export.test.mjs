@@ -73,11 +73,13 @@ assert.match(indexHtml, /Collection details/);
 assert.match(indexHtml, /Hero\/backdrop image URL/);
 assert.match(indexHtml, /Folder order/);
 assert.match(indexHtml, /Sorts generated folders, not the titles inside Trakt lists\./);
-assert.match(indexHtml, /Media type/);
-assert.match(indexHtml, /id="nuvio-media-mode"/);
-assert.match(indexHtml, /Automatic \(recommended\)/);
+assert.doesNotMatch(indexHtml, /id="nuvio-media-mode"/);
 assert.match(indexHtml, /Top creators on this page/);
-assert.match(indexHtml, /Artwork defaults/);
+assert.match(indexHtml, /Folder defaults/);
+assert.match(nuvioUiJs, /Per-list options/);
+assert.match(nuvioUiJs, /mediaSelect\.dataset\.mediaModeKey = key/);
+assert.match(nuvioUiJs, /\["automatic", "Automatic"\]/);
+assert.match(nuvioUiJs, /Detected: Movies & Series/);
 assert.match(indexHtml, /Auto poster images/);
 assert.doesNotMatch(indexHtml, /id="nuvio-folder-image-mode"/);
 assert.doesNotMatch(indexHtml, /Folder images/);
@@ -89,7 +91,7 @@ assert.match(indexHtml, /Folder titles/);
 assert.match(indexHtml, /data-folder-title-mode="show"/);
 assert.match(indexHtml, /data-folder-title-mode="hide"/);
 assert.match(indexHtml, /id="nuvio-folder-artwork-overrides"/);
-assert.match(nuvioUiJs, /Folder artwork overrides/);
+assert.doesNotMatch(nuvioUiJs, /Folder artwork overrides/);
 assert.doesNotMatch(nuvioUiJs, /Optional custom cover image URLs for generated folders\./);
 assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_DEFAULT, "Default"/);
 assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_NONE, "None"/);
@@ -357,6 +359,32 @@ const explicitBothExport = buildNuvioExport({
 assert.deepEqual(explicitBothExport[0].folders[0].sources.map((source) => source.mediaType), ["MOVIE", "TV"]);
 
 nextId = 0;
+const perListMediaExport = buildNuvioExportPayload({
+  lists: [
+    list("Auto Movie", 206),
+    list("Forced Series", 207),
+    list("Forced Both", 208),
+  ],
+  mediaModes: {
+    206: "automatic",
+    207: "series",
+    208: "both",
+  },
+  mediaDetections: {
+    206: { status: "resolved", movieCount: 8, showCount: 0 },
+    207: { status: "resolved", movieCount: 8, showCount: 0 },
+    208: { status: "resolved", movieCount: 8, showCount: 0 },
+  },
+  sortMode: "selected",
+  createId,
+});
+assert.deepEqual(
+  perListMediaExport.collections[0].folders.map((folder) => folder.sources.map((source) => source.mediaType)),
+  [["MOVIE"], ["TV"], ["MOVIE", "TV"]],
+);
+assert.equal(perListMediaExport.report.mediaDetectionFallbackCount, 0);
+
+nextId = 0;
 const imageExport = buildNuvioExport({
   lists,
   collectionName: "Image Picks",
@@ -583,7 +611,9 @@ const existingMediaUpgradePayload = buildNuvioExportPayload({
   existing: existingWithDuplicate,
   mode: "existing",
   targetCollectionKey: "collection-a",
-  mediaMode: "automatic",
+  mediaModes: {
+    101: "automatic",
+  },
   mediaDetections: {
     101: { status: "resolved", movieCount: 12, showCount: 5 },
   },
