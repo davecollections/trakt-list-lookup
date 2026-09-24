@@ -156,9 +156,14 @@ h2 {
 
 .search-control-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 28px;
   align-items: start;
+}
+
+.discovery-group {
+  padding-left: 28px;
+  border-left: 1px solid var(--border);
 }
 
 .control-group {
@@ -1194,6 +1199,13 @@ body.modal-open {
   .search-control-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .discovery-group {
+    padding-top: 12px;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
   }
 
   .query-row input {
