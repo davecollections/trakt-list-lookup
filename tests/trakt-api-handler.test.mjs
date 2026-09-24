@@ -462,8 +462,8 @@ async function testListItems() {
   const calls = mockFetch(({ url }) => {
     assert.equal(url.pathname, "/lists/808094/items/movie,show,episode,season");
     assert.equal(url.searchParams.get("page"), "1");
-    assert.equal(url.searchParams.get("limit"), "15");
-    assert.equal(url.searchParams.get("extended"), "full");
+    assert.equal(url.searchParams.get("limit"), "50");
+    assert.equal(url.searchParams.get("extended"), null);
     return jsonResponse([
       {
         rank: 1,
@@ -480,7 +480,7 @@ async function testListItems() {
       },
     ], {
       "x-pagination-page": "1",
-      "x-pagination-limit": "15",
+      "x-pagination-limit": "50",
       "x-pagination-page-count": "1",
       "x-pagination-item-count": "1",
     });
@@ -497,8 +497,8 @@ async function testListItems() {
   assert.equal(calls.length, 1);
   assert.equal(body.items.length, 1);
   assert.equal(body.items[0].title, "Demo Movie");
-  assert.equal(body.items[0].rating, 7.4);
-  assert.equal(body.pagination.limit, 15);
+  assert.equal("rating" in body.items[0], false);
+  assert.equal(body.pagination.limit, 50);
 }
 
 async function testListItemsWithoutPosters() {
