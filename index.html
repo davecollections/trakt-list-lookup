@@ -29,7 +29,7 @@
           <div class="search-control-grid">
             <div class="control-group">
               <span class="control-label">Search by</span>
-              <div class="mode-tabs" role="tablist" aria-label="Search mode">
+              <div class="mode-tabs" role="group" aria-label="Search by">
                 <label>
                   <input type="radio" name="mode" value="search" checked>
                   <span class="mode-label">Keyword</span>
@@ -42,17 +42,22 @@
                   <input type="radio" name="mode" value="url">
                   <span class="mode-label">URL</span>
                 </label>
-                <label class="discovery-tab">
-                  <input type="radio" name="mode" value="popular">
-                  <span class="mode-label mode-popular">Popular</span>
-                </label>
-                <label class="discovery-tab">
-                  <input type="radio" name="mode" value="trending">
-                  <span class="mode-label mode-trending">Trending</span>
-                </label>
               </div>
             </div>
 
+            <div class="control-group discovery-group">
+              <span class="control-label">Browse lists</span>
+              <div class="mode-tabs" role="group" aria-label="Browse lists">
+                <label class="discovery-tab">
+                  <input type="radio" name="mode" value="popular">
+                  <span class="mode-label mode-popular">Popular Lists</span>
+                </label>
+                <label class="discovery-tab">
+                  <input type="radio" name="mode" value="trending">
+                  <span class="mode-label mode-trending">Trending Lists</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <div class="query-row">
