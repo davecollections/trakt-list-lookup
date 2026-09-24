@@ -333,6 +333,10 @@ async function testResolveNumericListId() {
   assert.equal(calls.length, 1);
   assert.equal(body.results[0].ids.trakt, 600);
   assert.equal(body.results[0].like_count, 11);
+  assert.equal(
+    body.results[0].share_link,
+    "https://trakt.tv/users/demo/lists/id-list",
+  );
 }
 
 async function testRetryAfterIsPropagated() {
