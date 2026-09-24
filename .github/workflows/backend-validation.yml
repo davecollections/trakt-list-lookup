@@ -1,0 +1,28 @@
+name: Backend validation
+
+on:
+  push:
+    branches:
+      - agent/trakt-api-efficiency-cleanup
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run Trakt backend tests
+        run: |
+          node tests/trakt-api-handler.test.mjs
+          node tests/trakt-api-helpers.test.mjs
+      - name: Check backend syntax
+        run: |
+          node --check functions/api/trakt.js
+          node --check functions/lib/trakt-api-helpers.js
+          node --check functions/lib/trakt-client.js
+          node --check functions/lib/trakt-list-service.js
+          node --check tests/trakt-api-handler.test.mjs
