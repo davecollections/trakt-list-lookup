@@ -23,13 +23,16 @@ export function createSelectionUi({ selection, onClearSelection, onOpenNuvioExpo
 
   function render() {
     const count = selection.size;
-    selectionPanel.hidden = count === 0;
+    selectionPanel.hidden = false;
     selectionSummary.textContent = count
       ? `${formatNumber(count)} list${count === 1 ? "" : "s"} selected.`
-      : "No lists selected.";
+      : "Select one or more Trakt lists to create a Nuvio JSON export.";
     renderTable();
     manageSelectionButton.disabled = count === 0;
     openNuvioExportButton.disabled = count === 0;
+    openNuvioExportButton.title = count
+      ? "Create a Nuvio JSON export from the selected Trakt lists."
+      : "Select one or more Trakt lists to create a Nuvio JSON export.";
     clearSelectionButton.disabled = count === 0;
     if (isOpen() && count === 0) close();
   }
