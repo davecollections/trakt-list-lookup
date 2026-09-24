@@ -1,4 +1,3 @@
-import { showTraktApiServiceNotice } from "./js/service-notice.js";
 import { formatNumber } from "./js/formatting.js";
 import { fetchTraktLists } from "./js/api-client.js";
 import { createItemPreviewUi } from "./js/item-preview-ui.js";
@@ -20,7 +19,6 @@ const themeToggle = document.querySelector("#theme-toggle");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
 
-showTraktApiServiceNotice();
 
 const ITEMS_PREVIEW_LIMIT = 15;
 const POSTER_SAMPLE_LIMIT = 3;
