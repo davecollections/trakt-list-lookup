@@ -54,6 +54,16 @@ try {
   assert.deepEqual(samples, ["https://image.test/one.jpg"]);
   assert.equal(calls.length, 3);
 
+  const fullPreview = await fetchPosterPreviewItems(list(), {
+    targetCount: 50,
+    pageLimit: 50,
+    maxPages: 1,
+    requirePoster: false,
+  });
+  assert.deepEqual(fullPreview.items.map((item) => item.title), ["Missing poster", "Poster one"]);
+  assert.equal(calls.at(-1).searchParams.get("limit"), "50");
+  assert.equal(calls.at(-1).searchParams.get("page"), "1");
+
   const ownerlessPreview = await fetchPosterPreviewItems(list({
     trakt: 808094,
     slug: "great-movies-you-may-have-never-heard-of",
