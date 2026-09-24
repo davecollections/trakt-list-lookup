@@ -14,14 +14,19 @@ export async function fetchTraktLists({ mode, query, page, limit, sort, sortDire
   return fetchTraktJson(params, "Trakt request failed.");
 }
 
-export async function fetchTraktListItems({ user, slug, limit, page = 1, posters = true }) {
+export async function fetchTraktListItems({ id, user, slug, limit, page = 1, posters = true }) {
   const params = new URLSearchParams({
     mode: "items",
-    user,
-    slug,
     page: String(page),
     limit: String(limit),
   });
+
+  if (id) {
+    params.set("id", String(id));
+  } else {
+    params.set("user", user || "");
+    params.set("slug", slug || "");
+  }
 
   if (!posters) params.set("posters", "0");
 
