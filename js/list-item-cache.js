@@ -6,6 +6,7 @@ const pageCache = new Map();
 
 export function canFetchListItems(result) {
   if (result?.canPreview === false) return false;
+  if (result?.ids?.trakt) return true;
   return Boolean((result?.ownerUsername || result?.user?.username) && result?.ids?.slug);
 }
 
@@ -76,8 +77,9 @@ async function fetchCachedListItemsPage(result, { page, limit, posters = true })
   if (pageCache.has(cacheKey)) return pageCache.get(cacheKey);
 
   const request = fetchTraktListItems({
-    user: result.ownerUsername || result.user.username,
-    slug: result.ids.slug,
+    id: result.ids?.trakt,
+    user: result.ownerUsername || result.user?.username,
+    slug: result.ids?.slug,
     limit,
     page,
     posters,
