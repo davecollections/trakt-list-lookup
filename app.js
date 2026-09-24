@@ -16,6 +16,9 @@ const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
 const lastPageButton = document.querySelector("#last-page");
 const themeToggle = document.querySelector("#theme-toggle");
+const aboutCreditsOpenButton = document.querySelector("#about-credits-open");
+const aboutCreditsModal = document.querySelector("#about-credits-modal");
+const aboutCreditsCloseButton = document.querySelector("#about-credits-close");
 const backToTopButton = document.querySelector("#back-to-top");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
@@ -68,6 +71,12 @@ setTheme(savedTheme || preferredTheme);
 updateModeControls(getMode());
 initModalSystem();
 updateBackToTopVisibility();
+
+aboutCreditsOpenButton?.addEventListener("click", openAboutCredits);
+aboutCreditsCloseButton?.addEventListener("click", closeAboutCredits);
+aboutCreditsModal?.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-about-credits]")) closeAboutCredits();
+});
 
 window.addEventListener("scroll", updateBackToTopVisibility, { passive: true });
 backToTopButton?.addEventListener("click", () => {
@@ -203,6 +212,18 @@ async function runSearch(page) {
 
 function renderCurrentResults() {
   resultsView.renderResults(state.results);
+}
+
+function openAboutCredits() {
+  if (!aboutCreditsModal) return;
+  openModal(aboutCreditsModal, {
+    focusTarget: aboutCreditsCloseButton,
+    onClose: closeAboutCredits,
+  });
+}
+
+function closeAboutCredits() {
+  closeModal(aboutCreditsModal);
 }
 
 function updateBackToTopVisibility() {
