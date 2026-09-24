@@ -72,6 +72,27 @@ export async function getListItems(listId, page, limit, clientId) {
   return traktFetch(`/lists/${safeListId}/items/movie,show,episode,season?${params.toString()}`, clientId);
 }
 
+export async function getListMediaComposition(listId, clientId) {
+  const safeListId = encodeURIComponent(listId);
+  const params = new URLSearchParams({
+    page: "1",
+    limit: "1",
+  });
+
+  const [movies, shows] = await Promise.all([
+    traktFetch(`/lists/${safeListId}/items/movie?${params.toString()}`, clientId),
+    traktFetch(`/lists/${safeListId}/items/show?${params.toString()}`, clientId),
+  ]);
+
+  const movieCount = Number(movies.pagination?.item_count || 0);
+  const showCount = Number(shows.pagination?.item_count || 0);
+
+  return {
+    movie_count: Number.isFinite(movieCount) ? movieCount : 0,
+    show_count: Number.isFinite(showCount) ? showCount : 0,
+  };
+}
+
 export async function getListItemsByRoute(username, slug, page, limit, clientId) {
   const safeUsername = encodeURIComponent(username);
   const safeSlug = encodeURIComponent(slug);
