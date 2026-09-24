@@ -1,7 +1,7 @@
 import { formatNumber } from "./js/formatting.js";
 import { fetchTraktLists } from "./js/api-client.js";
 import { createItemPreviewUi } from "./js/item-preview-ui.js";
-import { initModalSystem } from "./js/modal-utils.js";
+import { closeModal, initModalSystem, openModal } from "./js/modal-utils.js";
 import { createNuvioExportUi } from "./js/nuvio-export-ui.js";
 import { createResultsView } from "./js/results-view.js";
 import { createSelectionState } from "./js/selection-state.js";
