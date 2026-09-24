@@ -1,0 +1,25 @@
+name: Restore UI validation
+
+on:
+  push:
+    branches:
+      - agent/restore-live-ui
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run full test suite
+        run: npm test
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check app.js
+          node --check js/api-client.js
+          node --check js/list-item-cache.js
+          node --check tests/list-item-cache.test.mjs
