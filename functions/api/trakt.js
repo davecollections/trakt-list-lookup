@@ -24,6 +24,7 @@ import {
 import {
   getListItems,
   getListItemsByRoute,
+  getListMediaComposition,
   getTraktClientId,
 } from "../lib/trakt-client.js";
 
@@ -58,6 +59,19 @@ export async function onRequestGet({ request, env, waitUntil }) {
   if (cached) return cached;
 
   try {
+    if (mode === "media") {
+      const listId = parseTraktListId((url.searchParams.get("id") || "").trim());
+      if (!listId) {
+        return json({ error: "Invalid or missing Trakt list ID." }, 400);
+      }
+
+      const media = await getListMediaComposition(listId, clientId);
+      return cacheSuccessfulApiResponse(request, json({
+        id: Number(listId),
+        ...media,
+      }, 200, true), waitUntil);
+    }
+
     if (mode === "items") {
       const rawListId = (url.searchParams.get("id") || "").trim();
       const listId = parseTraktListId(rawListId);
@@ -196,6 +210,7 @@ function shouldIncludePosters(url) {
 }
 
 function getRequestRateLimitCost(mode, sort) {
+  if (mode === "media") return 2;
   if (sort && mode !== "url") return SORT_REQUEST_COST;
   return 1;
 }
