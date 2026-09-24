@@ -62,7 +62,17 @@ export async function traktFetch(path, clientId, { quietStatuses = [], timeoutMs
   };
 }
 
-export async function getListItems(username, slug, page, limit, clientId) {
+export async function getListItems(listId, page, limit, clientId) {
+  const safeListId = encodeURIComponent(listId);
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+    extended: "full",
+  });
+  return traktFetch(`/lists/${safeListId}/items/movie,show,episode,season?${params.toString()}`, clientId);
+}
+
+export async function getListItemsByRoute(username, slug, page, limit, clientId) {
   const safeUsername = encodeURIComponent(username);
   const safeSlug = encodeURIComponent(slug);
   const params = new URLSearchParams({
