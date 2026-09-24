@@ -71,7 +71,8 @@ assert.match(indexHtml, /<div class="top-actions">[\s\S]*id="about-credits-open"
 assert.match(indexHtml, /id="about-credits-modal"[^>]*class="modal"[^>]*hidden/);
 assert.match(indexHtml, /<h2 id="about-credits-title">About &amp; Credits<\/h2>/);
 assert.match(indexHtml, /href="https:\/\/github\.com\/davecollections\/trakt-list-lookup\/issues"[^>]*>Feedback \/ report an issue<\/a>/);
-assert.match(indexHtml, /href="https:\/\/davecollections\.github\.io\/tmdb-id-lookup\/builder\/"[^>]*>Dingo's Collection Builder<\/a>/);
+assert.doesNotMatch(indexHtml, /Dingo's Collection Builder/);
+assert.doesNotMatch(indexHtml, /tmdb-id-lookup\/builder\//);
 assert.match(indexHtml, /href="https:\/\/davecollections\.github\.io\/tmdb-id-lookup\/"[^>]*>TMDB ID Lookup Tool<\/a>/);
 assert.match(indexHtml, /Public list data is supplied by Trakt\. Trakt List Lookup is an independent tool and is not affiliated with or endorsed by Trakt\./);
 assert.match(indexHtml, /This product uses the TMDB API but is not endorsed or certified by TMDB\./);
