@@ -14,6 +14,9 @@ try {
   globalThis.fetch = async (value) => {
     const url = new URL(value, "https://example.test");
     calls.push(url);
+    assert.ok(url.searchParams.get("id"));
+    assert.equal(url.searchParams.get("user"), null);
+    assert.equal(url.searchParams.get("slug"), null);
     const page = Number(url.searchParams.get("page"));
     return jsonResponse({
       items: page === 1
@@ -50,6 +53,17 @@ try {
   const samples = await fetchPosterSampleUrls(list(), { targetCount: 1 });
   assert.deepEqual(samples, ["https://image.test/one.jpg"]);
   assert.equal(calls.length, 3);
+
+  const ownerlessPreview = await fetchPosterPreviewItems(list({
+    trakt: 808094,
+    slug: "great-movies-you-may-have-never-heard-of",
+    username: "",
+  }), {
+    targetCount: 1,
+    maxPages: 1,
+  });
+  assert.equal(ownerlessPreview.items[0]?.title, "Poster one");
+  assert.equal(calls.at(-1).searchParams.get("id"), "808094");
 } finally {
   globalThis.fetch = originalFetch;
   clearListItemCache();
@@ -64,14 +78,16 @@ function jsonResponse(payload) {
   });
 }
 
-function list({ trakt = 123, slug = "demo" } = {}) {
+function list({ trakt = 123, slug = "demo", username = "snoak" } = {}) {
   return {
     ids: {
       trakt,
       slug,
     },
     user: {
-      username: "snoak",
+      username,
     },
+    ownerUsername: username,
+    canPreview: true,
   };
 }
