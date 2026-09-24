@@ -16,6 +16,7 @@ try {
   await testResolveListUrl();
   await testResolveNumericListId();
   await testOwnerlessNumericListRemainsPreviewable();
+  await testListMediaComposition();
   await testRetryAfterIsPropagated();
   await testUpstreamNonJsonIsGeneric();
   await testListItems();
@@ -362,6 +363,46 @@ async function testOwnerlessNumericListRemainsPreviewable() {
   assert.equal(body.results[0].canOpen, false);
   assert.equal(body.results[0].canPreview, true);
   assert.equal(body.results[0].isExportable, true);
+}
+
+async function testListMediaComposition() {
+  const calls = mockFetch(({ url }) => {
+    assert.equal(url.searchParams.get("page"), "1");
+    assert.equal(url.searchParams.get("limit"), "1");
+
+    if (url.pathname === "/lists/700/items/movie") {
+      return jsonResponse([{ rank: 1, type: "movie", movie: { title: "Movie" } }], {
+        "x-pagination-page": "1",
+        "x-pagination-limit": "1",
+        "x-pagination-page-count": "12",
+        "x-pagination-item-count": "12",
+      });
+    }
+
+    if (url.pathname === "/lists/700/items/show") {
+      return jsonResponse([{ rank: 1, type: "show", show: { title: "Show" } }], {
+        "x-pagination-page": "1",
+        "x-pagination-limit": "1",
+        "x-pagination-page-count": "4",
+        "x-pagination-item-count": "4",
+      });
+    }
+
+    throw new Error(`Unexpected media path ${url.pathname}`);
+  });
+
+  const response = await callHandler(
+    "https://example.test/api/trakt?mode=media&id=700",
+    env(),
+    { "CF-Connecting-IP": "203.0.113.114" },
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 2);
+  assert.equal(body.id, 700);
+  assert.equal(body.movie_count, 12);
+  assert.equal(body.show_count, 4);
 }
 
 async function testRetryAfterIsPropagated() {
