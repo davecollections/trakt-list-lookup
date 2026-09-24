@@ -15,6 +15,7 @@ try {
   await testFilteredUserLookupFollowsPaginationUntilMatch();
   await testResolveListUrl();
   await testResolveNumericListId();
+  await testOwnerlessNumericListRemainsPreviewable();
   await testRetryAfterIsPropagated();
   await testUpstreamNonJsonIsGeneric();
   await testListItems();
@@ -333,10 +334,34 @@ async function testResolveNumericListId() {
   assert.equal(calls.length, 1);
   assert.equal(body.results[0].ids.trakt, 600);
   assert.equal(body.results[0].like_count, 11);
-  assert.equal(
-    body.results[0].share_link,
-    "https://trakt.tv/users/demo/lists/id-list",
+}
+
+async function testOwnerlessNumericListRemainsPreviewable() {
+  const calls = mockFetch(({ url }) => {
+    assert.equal(url.pathname, "/lists/808094");
+    return jsonResponse(list({
+      name: "Great Movies You May Have Never Heard Of",
+      trakt: 808094,
+      slug: "great-movies-you-may-have-never-heard-of",
+      username: "",
+      likes: 1683,
+    }));
+  });
+
+  const response = await callHandler(
+    "https://example.test/api/trakt?mode=url&q=808094",
+    env(),
+    { "CF-Connecting-IP": "203.0.113.113" },
   );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(body.results[0].ids.trakt, 808094);
+  assert.equal(body.results[0].ownerUsername, "");
+  assert.equal(body.results[0].canOpen, false);
+  assert.equal(body.results[0].canPreview, true);
+  assert.equal(body.results[0].isExportable, true);
 }
 
 async function testRetryAfterIsPropagated() {
@@ -394,7 +419,7 @@ async function testUpstreamNonJsonIsGeneric() {
 
 async function testListItems() {
   const calls = mockFetch(({ url }) => {
-    assert.equal(url.pathname, "/users/snoak/lists/demo/items");
+    assert.equal(url.pathname, "/lists/808094/items/movie,show,episode,season");
     assert.equal(url.searchParams.get("page"), "1");
     assert.equal(url.searchParams.get("limit"), "15");
     assert.equal(url.searchParams.get("extended"), "full");
@@ -421,7 +446,7 @@ async function testListItems() {
   });
 
   const response = await callHandler(
-    "https://example.test/api/trakt?mode=items&user=snoak&slug=demo&limit=50",
+    "https://example.test/api/trakt?mode=items&id=808094&limit=50",
     env(),
     { "CF-Connecting-IP": "203.0.113.111" },
   );
@@ -437,7 +462,7 @@ async function testListItems() {
 
 async function testListItemsWithoutPosters() {
   const calls = mockFetch(({ url }) => {
-    assert.equal(url.pathname, "/users/snoak/lists/demo/items");
+    assert.equal(url.pathname, "/lists/33123250/items/movie,show,episode,season");
     return jsonResponse([
       {
         rank: 1,
@@ -455,7 +480,7 @@ async function testListItemsWithoutPosters() {
   });
 
   const response = await callHandler(
-    "https://example.test/api/trakt?mode=items&user=snoak&slug=demo&posters=0",
+    "https://example.test/api/trakt?mode=items&id=33123250&posters=0",
     {
       ...env(),
       TMDB_API_KEY: "test-tmdb-key",
