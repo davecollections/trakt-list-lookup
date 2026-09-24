@@ -81,7 +81,14 @@ export function createResultsView({
       node.querySelector(".trakt-id-button").textContent = result.ids?.trakt || "n/a";
       const itemCount = node.querySelector(".result-counts");
       itemCount.hidden = !displayState.showTrustedMetadata;
-      itemCount.querySelector(".items").textContent = displayState.showTrustedMetadata ? formatNumber(result.item_count) : "";
+      const formattedItemCount = displayState.showTrustedMetadata ? formatNumber(result.item_count) : "";
+      itemCount.querySelector(".items").textContent = formattedItemCount;
+      itemCount.title = "Trakt item count; unusual lists may include seasons or episodes.";
+      if (displayState.showTrustedMetadata) {
+        itemCount.setAttribute("aria-label", `Titles: ${formattedItemCount}. Trakt item count; unusual lists may include seasons or episodes.`);
+      } else {
+        itemCount.removeAttribute("aria-label");
+      }
       const likes = node.querySelector(".result-likes");
       likes.hidden = !displayState.showTrustedMetadata;
       likes.querySelector(".likes").textContent = displayState.showTrustedMetadata ? formatNumber(result.like_count) : "";
