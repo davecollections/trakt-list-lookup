@@ -130,16 +130,17 @@ export async function onRequestGet({ request, env, waitUntil }) {
       return json({ error: "Unsupported search mode." }, 400);
     }
 
-    const quickUsersPromise = mode !== "url" && !directListId
-      ? getQuickUsers(mode, query, payload, clientId)
-      : null;
     const lists = await validateListAvailability(payload.data, clientId);
-    const quickUsersPayload = mode === "url" || directListId
-      ? { ...payload, quickUserLists: lists }
-      : payload;
-    const quickUsers = quickUsersPromise
-      ? await withTimeout(quickUsersPromise, QUICK_USERS_TIMEOUT_MS, null)
-      : await withTimeout(getQuickUsers(mode, query, quickUsersPayload, clientId), QUICK_USERS_TIMEOUT_MS, null);
+    const quickUsersPayload = {
+      ...payload,
+      data: lists,
+      quickUserLists: lists,
+    };
+    const quickUsers = await withTimeout(
+      getQuickUsers(mode, query, quickUsersPayload, clientId),
+      QUICK_USERS_TIMEOUT_MS,
+      null,
+    );
 
     const responsePayload = {
       results: lists.map(normalizeList).filter(Boolean),
