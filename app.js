@@ -16,12 +16,14 @@ const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
 const lastPageButton = document.querySelector("#last-page");
 const themeToggle = document.querySelector("#theme-toggle");
+const backToTopButton = document.querySelector("#back-to-top");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
 
 
 const ITEMS_PREVIEW_LIMIT = 50;
 const POSTER_SAMPLE_LIMIT = 3;
+const BACK_TO_TOP_SCROLL_THRESHOLD = 700;
 
 const state = {
   mode: "search",
@@ -65,6 +67,16 @@ const preferredTheme = window.matchMedia?.("(prefers-color-scheme: dark)")?.matc
 setTheme(savedTheme || preferredTheme);
 updateModeControls(getMode());
 initModalSystem();
+updateBackToTopVisibility();
+
+window.addEventListener("scroll", updateBackToTopVisibility, { passive: true });
+backToTopButton?.addEventListener("click", () => {
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  window.scrollTo({
+    top: 0,
+    behavior: reduceMotion ? "auto" : "smooth",
+  });
+});
 
 themeToggle.addEventListener("click", () => {
   const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
@@ -191,6 +203,11 @@ async function runSearch(page) {
 
 function renderCurrentResults() {
   resultsView.renderResults(state.results);
+}
+
+function updateBackToTopVisibility() {
+  if (!backToTopButton) return;
+  backToTopButton.hidden = window.scrollY < BACK_TO_TOP_SCROLL_THRESHOLD;
 }
 
 function getMode() {
