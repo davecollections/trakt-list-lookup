@@ -31,7 +31,7 @@ import {
 const MAX_RESULT_LIMIT = 50;
 const ITEM_LIMIT = 15;
 const MAX_PAGE = 25;
-const MAX_ITEM_LIMIT = 15;
+const MAX_ITEM_LIMIT = 50;
 const MAX_QUERY_LENGTH = 220;
 const SORT_REQUEST_COST = 8;
 const QUICK_USERS_TIMEOUT_MS = 1200;
