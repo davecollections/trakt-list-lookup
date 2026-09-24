@@ -28,8 +28,6 @@ export function createNuvioExportUi({ selection }) {
   const coverUrlInput = document.querySelector("#nuvio-cover-url");
   const coverStatus = document.querySelector("#nuvio-cover-status");
   const sortModeSelect = document.querySelector("#nuvio-sort-mode");
-  const mediaModeSelect = document.querySelector("#nuvio-media-mode");
-  const mediaStatus = document.querySelector("#nuvio-media-status");
   const folderTileShapeButtons = [...document.querySelectorAll("[data-folder-tile-shape]")];
   const folderTitleModeButtons = [...document.querySelectorAll("[data-folder-title-mode]")];
   const folderImageStatus = document.querySelector("#nuvio-folder-image-status");
@@ -70,6 +68,7 @@ export function createNuvioExportUi({ selection }) {
   };
   const folderImageCache = new Map();
   const mediaDetectionCache = new Map();
+  const mediaModeChoices = new Map();
   const folderArtworkChoices = new Map();
   let importSources = [];
   let importSourceCounter = 0;
@@ -88,7 +87,6 @@ export function createNuvioExportUi({ selection }) {
   collectionNameInput.addEventListener("input", update);
   coverUrlInput.addEventListener("input", update);
   sortModeSelect.addEventListener("change", update);
-  mediaModeSelect.addEventListener("change", update);
   folderTileShapeButtons.forEach((button) => {
     button.addEventListener("click", () => {
       folderTileShape = button.dataset.folderTileShape || DEFAULT_FOLDER_TILE_SHAPE;
@@ -146,6 +144,21 @@ export function createNuvioExportUi({ selection }) {
     syncFolderArtworkRow(row, key);
     refreshGeneratedOutput();
   });
+  folderArtworkOverrides.addEventListener("change", (event) => {
+    const mediaSelect = event.target.closest("select[data-media-mode-key]");
+    if (!mediaSelect) return;
+    const key = mediaSelect.dataset.mediaModeKey;
+    const mode = normalizeMediaMode(mediaSelect.value);
+    if (mode === DEFAULT_MEDIA_MODE) {
+      mediaModeChoices.delete(key);
+    } else {
+      mediaModeChoices.set(key, mode);
+    }
+    renderFolderArtworkOverrides();
+    refreshMediaDetections();
+    refreshGeneratedOutput();
+  });
+
   folderArtworkOverrides.addEventListener("focusin", (event) => {
     const input = event.target.closest("input[data-folder-cover-key]");
     if (!input || !input.value || input.dataset.selectedOnFocus === "true") return;
@@ -247,7 +260,7 @@ export function createNuvioExportUi({ selection }) {
       output.value = payload.json;
       updateExportSummary(payload);
       renderExportStatus(payload);
-      setJsonActionsDisabled(getMediaMode() === DEFAULT_MEDIA_MODE && hasSelectedMediaDetectionLoading());
+      setJsonActionsDisabled(hasSelectedMediaDetectionLoading());
     } catch (error) {
       latestPayload = null;
       output.value = `Could not build JSON: ${error.message}`;
@@ -269,7 +282,7 @@ export function createNuvioExportUi({ selection }) {
       folderImages: getFolderImageObject(),
       folderTileShape,
       hideFolderTitles: folderTitleMode !== "show",
-      mediaMode: getMediaMode(),
+      mediaModes: getMediaModeObject(),
       mediaDetections: getMediaDetectionObject(),
       sortMode: sortModeSelect.value,
       splitAssignments: selection.splitAssignmentObject(),
@@ -561,7 +574,7 @@ export function createNuvioExportUi({ selection }) {
     heading.className = "nuvio-folder-artwork-heading";
 
     const title = document.createElement("strong");
-    title.textContent = "Folder artwork overrides";
+    title.textContent = "Per-list options";
     heading.append(title);
     folderArtworkOverrides.append(heading);
 
@@ -601,11 +614,38 @@ export function createNuvioExportUi({ selection }) {
       const name = document.createElement("strong");
       name.textContent = result.name || "Untitled list";
 
+      const mediaField = document.createElement("label");
+      mediaField.className = "nuvio-list-media-field";
+
+      const mediaLabel = document.createElement("span");
+      mediaLabel.textContent = "Media type";
+
+      const mediaSelect = document.createElement("select");
+      mediaSelect.dataset.mediaModeKey = key;
+      mediaSelect.setAttribute("aria-label", `${result.name || "Selected list"} media type`);
+      [
+        ["automatic", "Automatic"],
+        ["both", "Both"],
+        ["movies", "Movies"],
+        ["series", "Series"],
+      ].forEach(([value, label]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        mediaSelect.append(option);
+      });
+      mediaSelect.value = getListMediaMode(key);
+
+      const mediaStatus = document.createElement("small");
+      mediaStatus.className = "field-status";
+      mediaStatus.textContent = getMediaStatusText(key);
+      mediaField.append(mediaLabel, mediaSelect, mediaStatus);
+
       const status = document.createElement("small");
       status.className = "field-status";
       status.dataset.folderArtworkStatus = "true";
 
-      details.append(name, status);
+      details.append(name, mediaField, status);
 
       const modeGroup = document.createElement("div");
       modeGroup.className = "nuvio-folder-artwork-modes";
@@ -935,9 +975,20 @@ export function createNuvioExportUi({ selection }) {
     return getSelectedListsForExport().map((result) => getListSelectionKey(result)).filter(Boolean).join("|");
   }
 
-  function getMediaMode() {
-    const value = String(mediaModeSelect.value || DEFAULT_MEDIA_MODE).toLowerCase();
-    return ["automatic", "both", "movies", "series"].includes(value) ? value : DEFAULT_MEDIA_MODE;
+  function normalizeMediaMode(value) {
+    const mode = String(value || DEFAULT_MEDIA_MODE).toLowerCase();
+    return ["automatic", "both", "movies", "series"].includes(mode) ? mode : DEFAULT_MEDIA_MODE;
+  }
+
+  function getListMediaMode(key) {
+    return normalizeMediaMode(mediaModeChoices.get(key) || DEFAULT_MEDIA_MODE);
+  }
+
+  function getMediaModeObject() {
+    return Object.fromEntries(getSelectedListsForExport().flatMap((result) => {
+      const key = getListSelectionKey(result);
+      return key ? [[key, getListMediaMode(key)]] : [];
+    }));
   }
 
   function getMediaDetectionObject() {
@@ -950,25 +1001,24 @@ export function createNuvioExportUi({ selection }) {
   }
 
   function hasSelectedMediaDetectionLoading() {
-    if (getMediaMode() !== DEFAULT_MEDIA_MODE) return false;
     return getSelectedListsForExport().some((result) => {
       const key = getListSelectionKey(result);
-      if (!key) return false;
+      if (!key || getListMediaMode(key) !== DEFAULT_MEDIA_MODE) return false;
       const detection = mediaDetectionCache.get(key);
       return !detection || detection.status === "loading";
     });
   }
 
   async function refreshMediaDetections() {
-    const selected = getSelectedListsForExport().filter((result) => getListSelectionKey(result));
-    if (getMediaMode() !== DEFAULT_MEDIA_MODE) {
-      updateMediaDetectionStatus();
-      return;
-    }
+    const selected = getSelectedListsForExport().filter((result) => {
+      const key = getListSelectionKey(result);
+      return key && getListMediaMode(key) === DEFAULT_MEDIA_MODE;
+    });
 
     const missing = selected.filter((result) => !mediaDetectionCache.has(getListSelectionKey(result)));
     if (!missing.length) {
-      updateMediaDetectionStatus();
+      renderFolderArtworkOverrides();
+      refreshGeneratedOutput();
       return;
     }
 
@@ -979,7 +1029,7 @@ export function createNuvioExportUi({ selection }) {
         showCount: 0,
       });
     });
-    updateMediaDetectionStatus();
+    renderFolderArtworkOverrides();
     setJsonActionsDisabled(true);
 
     let cursor = 0;
@@ -1006,54 +1056,24 @@ export function createNuvioExportUi({ selection }) {
     });
 
     await Promise.all(workers);
-    updateMediaDetectionStatus();
+    renderFolderArtworkOverrides();
     refreshGeneratedOutput();
   }
 
-  function updateMediaDetectionStatus() {
-    const selected = getSelectedListsForExport().filter((result) => getListSelectionKey(result));
-    const mode = getMediaMode();
+  function getMediaStatusText(key) {
+    const mode = getListMediaMode(key);
+    if (mode === "both") return "Export: Movies & Series";
+    if (mode === "movies") return "Export: Movies";
+    if (mode === "series") return "Export: Series";
 
-    if (!selected.length) {
-      mediaStatus.textContent = "";
-      return;
-    }
-
-    if (mode !== DEFAULT_MEDIA_MODE) {
-      const label = mode === "both" ? "Movies & Series" : mode === "series" ? "Series" : "Movies";
-      mediaStatus.textContent = `All selected lists will export as ${label}.`;
-      return;
-    }
-
-    const detections = selected.map((result) => mediaDetectionCache.get(getListSelectionKey(result)));
-    const loadingCount = detections.filter((entry) => !entry || entry.status === "loading").length;
-    if (loadingCount) {
-      mediaStatus.textContent = `Detecting media for ${formatNumber(loadingCount)} selected list${loadingCount === 1 ? "" : "s"}...`;
-      return;
-    }
-
-    let movies = 0;
-    let series = 0;
-    let both = 0;
-    let fallback = 0;
-    detections.forEach((entry) => {
-      const movieCount = Number(entry?.movieCount || 0);
-      const showCount = Number(entry?.showCount || 0);
-      if (movieCount > 0 && showCount > 0) both += 1;
-      else if (showCount > 0) series += 1;
-      else if (movieCount > 0) movies += 1;
-      else fallback += 1;
-    });
-
-    const parts = [];
-    if (movies) parts.push(`${formatNumber(movies)} Movies`);
-    if (series) parts.push(`${formatNumber(series)} Series`);
-    if (both) parts.push(`${formatNumber(both)} Movies & Series`);
-    const detected = parts.length ? `Detected: ${parts.join(" · ")}.` : "";
-    const fallbackText = fallback
-      ? ` ${formatNumber(fallback)} list${fallback === 1 ? "" : "s"} could not be determined and will use Both.`
-      : "";
-    mediaStatus.textContent = `${detected}${fallbackText}`.trim();
+    const detection = mediaDetectionCache.get(key);
+    if (!detection || detection.status === "loading") return "Detecting media...";
+    const movieCount = Number(detection.movieCount || 0);
+    const showCount = Number(detection.showCount || 0);
+    if (movieCount > 0 && showCount > 0) return "Detected: Movies & Series";
+    if (showCount > 0) return "Detected: Series";
+    if (movieCount > 0) return "Detected: Movies";
+    return "Could not detect; Both will be used.";
   }
 
   function resetExportForm() {
@@ -1063,11 +1083,11 @@ export function createNuvioExportUi({ selection }) {
     latestPayload = null;
     importSources = [];
     folderArtworkChoices.clear();
+    mediaModeChoices.clear();
 
     collectionNameInput.value = "";
     coverUrlInput.value = "";
     sortModeSelect.value = DEFAULT_SORT_MODE;
-    mediaModeSelect.value = DEFAULT_MEDIA_MODE;
     folderTileShape = DEFAULT_FOLDER_TILE_SHAPE;
     folderTitleMode = DEFAULT_FOLDER_TITLE_MODE;
     syncFolderDisplayButtons();
