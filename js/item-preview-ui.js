@@ -2,8 +2,6 @@ import { formatNumber } from "./formatting.js";
 import { fetchPosterPreviewItems } from "./list-item-cache.js";
 import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
 
-const MAX_PREVIEW_ITEM_PAGES = 5;
-
 export function createItemPreviewUi({ itemPreviewLimit }) {
   const previewModal = document.querySelector("#preview-modal");
   const previewTitle = document.querySelector("#preview-title");
@@ -46,15 +44,15 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
     try {
       const preview = await fetchPosterPreviewItems(result, {
         targetCount: itemPreviewLimit,
-        maxPages: MAX_PREVIEW_ITEM_PAGES,
+        pageLimit: itemPreviewLimit,
+        maxPages: 1,
+        requirePoster: false,
       });
       const posterItems = preview.items;
       renderItems(modalItemList, posterItems);
       previewStatus.textContent = posterItems.length
-        ? `Showing a sample of ${formatNumber(posterItems.length)} titles from this list.`
-        : preview.total
-          ? `No poster previews available in the first ${formatNumber(preview.scanned)} of ${formatNumber(preview.total)}.`
-          : "No items found.";
+        ? `Showing the first ${formatNumber(posterItems.length)} title${posterItems.length === 1 ? "" : "s"} from this list.`
+        : "No items found.";
     } catch (error) {
       previewStatus.textContent = error.message;
     } finally {
@@ -147,21 +145,7 @@ function renderItems(container, items) {
       posterWrap.textContent = "No poster";
     }
 
-    const ratingBadge = renderRatingBadge(item);
-    if (ratingBadge) posterWrap.append(ratingBadge);
-
     card.append(posterWrap);
     container.append(card);
   });
-}
-
-function renderRatingBadge(item) {
-  const rating = Number(item.rating);
-  if (!Number.isFinite(rating) || rating <= 0) return null;
-
-  const badge = document.createElement("span");
-  badge.className = "preview-rating-badge";
-  badge.textContent = rating.toFixed(1);
-  badge.title = "Trakt rating";
-  return badge;
 }
