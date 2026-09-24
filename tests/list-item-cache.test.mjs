@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { getPreviewStatusText } from "../js/item-preview-ui.js";
 import {
   clearListItemCache,
   fetchFirstPosterUrl,
@@ -7,6 +8,19 @@ import {
 } from "../js/list-item-cache.js";
 
 const originalFetch = globalThis.fetch;
+
+assert.equal(
+  getPreviewStatusText({ items: Array.from({ length: 37 }, () => ({})), total: 37 }),
+  "Showing 37 of 37 titles from this list.",
+);
+assert.equal(
+  getPreviewStatusText({ items: Array.from({ length: 50 }, () => ({})), total: 443 }),
+  "Showing the first 50 titles from this list.",
+);
+assert.equal(
+  getPreviewStatusText({ items: [], total: 0 }),
+  "No items found.",
+);
 
 try {
   clearListItemCache();
