@@ -67,7 +67,6 @@ export async function getListItems(listId, page, limit, clientId) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
-    extended: "full",
   });
   return traktFetch(`/lists/${safeListId}/items/movie,show,episode,season?${params.toString()}`, clientId);
 }
@@ -99,7 +98,6 @@ export async function getListItemsByRoute(username, slug, page, limit, clientId)
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
-    extended: "full",
   });
   return traktFetch(`/users/${safeUsername}/lists/${safeSlug}/items?${params.toString()}`, clientId);
 }
