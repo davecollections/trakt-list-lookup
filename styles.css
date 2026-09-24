@@ -121,6 +121,11 @@ input {
   font-size: 0.86rem;
 }
 
+.top-actions {
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 h1,
 h2,
 h3,
@@ -156,9 +161,14 @@ h2 {
 
 .search-control-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 28px;
   align-items: start;
+}
+
+.discovery-group {
+  padding-left: 28px;
+  border-left: 1px solid var(--border);
 }
 
 .control-group {
@@ -208,8 +218,20 @@ h2 {
 }
 
 .discovery-tab .mode-label {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  min-height: 36px;
+  padding: 0 14px;
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--soft) 72%, var(--panel));
+  color: var(--muted);
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.discovery-tab .mode-label:hover {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
   background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+  color: var(--text);
 }
 
 .mode-popular::before {
@@ -1081,25 +1103,6 @@ body.modal-open {
   object-fit: cover;
 }
 
-.preview-rating-badge {
-  position: absolute;
-  left: 50%;
-  bottom: 7px;
-  display: inline-grid;
-  min-width: 34px;
-  min-height: 22px;
-  place-items: center;
-  padding: 0 8px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  background: rgba(10, 12, 16, 0.72);
-  color: white;
-  font-size: 0.72rem;
-  font-weight: 800;
-  line-height: 1;
-  transform: translateX(-50%);
-  backdrop-filter: blur(4px);
-}
 
 .item-empty {
   color: var(--muted);
@@ -1125,6 +1128,136 @@ body.modal-open {
   gap: 4px;
 }
 
+.about-credits-trigger {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.about-credits-trigger:hover,
+.about-credits-trigger:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--soft));
+  color: var(--accent-dark);
+}
+
+.about-credits-dialog {
+  width: min(580px, 100%);
+  padding: 0;
+  overflow: hidden;
+}
+
+.about-credits-heading {
+  margin: 0;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.about-credits-heading h2 {
+  font-size: 1.08rem;
+}
+
+.about-credits-content {
+  display: grid;
+  gap: 16px;
+  padding: 16px 18px 18px;
+}
+
+.about-credits-attributions {
+  display: grid;
+  gap: 12px;
+}
+
+.about-credit-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.about-credit-row p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.about-credit-logo-link {
+  display: grid;
+  min-height: 40px;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.about-credit-logo {
+  display: block;
+  max-width: 38px;
+  height: auto;
+  object-fit: contain;
+}
+
+.trakt-credit-logo {
+  width: 32px;
+  border-radius: 7px;
+}
+
+.tmdb-credit-logo {
+  width: 38px;
+}
+
+.about-credits-footer {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.about-credits-creator,
+.about-credits-independence {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.about-credits-creator a {
+  color: var(--accent);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.about-credits-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+}
+
+.about-credits-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 82%, var(--soft));
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.about-credits-links a:hover,
+.about-credits-links a:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border));
+  color: var(--accent-dark);
+}
+
 .site-footer nav {
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -1147,6 +1280,38 @@ body.modal-open {
 .site-footer nav a:hover,
 .project-guide-link a:hover {
   color: var(--accent-dark);
+}
+
+.back-to-top {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 15;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--panel) 88%, var(--accent) 12%);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.2);
+  cursor: pointer;
+  font-size: 1.35rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.back-to-top:hover,
+.back-to-top:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 66%, var(--border));
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  color: var(--accent-dark);
+}
+
+.back-to-top[hidden] {
+  display: none;
 }
 
 @media (min-width: 1061px) {
@@ -1198,6 +1363,32 @@ body.modal-open {
     padding: 18px;
   }
 
+  .back-to-top {
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: 46px;
+    height: 46px;
+  }
+
+  .about-credits-content {
+    padding: 14px;
+  }
+
+  .about-credit-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .about-credits-links {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .about-credits-links a {
+    justify-content: center;
+    width: 100%;
+  }
+
   .title-row,
   .results-toolbar,
   .modal-header,
@@ -1213,6 +1404,13 @@ body.modal-open {
   .search-control-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .discovery-group {
+    padding-top: 12px;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
   }
 
   .query-row input {
@@ -1345,7 +1543,7 @@ body.modal-open {
   }
 
   .result-counts::before {
-    content: "Items";
+    content: "Titles";
   }
 
   .result-likes::before {
@@ -1385,12 +1583,17 @@ body.modal-open {
   .toolbar-actions,
   .pager,
   .sort-control,
-  .top-actions,
   .site-footer nav,
   .selection-panel,
   .selection-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .top-actions {
+    align-self: flex-end;
+    width: auto;
+    justify-content: flex-end;
   }
 
   .selection-panel {

@@ -16,6 +16,7 @@ try {
   await testResolveListUrl();
   await testResolveNumericListId();
   await testOwnerlessNumericListRemainsPreviewable();
+  await testListMediaComposition();
   await testRetryAfterIsPropagated();
   await testUpstreamNonJsonIsGeneric();
   await testListItems();
@@ -364,6 +365,46 @@ async function testOwnerlessNumericListRemainsPreviewable() {
   assert.equal(body.results[0].isExportable, true);
 }
 
+async function testListMediaComposition() {
+  const calls = mockFetch(({ url }) => {
+    assert.equal(url.searchParams.get("page"), "1");
+    assert.equal(url.searchParams.get("limit"), "1");
+
+    if (url.pathname === "/lists/700/items/movie") {
+      return jsonResponse([{ rank: 1, type: "movie", movie: { title: "Movie" } }], {
+        "x-pagination-page": "1",
+        "x-pagination-limit": "1",
+        "x-pagination-page-count": "12",
+        "x-pagination-item-count": "12",
+      });
+    }
+
+    if (url.pathname === "/lists/700/items/show") {
+      return jsonResponse([{ rank: 1, type: "show", show: { title: "Show" } }], {
+        "x-pagination-page": "1",
+        "x-pagination-limit": "1",
+        "x-pagination-page-count": "4",
+        "x-pagination-item-count": "4",
+      });
+    }
+
+    throw new Error(`Unexpected media path ${url.pathname}`);
+  });
+
+  const response = await callHandler(
+    "https://example.test/api/trakt?mode=media&id=700",
+    env(),
+    { "CF-Connecting-IP": "203.0.113.114" },
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 2);
+  assert.equal(body.id, 700);
+  assert.equal(body.movie_count, 12);
+  assert.equal(body.show_count, 4);
+}
+
 async function testRetryAfterIsPropagated() {
   const response = await withMutedConsoleError(async () => {
     mockFetch(({ url }) => {
@@ -421,8 +462,8 @@ async function testListItems() {
   const calls = mockFetch(({ url }) => {
     assert.equal(url.pathname, "/lists/808094/items/movie,show,episode,season");
     assert.equal(url.searchParams.get("page"), "1");
-    assert.equal(url.searchParams.get("limit"), "15");
-    assert.equal(url.searchParams.get("extended"), "full");
+    assert.equal(url.searchParams.get("limit"), "50");
+    assert.equal(url.searchParams.get("extended"), null);
     return jsonResponse([
       {
         rank: 1,
@@ -439,7 +480,7 @@ async function testListItems() {
       },
     ], {
       "x-pagination-page": "1",
-      "x-pagination-limit": "15",
+      "x-pagination-limit": "50",
       "x-pagination-page-count": "1",
       "x-pagination-item-count": "1",
     });
@@ -456,8 +497,8 @@ async function testListItems() {
   assert.equal(calls.length, 1);
   assert.equal(body.items.length, 1);
   assert.equal(body.items[0].title, "Demo Movie");
-  assert.equal(body.items[0].rating, 7.4);
-  assert.equal(body.pagination.limit, 15);
+  assert.equal("rating" in body.items[0], false);
+  assert.equal(body.pagination.limit, 50);
 }
 
 async function testListItemsWithoutPosters() {

@@ -2,8 +2,6 @@ import { formatNumber } from "./formatting.js";
 import { fetchPosterPreviewItems } from "./list-item-cache.js";
 import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
 
-const MAX_PREVIEW_ITEM_PAGES = 5;
-
 export function createItemPreviewUi({ itemPreviewLimit }) {
   const previewModal = document.querySelector("#preview-modal");
   const previewTitle = document.querySelector("#preview-title");
@@ -46,15 +44,13 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
     try {
       const preview = await fetchPosterPreviewItems(result, {
         targetCount: itemPreviewLimit,
-        maxPages: MAX_PREVIEW_ITEM_PAGES,
+        pageLimit: itemPreviewLimit,
+        maxPages: 1,
+        requirePoster: false,
       });
-      const posterItems = preview.items;
-      renderItems(modalItemList, posterItems);
-      previewStatus.textContent = posterItems.length
-        ? `Showing a sample of ${formatNumber(posterItems.length)} titles from this list.`
-        : preview.total
-          ? `No poster previews available in the first ${formatNumber(preview.scanned)} of ${formatNumber(preview.total)}.`
-          : "No items found.";
+      const previewItems = preview.items;
+      renderItems(modalItemList, previewItems);
+      previewStatus.textContent = getPreviewStatusText(preview);
     } catch (error) {
       previewStatus.textContent = error.message;
     } finally {
@@ -108,6 +104,17 @@ export function createItemPreviewUi({ itemPreviewLimit }) {
   };
 }
 
+export function getPreviewStatusText(preview) {
+  const shown = Array.isArray(preview?.items) ? preview.items.length : 0;
+  const total = Number(preview?.total || 0);
+
+  if (!shown) return "No items found.";
+  if (total > 0 && total <= shown) {
+    return `Showing ${formatNumber(shown)} of ${formatNumber(total)} title${total === 1 ? "" : "s"} from this list.`;
+  }
+  return `Showing the first ${formatNumber(shown)} title${shown === 1 ? "" : "s"} from this list.`;
+}
+
 function getOwnerLabel(result) {
   const status = String(result?.availabilityStatus || "available").toLowerCase();
   if (status === "unavailable") return "Owner unavailable";
@@ -125,7 +132,7 @@ function renderItems(container, items) {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "item-empty";
-    empty.textContent = "No poster previews available for this list sample.";
+    empty.textContent = "No items found.";
     container.append(empty);
     return;
   }
@@ -142,26 +149,13 @@ function renderItems(container, items) {
       image.src = item.poster;
       image.alt = "";
       image.loading = "lazy";
+      image.decoding = "async";
       posterWrap.append(image);
     } else {
       posterWrap.textContent = "No poster";
     }
 
-    const ratingBadge = renderRatingBadge(item);
-    if (ratingBadge) posterWrap.append(ratingBadge);
-
     card.append(posterWrap);
     container.append(card);
   });
-}
-
-function renderRatingBadge(item) {
-  const rating = Number(item.rating);
-  if (!Number.isFinite(rating) || rating <= 0) return null;
-
-  const badge = document.createElement("span");
-  badge.className = "preview-rating-badge";
-  badge.textContent = rating.toFixed(1);
-  badge.title = "Trakt rating";
-  return badge;
 }

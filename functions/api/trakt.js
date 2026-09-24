@@ -24,13 +24,14 @@ import {
 import {
   getListItems,
   getListItemsByRoute,
+  getListMediaComposition,
   getTraktClientId,
 } from "../lib/trakt-client.js";
 
 const MAX_RESULT_LIMIT = 50;
 const ITEM_LIMIT = 15;
 const MAX_PAGE = 25;
-const MAX_ITEM_LIMIT = 15;
+const MAX_ITEM_LIMIT = 50;
 const MAX_QUERY_LENGTH = 220;
 const SORT_REQUEST_COST = 8;
 const QUICK_USERS_TIMEOUT_MS = 1200;
@@ -58,6 +59,19 @@ export async function onRequestGet({ request, env, waitUntil }) {
   if (cached) return cached;
 
   try {
+    if (mode === "media") {
+      const listId = parseTraktListId((url.searchParams.get("id") || "").trim());
+      if (!listId) {
+        return json({ error: "Invalid or missing Trakt list ID." }, 400);
+      }
+
+      const media = await getListMediaComposition(listId, clientId);
+      return cacheSuccessfulApiResponse(request, json({
+        id: Number(listId),
+        ...media,
+      }, 200, true), waitUntil);
+    }
+
     if (mode === "items") {
       const rawListId = (url.searchParams.get("id") || "").trim();
       const listId = parseTraktListId(rawListId);
@@ -116,16 +130,17 @@ export async function onRequestGet({ request, env, waitUntil }) {
       return json({ error: "Unsupported search mode." }, 400);
     }
 
-    const quickUsersPromise = mode !== "url" && !directListId
-      ? getQuickUsers(mode, query, payload, clientId)
-      : null;
     const lists = await validateListAvailability(payload.data, clientId);
-    const quickUsersPayload = mode === "url" || directListId
-      ? { ...payload, quickUserLists: lists }
-      : payload;
-    const quickUsers = quickUsersPromise
-      ? await withTimeout(quickUsersPromise, QUICK_USERS_TIMEOUT_MS, null)
-      : await withTimeout(getQuickUsers(mode, query, quickUsersPayload, clientId), QUICK_USERS_TIMEOUT_MS, null);
+    const quickUsersPayload = {
+      ...payload,
+      data: lists,
+      quickUserLists: lists,
+    };
+    const quickUsers = await withTimeout(
+      getQuickUsers(mode, query, quickUsersPayload, clientId),
+      QUICK_USERS_TIMEOUT_MS,
+      null,
+    );
 
     const responsePayload = {
       results: lists.map(normalizeList).filter(Boolean),
@@ -196,6 +211,7 @@ function shouldIncludePosters(url) {
 }
 
 function getRequestRateLimitCost(mode, sort) {
+  if (mode === "media") return 2;
   if (sort && mode !== "url") return SORT_REQUEST_COST;
   return 1;
 }

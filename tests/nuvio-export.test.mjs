@@ -26,6 +26,9 @@ const fiveLists = [
 let nextId = 0;
 const createId = (prefix) => `${prefix}-${++nextId}`;
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+const selectionUiJs = readFileSync(new URL("../js/selection-ui.js", import.meta.url), "utf8");
+const stylesText = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const nuvioUiJs = readFileSync(new URL("../js/nuvio-export-ui.js", import.meta.url), "utf8");
 const headersText = readFileSync(new URL("../_headers", import.meta.url), "utf8");
 const robotsText = readFileSync(new URL("../robots.txt", import.meta.url), "utf8");
@@ -65,27 +68,67 @@ assert.match(indexHtml, /<link rel="canonical" href="https:\/\/trakt-list-lookup
 assert.match(indexHtml, /<script data-goatcounter="https:\/\/trakt-list-lookup\.goatcounter\.com\/count" async src="https:\/\/gc\.zgo\.at\/count\.js"><\/script>/);
 assert.match(indexHtml, /<h2 id="nuvio-title">Create Nuvio JSON<\/h2>\s*<p id="nuvio-count" class="result-owner"><\/p>/);
 assert.match(indexHtml, /Need help\? <a href="https:\/\/github\.com\/davecollections\/trakt-list-lookup#readme"[^>]*>Read the project guide<\/a>\./);
+assert.match(indexHtml, /<div class="top-actions">[\s\S]*id="about-credits-open"[^>]*aria-haspopup="dialog"[^>]*>About<\/button>[\s\S]*id="theme-toggle"/);
+assert.match(indexHtml, /id="about-credits-modal"[^>]*class="modal"[^>]*hidden/);
+assert.match(indexHtml, /<h2 id="about-credits-title">About &amp; Credits<\/h2>/);
 assert.match(indexHtml, /href="https:\/\/github\.com\/davecollections\/trakt-list-lookup\/issues"[^>]*>Feedback \/ report an issue<\/a>/);
-assert.match(indexHtml, /href="https:\/\/davecollections\.github\.io\/tmdb-id-lookup\/"[^>]*>Related tool: TMDB ID Lookup<\/a>/);
-assert.match(indexHtml, /Find public Trakt lists and create Nuvio-compatible JSON exports\./);
-assert.match(indexHtml, /Not affiliated with Trakt, Nuvio, or TMDB\. Poster previews may use TMDB data where available; this product uses the TMDB API but is not endorsed or certified by TMDB\./);
+assert.doesNotMatch(indexHtml, /Dingo's Collection Builder/);
+assert.doesNotMatch(indexHtml, /tmdb-id-lookup\/builder\//);
+assert.match(indexHtml, /href="https:\/\/davecollections\.github\.io\/tmdb-id-lookup\/"[^>]*>TMDB ID Lookup Tool<\/a>/);
+assert.match(indexHtml, /Public list data is supplied by Trakt\. Trakt List Lookup is an independent tool and is not affiliated with or endorsed by Trakt\./);
+assert.match(indexHtml, /This product uses the TMDB API but is not endorsed or certified by TMDB\./);
+assert.match(indexHtml, /Independent community tool for Nuvio collections\. Not affiliated with or endorsed by Nuvio\./);
+assert.match(indexHtml, /src="\.\/assets\/tmdb-logo-square\.svg" alt="TMDB"/);
+assert.match(indexHtml, /src="\.\/assets\/trakt\.ico" alt="Trakt"/);
+assert.doesNotMatch(indexHtml, /site-footer-minimal/);
+assert.doesNotMatch(indexHtml, /<footer class="site-footer">[\s\S]*Feedback \/ report an issue/);
 assert.match(indexHtml, /Collection details/);
 assert.match(indexHtml, /Hero\/backdrop image URL/);
 assert.match(indexHtml, /Folder order/);
 assert.match(indexHtml, /Sorts generated folders, not the titles inside Trakt lists\./);
-assert.match(indexHtml, /Artwork defaults/);
+assert.doesNotMatch(indexHtml, /id="nuvio-media-mode"/);
+assert.match(indexHtml, /Top creators on this page/);
+assert.match(indexHtml, /<span class="control-label">Search by<\/span>/);
+assert.match(indexHtml, /<span class="control-label">Browse lists<\/span>/);
+assert.match(indexHtml, />Popular Lists<\/span>/);
+assert.match(indexHtml, />Trending Lists<\/span>/);
+assert.match(indexHtml, /data-sort="items"[^>]*>Titles<\/button>/);
+assert.match(indexHtml, /<th[^>]*>Titles<\/th>/);
+assert.match(indexHtml, />Most titles<\/option>/);
+assert.match(indexHtml, /id="back-to-top"[^>]*aria-label="Back to top"[^>]*hidden>↑<\/button>/);
+assert.match(indexHtml, /<section id="selection-panel" class="selection-panel" aria-label="Selected Trakt lists">/);
+assert.doesNotMatch(indexHtml, /id="selection-panel"[^>]*hidden/);
+assert.match(indexHtml, /id="open-nuvio-export"[^>]*title="Select one or more Trakt lists to create a Nuvio JSON export\."[^>]*disabled>Create Nuvio JSON<\/button>/);
+assert.match(selectionUiJs, /selectionPanel\.hidden = false/);
+assert.match(selectionUiJs, /Select one or more Trakt lists to create a Nuvio JSON export\./);
+assert.match(appJs, /BACK_TO_TOP_SCROLL_THRESHOLD = 700/);
+assert.match(appJs, /import \{ closeModal, initModalSystem, openModal \} from "\.\/js\/modal-utils\.js";/);
+assert.match(appJs, /aboutCreditsOpenButton\?\.addEventListener\("click", openAboutCredits\)/);
+assert.match(appJs, /openModal\(aboutCreditsModal/);
+assert.match(stylesText, /\.about-credits-dialog \{/);
+assert.match(stylesText, /\.about-credits-trigger \{[\s\S]*min-height: 36px/);
+assert.match(appJs, /window\.addEventListener\("scroll", updateBackToTopVisibility/);
+assert.match(appJs, /window\.scrollTo\(\{/);
+assert.match(stylesText, /\.back-to-top \{/);
+assert.match(stylesText, /\.discovery-tab \.mode-label \{/);
+assert.match(stylesText, /border-radius: 9px/);
+assert.match(indexHtml, /Folder defaults/);
+assert.match(nuvioUiJs, /Per-list options/);
+assert.match(nuvioUiJs, /mediaSelect\.dataset\.mediaModeKey = key/);
+assert.match(nuvioUiJs, /\["automatic", "Automatic"\]/);
+assert.match(nuvioUiJs, /Detected: Movies & Series/);
 assert.match(indexHtml, /Auto poster images/);
 assert.doesNotMatch(indexHtml, /id="nuvio-folder-image-mode"/);
 assert.doesNotMatch(indexHtml, /Folder images/);
 assert.match(nuvioUiJs, /auto poster images found/);
 assert.match(indexHtml, /Folder tile shape/);
-assert.match(indexHtml, /data-folder-tile-shape="LANDSCAPE"/);
-assert.match(indexHtml, /data-folder-tile-shape="POSTER"/);
+assert.match(indexHtml, /class="nuvio-mode-pill" data-folder-tile-shape="LANDSCAPE" aria-pressed="false">Landscape/);
+assert.match(indexHtml, /class="nuvio-mode-pill is-active" data-folder-tile-shape="POSTER" aria-pressed="true">Poster/);
 assert.match(indexHtml, /Folder titles/);
 assert.match(indexHtml, /data-folder-title-mode="show"/);
 assert.match(indexHtml, /data-folder-title-mode="hide"/);
 assert.match(indexHtml, /id="nuvio-folder-artwork-overrides"/);
-assert.match(nuvioUiJs, /Folder artwork overrides/);
+assert.doesNotMatch(nuvioUiJs, /Folder artwork overrides/);
 assert.doesNotMatch(nuvioUiJs, /Optional custom cover image URLs for generated folders\./);
 assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_DEFAULT, "Default"/);
 assert.match(nuvioUiJs, /FOLDER_ARTWORK_MODE_NONE, "None"/);
@@ -188,6 +231,7 @@ assert.equal(freshExport[0].folders.length, 3);
 assert.equal(freshExport[0].folders[0].sources[0].provider, "trakt");
 assert.equal(freshExport[0].backdropImageUrl, "https://example.com/cover.jpg");
 assert.equal(freshExport[0].folders[0].sources[0].mediaType, "MOVIE");
+assert.equal(freshExport[0].folders[0].tileShape, "POSTER");
 
 nextId = 0;
 const fallbackTitleExport = buildNuvioExport({
@@ -264,12 +308,8 @@ assert.equal(mixedImportPayload.collections[0].folders[0].sources[1].provider, "
 
 nextId = 0;
 const seriesExport = buildNuvioExport({
-  lists: [
-    {
-      ...list("IMDB: Top Rated TV Shows", 2143363),
-      nuvioMediaType: "TV",
-    },
-  ],
+  lists: [list("IMDB: Top Rated TV Shows", 2143363)],
+  mediaMode: "series",
   createId,
 });
 assert.equal(seriesExport[0].folders[0].sources[0].mediaType, "TV");
@@ -289,6 +329,98 @@ const uncertainMediaExport = buildNuvioExport({
   createId,
 });
 assert.deepEqual(uncertainMediaExport[0].folders.map((folder) => folder.sources[0].mediaType), ["MOVIE", "MOVIE"]);
+
+nextId = 0;
+const automaticMediaExport = buildNuvioExportPayload({
+  lists: [
+    list("Movies Only", 201),
+    list("Series Only", 202),
+    list("Mixed List", 203),
+  ],
+  mediaMode: "automatic",
+  mediaDetections: {
+    201: { status: "resolved", movieCount: 14, showCount: 0 },
+    202: { status: "resolved", movieCount: 0, showCount: 9 },
+    203: { status: "resolved", movieCount: 7, showCount: 4 },
+  },
+  sortMode: "selected",
+  createId,
+});
+assert.deepEqual(
+  automaticMediaExport.collections[0].folders.map((folder) => folder.sources.map((source) => source.mediaType)),
+  [["MOVIE"], ["TV"], ["MOVIE", "TV"]],
+);
+assert.deepEqual(automaticMediaExport.collections[0].folders[2].sources, [
+  {
+    title: "Mixed List Movies",
+    sortBy: "rank",
+    sortHow: "asc",
+    provider: "trakt",
+    mediaType: "MOVIE",
+    traktListId: 203,
+  },
+  {
+    title: "Mixed List Series",
+    sortBy: "rank",
+    sortHow: "asc",
+    provider: "trakt",
+    mediaType: "TV",
+    traktListId: 203,
+  },
+]);
+assert.equal(automaticMediaExport.report.mediaDetectionFallbackCount, 0);
+
+nextId = 0;
+const automaticFallbackPayload = buildNuvioExportPayload({
+  lists: [list("Unclassified List", 204)],
+  mediaMode: "automatic",
+  mediaDetections: {
+    204: { status: "failed", movieCount: 0, showCount: 0 },
+  },
+  createId,
+});
+assert.deepEqual(
+  automaticFallbackPayload.collections[0].folders[0].sources.map((source) => source.mediaType),
+  ["MOVIE", "TV"],
+);
+assert.equal(automaticFallbackPayload.report.mediaDetectionFallbackCount, 1);
+const automaticFallbackStatus = getNuvioExportStatusModel(automaticFallbackPayload);
+assert.equal(automaticFallbackStatus.tone, "warning");
+assert.ok(automaticFallbackStatus.messages.some((message) => message.includes("Media detection fallback")));
+
+nextId = 0;
+const explicitBothExport = buildNuvioExport({
+  lists: [list("Forced Both", 205)],
+  mediaMode: "both",
+  createId,
+});
+assert.deepEqual(explicitBothExport[0].folders[0].sources.map((source) => source.mediaType), ["MOVIE", "TV"]);
+
+nextId = 0;
+const perListMediaExport = buildNuvioExportPayload({
+  lists: [
+    list("Auto Movie", 206),
+    list("Forced Series", 207),
+    list("Forced Both", 208),
+  ],
+  mediaModes: {
+    206: "automatic",
+    207: "series",
+    208: "both",
+  },
+  mediaDetections: {
+    206: { status: "resolved", movieCount: 8, showCount: 0 },
+    207: { status: "resolved", movieCount: 8, showCount: 0 },
+    208: { status: "resolved", movieCount: 8, showCount: 0 },
+  },
+  sortMode: "selected",
+  createId,
+});
+assert.deepEqual(
+  perListMediaExport.collections[0].folders.map((folder) => folder.sources.map((source) => source.mediaType)),
+  [["MOVIE"], ["TV"], ["MOVIE", "TV"]],
+);
+assert.equal(perListMediaExport.report.mediaDetectionFallbackCount, 0);
 
 nextId = 0;
 const imageExport = buildNuvioExport({
@@ -510,6 +642,32 @@ const duplicateSafeStatus = getNuvioExportStatusModel(duplicateSafePayload);
 assert.equal(duplicateSafeStatus.title, "Export ready with warnings");
 assert.equal(duplicateSafeStatus.tone, "warning");
 assert.ok(duplicateSafeStatus.messages.includes("Already-existing Trakt list skipped: 1 selected list already exists or would duplicate existing output."));
+
+nextId = 0;
+const existingMediaUpgradePayload = buildNuvioExportPayload({
+  lists: [list("Comedy Nights", 101)],
+  existing: existingWithDuplicate,
+  mode: "existing",
+  targetCollectionKey: "collection-a",
+  mediaModes: {
+    101: "automatic",
+  },
+  mediaDetections: {
+    101: { status: "resolved", movieCount: 12, showCount: 5 },
+  },
+  createId,
+});
+assert.equal(existingMediaUpgradePayload.collections[0].folders.length, 1);
+assert.equal(existingMediaUpgradePayload.collections[0].folders[0].id, "existing-folder");
+assert.equal(existingMediaUpgradePayload.collections[0].folders[0].coverImageUrl, "https://example.com/existing-artwork.jpg");
+assert.deepEqual(
+  existingMediaUpgradePayload.collections[0].folders[0].sources.map((source) => source.mediaType),
+  ["MOVIE", "TV"],
+);
+assert.equal(existingMediaUpgradePayload.report.mergedTraktSourceCount, 1);
+assert.equal(existingMediaUpgradePayload.report.duplicateSourceFolderCount, 0);
+const existingMediaUpgradeStatus = getNuvioExportStatusModel(existingMediaUpgradePayload);
+assert.ok(existingMediaUpgradeStatus.messages.some((message) => message.includes("missing media source added")));
 
 nextId = 0;
 const existingWithTwoDuplicateTraktLists = [

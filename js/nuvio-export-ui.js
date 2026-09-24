@@ -1,3 +1,4 @@
+import { fetchTraktListMediaComposition } from "./api-client.js";
 import { formatNumber, slugifyFilename } from "./formatting.js";
 import { canFetchListItems, fetchFirstPosterUrl } from "./list-item-cache.js";
 import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
@@ -5,11 +6,13 @@ import { buildNuvioExportPayload, getListSelectionKey, getSafeHttpsUrl, normaliz
 
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
+const MEDIA_DETECTION_CONCURRENCY = 3;
 const MAX_EXISTING_JSON_BYTES = 2 * 1024 * 1024;
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const DEFAULT_MERGE_MODE = "new";
 const DEFAULT_SORT_MODE = "title-asc";
-const DEFAULT_FOLDER_TILE_SHAPE = "LANDSCAPE";
+const DEFAULT_MEDIA_MODE = "automatic";
+const DEFAULT_FOLDER_TILE_SHAPE = "POSTER";
 const DEFAULT_FOLDER_TITLE_MODE = "hide";
 const FOLDER_ARTWORK_MODE_DEFAULT = "default";
 const FOLDER_ARTWORK_MODE_NONE = "none";
@@ -64,6 +67,8 @@ export function createNuvioExportUi({ selection }) {
     mapped: document.querySelector("#nuvio-mapped-mode-description"),
   };
   const folderImageCache = new Map();
+  const mediaDetectionCache = new Map();
+  const mediaModeChoices = new Map();
   const folderArtworkChoices = new Map();
   let importSources = [];
   let importSourceCounter = 0;
@@ -139,6 +144,21 @@ export function createNuvioExportUi({ selection }) {
     syncFolderArtworkRow(row, key);
     refreshGeneratedOutput();
   });
+  folderArtworkOverrides.addEventListener("change", (event) => {
+    const mediaSelect = event.target.closest("select[data-media-mode-key]");
+    if (!mediaSelect) return;
+    const key = mediaSelect.dataset.mediaModeKey;
+    const mode = normalizeMediaMode(mediaSelect.value);
+    if (mode === DEFAULT_MEDIA_MODE) {
+      mediaModeChoices.delete(key);
+    } else {
+      mediaModeChoices.set(key, mode);
+    }
+    renderFolderArtworkOverrides();
+    refreshMediaDetections();
+    refreshGeneratedOutput();
+  });
+
   folderArtworkOverrides.addEventListener("focusin", (event) => {
     const input = event.target.closest("input[data-folder-cover-key]");
     if (!input || !input.value || input.dataset.selectedOnFocus === "true") return;
@@ -218,6 +238,7 @@ export function createNuvioExportUi({ selection }) {
       selectedArtworkSignature = nextArtworkSignature;
       updateMergeControls();
       renderFolderArtworkOverrides();
+      refreshMediaDetections();
       refreshGeneratedOutput();
       if (shouldRefreshFolderImages) refreshFolderImages();
     } catch (error) {
@@ -239,7 +260,7 @@ export function createNuvioExportUi({ selection }) {
       output.value = payload.json;
       updateExportSummary(payload);
       renderExportStatus(payload);
-      setJsonActionsDisabled(false);
+      setJsonActionsDisabled(hasSelectedMediaDetectionLoading());
     } catch (error) {
       latestPayload = null;
       output.value = `Could not build JSON: ${error.message}`;
@@ -261,6 +282,8 @@ export function createNuvioExportUi({ selection }) {
       folderImages: getFolderImageObject(),
       folderTileShape,
       hideFolderTitles: folderTitleMode !== "show",
+      mediaModes: getMediaModeObject(),
+      mediaDetections: getMediaDetectionObject(),
       sortMode: sortModeSelect.value,
       splitAssignments: selection.splitAssignmentObject(),
       mappedAssignments: selection.mappedAssignmentObject(),
@@ -551,7 +574,7 @@ export function createNuvioExportUi({ selection }) {
     heading.className = "nuvio-folder-artwork-heading";
 
     const title = document.createElement("strong");
-    title.textContent = "Folder artwork overrides";
+    title.textContent = "Per-list options";
     heading.append(title);
     folderArtworkOverrides.append(heading);
 
@@ -591,11 +614,38 @@ export function createNuvioExportUi({ selection }) {
       const name = document.createElement("strong");
       name.textContent = result.name || "Untitled list";
 
+      const mediaField = document.createElement("label");
+      mediaField.className = "nuvio-list-media-field";
+
+      const mediaLabel = document.createElement("span");
+      mediaLabel.textContent = "Media type";
+
+      const mediaSelect = document.createElement("select");
+      mediaSelect.dataset.mediaModeKey = key;
+      mediaSelect.setAttribute("aria-label", `${result.name || "Selected list"} media type`);
+      [
+        ["automatic", "Automatic"],
+        ["both", "Both"],
+        ["movies", "Movies"],
+        ["series", "Series"],
+      ].forEach(([value, label]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        mediaSelect.append(option);
+      });
+      mediaSelect.value = getListMediaMode(key);
+
+      const mediaStatus = document.createElement("small");
+      mediaStatus.className = "field-status";
+      mediaStatus.textContent = getMediaStatusText(key);
+      mediaField.append(mediaLabel, mediaSelect, mediaStatus);
+
       const status = document.createElement("small");
       status.className = "field-status";
       status.dataset.folderArtworkStatus = "true";
 
-      details.append(name, status);
+      details.append(name, mediaField, status);
 
       const modeGroup = document.createElement("div");
       modeGroup.className = "nuvio-folder-artwork-modes";
@@ -925,6 +975,107 @@ export function createNuvioExportUi({ selection }) {
     return getSelectedListsForExport().map((result) => getListSelectionKey(result)).filter(Boolean).join("|");
   }
 
+  function normalizeMediaMode(value) {
+    const mode = String(value || DEFAULT_MEDIA_MODE).toLowerCase();
+    return ["automatic", "both", "movies", "series"].includes(mode) ? mode : DEFAULT_MEDIA_MODE;
+  }
+
+  function getListMediaMode(key) {
+    return normalizeMediaMode(mediaModeChoices.get(key) || DEFAULT_MEDIA_MODE);
+  }
+
+  function getMediaModeObject() {
+    return Object.fromEntries(getSelectedListsForExport().flatMap((result) => {
+      const key = getListSelectionKey(result);
+      return key ? [[key, getListMediaMode(key)]] : [];
+    }));
+  }
+
+  function getMediaDetectionObject() {
+    return Object.fromEntries(getSelectedListsForExport().flatMap((result) => {
+      const key = getListSelectionKey(result);
+      const detection = key ? mediaDetectionCache.get(key) : null;
+      if (!key || !detection || detection.status === "loading") return [];
+      return [[key, detection]];
+    }));
+  }
+
+  function hasSelectedMediaDetectionLoading() {
+    return getSelectedListsForExport().some((result) => {
+      const key = getListSelectionKey(result);
+      if (!key || getListMediaMode(key) !== DEFAULT_MEDIA_MODE) return false;
+      const detection = mediaDetectionCache.get(key);
+      return !detection || detection.status === "loading";
+    });
+  }
+
+  async function refreshMediaDetections() {
+    const selected = getSelectedListsForExport().filter((result) => {
+      const key = getListSelectionKey(result);
+      return key && getListMediaMode(key) === DEFAULT_MEDIA_MODE;
+    });
+
+    const missing = selected.filter((result) => !mediaDetectionCache.has(getListSelectionKey(result)));
+    if (!missing.length) {
+      renderFolderArtworkOverrides();
+      refreshGeneratedOutput();
+      return;
+    }
+
+    missing.forEach((result) => {
+      mediaDetectionCache.set(getListSelectionKey(result), {
+        status: "loading",
+        movieCount: 0,
+        showCount: 0,
+      });
+    });
+    renderFolderArtworkOverrides();
+    setJsonActionsDisabled(true);
+
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(MEDIA_DETECTION_CONCURRENCY, missing.length) }, async () => {
+      while (cursor < missing.length) {
+        const result = missing[cursor];
+        cursor += 1;
+        const key = getListSelectionKey(result);
+        try {
+          const payload = await fetchTraktListMediaComposition(result.ids?.trakt);
+          mediaDetectionCache.set(key, {
+            status: "resolved",
+            movieCount: Number(payload.movie_count || 0),
+            showCount: Number(payload.show_count || 0),
+          });
+        } catch {
+          mediaDetectionCache.set(key, {
+            status: "failed",
+            movieCount: 0,
+            showCount: 0,
+          });
+        }
+      }
+    });
+
+    await Promise.all(workers);
+    renderFolderArtworkOverrides();
+    refreshGeneratedOutput();
+  }
+
+  function getMediaStatusText(key) {
+    const mode = getListMediaMode(key);
+    if (mode === "both") return "Export: Movies & Series";
+    if (mode === "movies") return "Export: Movies";
+    if (mode === "series") return "Export: Series";
+
+    const detection = mediaDetectionCache.get(key);
+    if (!detection || detection.status === "loading") return "Detecting media...";
+    const movieCount = Number(detection.movieCount || 0);
+    const showCount = Number(detection.showCount || 0);
+    if (movieCount > 0 && showCount > 0) return "Detected: Movies & Series";
+    if (showCount > 0) return "Detected: Series";
+    if (movieCount > 0) return "Detected: Movies";
+    return "Could not detect; Both will be used.";
+  }
+
   function resetExportForm() {
     closeImportHelp();
     closeImportManage();
@@ -932,6 +1083,7 @@ export function createNuvioExportUi({ selection }) {
     latestPayload = null;
     importSources = [];
     folderArtworkChoices.clear();
+    mediaModeChoices.clear();
 
     collectionNameInput.value = "";
     coverUrlInput.value = "";
@@ -1256,6 +1408,7 @@ export function getNuvioExportStatusModel(payload, context = {}) {
   const hasWarnings = Boolean(
     importedDuplicateListCount
       || report.duplicateSourceFolderCount
+      || report.mediaDetectionFallbackCount
       || report.skippedUnavailableListCount
       || report.idFixCount
       || report.warningCount,
@@ -1272,6 +1425,14 @@ export function getNuvioExportStatusModel(payload, context = {}) {
 
   if (report.duplicateSourceFolderCount) {
     messages.push(`${formatStatusLabel(report.duplicateSourceFolderCount, "Already-existing Trakt list skipped", "Already-existing Trakt lists skipped")}: ${formatCount(report.duplicateSourceFolderCount, "selected list already exists", "selected lists already exist")} or would duplicate existing output.`);
+  }
+
+  if (report.mergedTraktSourceCount) {
+    messages.push(`Existing Trakt folders updated: ${formatCount(report.mergedTraktSourceCount, "missing media source added", "missing media sources added")} without replacing existing folder settings.`);
+  }
+
+  if (report.mediaDetectionFallbackCount) {
+    messages.push(`Media detection fallback: ${formatCount(report.mediaDetectionFallbackCount, "selected list could not be classified", "selected lists could not be classified")} as Movies or Series, so Both was used.`);
   }
 
   if (report.skippedUnavailableListCount) {

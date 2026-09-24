@@ -261,6 +261,32 @@
   white-space: nowrap;
 }
 
+.nuvio-list-media-field {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 220px);
+  gap: 3px 8px;
+  align-items: center;
+  justify-content: start;
+  margin-top: 3px;
+  max-width: 430px;
+}
+
+.nuvio-list-media-field > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.nuvio-list-media-field select {
+  min-height: 28px;
+  padding: 0 30px 0 8px;
+  font-size: 0.76rem;
+}
+
+.nuvio-list-media-field .field-status {
+  grid-column: 1 / -1;
+}
+
 .nuvio-folder-artwork-actions {
   display: flex;
   flex-wrap: wrap;

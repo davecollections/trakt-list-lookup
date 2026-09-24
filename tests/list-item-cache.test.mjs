@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { getPreviewStatusText } from "../js/item-preview-ui.js";
 import {
   clearListItemCache,
   fetchFirstPosterUrl,
@@ -8,12 +9,28 @@ import {
 
 const originalFetch = globalThis.fetch;
 
+assert.equal(
+  getPreviewStatusText({ items: Array.from({ length: 37 }, () => ({})), total: 37 }),
+  "Showing 37 of 37 titles from this list.",
+);
+assert.equal(
+  getPreviewStatusText({ items: Array.from({ length: 50 }, () => ({})), total: 443 }),
+  "Showing the first 50 titles from this list.",
+);
+assert.equal(
+  getPreviewStatusText({ items: [], total: 0 }),
+  "No items found.",
+);
+
 try {
   clearListItemCache();
   const calls = [];
   globalThis.fetch = async (value) => {
     const url = new URL(value, "https://example.test");
     calls.push(url);
+    assert.ok(url.searchParams.get("id"));
+    assert.equal(url.searchParams.get("user"), null);
+    assert.equal(url.searchParams.get("slug"), null);
     const page = Number(url.searchParams.get("page"));
     return jsonResponse({
       items: page === 1
@@ -50,6 +67,27 @@ try {
   const samples = await fetchPosterSampleUrls(list(), { targetCount: 1 });
   assert.deepEqual(samples, ["https://image.test/one.jpg"]);
   assert.equal(calls.length, 3);
+
+  const fullPreview = await fetchPosterPreviewItems(list(), {
+    targetCount: 50,
+    pageLimit: 50,
+    maxPages: 1,
+    requirePoster: false,
+  });
+  assert.deepEqual(fullPreview.items.map((item) => item.title), ["Missing poster", "Poster one"]);
+  assert.equal(calls.at(-1).searchParams.get("limit"), "50");
+  assert.equal(calls.at(-1).searchParams.get("page"), "1");
+
+  const ownerlessPreview = await fetchPosterPreviewItems(list({
+    trakt: 808094,
+    slug: "great-movies-you-may-have-never-heard-of",
+    username: "",
+  }), {
+    targetCount: 1,
+    maxPages: 1,
+  });
+  assert.equal(ownerlessPreview.items[0]?.title, "Poster one");
+  assert.equal(calls.at(-1).searchParams.get("id"), "808094");
 } finally {
   globalThis.fetch = originalFetch;
   clearListItemCache();
@@ -64,14 +102,16 @@ function jsonResponse(payload) {
   });
 }
 
-function list({ trakt = 123, slug = "demo" } = {}) {
+function list({ trakt = 123, slug = "demo", username = "snoak" } = {}) {
   return {
     ids: {
       trakt,
       slug,
     },
     user: {
-      username: "snoak",
+      username,
     },
+    ownerUsername: username,
+    canPreview: true,
   };
 }

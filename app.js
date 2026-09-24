@@ -1,8 +1,7 @@
-import { showTraktApiServiceNotice } from "./js/service-notice.js";
 import { formatNumber } from "./js/formatting.js";
 import { fetchTraktLists } from "./js/api-client.js";
 import { createItemPreviewUi } from "./js/item-preview-ui.js";
-import { initModalSystem } from "./js/modal-utils.js";
+import { closeModal, initModalSystem, openModal } from "./js/modal-utils.js";
 import { createNuvioExportUi } from "./js/nuvio-export-ui.js";
 import { createResultsView } from "./js/results-view.js";
 import { createSelectionState } from "./js/selection-state.js";
@@ -17,13 +16,17 @@ const prevPageButton = document.querySelector("#prev-page");
 const nextPageButton = document.querySelector("#next-page");
 const lastPageButton = document.querySelector("#last-page");
 const themeToggle = document.querySelector("#theme-toggle");
+const aboutCreditsOpenButton = document.querySelector("#about-credits-open");
+const aboutCreditsModal = document.querySelector("#about-credits-modal");
+const aboutCreditsCloseButton = document.querySelector("#about-credits-close");
+const backToTopButton = document.querySelector("#back-to-top");
 const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
 
-showTraktApiServiceNotice();
 
-const ITEMS_PREVIEW_LIMIT = 15;
+const ITEMS_PREVIEW_LIMIT = 50;
 const POSTER_SAMPLE_LIMIT = 3;
+const BACK_TO_TOP_SCROLL_THRESHOLD = 700;
 
 const state = {
   mode: "search",
@@ -67,6 +70,22 @@ const preferredTheme = window.matchMedia?.("(prefers-color-scheme: dark)")?.matc
 setTheme(savedTheme || preferredTheme);
 updateModeControls(getMode());
 initModalSystem();
+updateBackToTopVisibility();
+
+aboutCreditsOpenButton?.addEventListener("click", openAboutCredits);
+aboutCreditsCloseButton?.addEventListener("click", closeAboutCredits);
+aboutCreditsModal?.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-about-credits]")) closeAboutCredits();
+});
+
+window.addEventListener("scroll", updateBackToTopVisibility, { passive: true });
+backToTopButton?.addEventListener("click", () => {
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  window.scrollTo({
+    top: 0,
+    behavior: reduceMotion ? "auto" : "smooth",
+  });
+});
 
 themeToggle.addEventListener("click", () => {
   const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
@@ -193,6 +212,23 @@ async function runSearch(page) {
 
 function renderCurrentResults() {
   resultsView.renderResults(state.results);
+}
+
+function openAboutCredits() {
+  if (!aboutCreditsModal) return;
+  openModal(aboutCreditsModal, {
+    focusTarget: aboutCreditsCloseButton,
+    onClose: closeAboutCredits,
+  });
+}
+
+function closeAboutCredits() {
+  closeModal(aboutCreditsModal);
+}
+
+function updateBackToTopVisibility() {
+  if (!backToTopButton) return;
+  backToTopButton.hidden = window.scrollY < BACK_TO_TOP_SCROLL_THRESHOLD;
 }
 
 function getMode() {

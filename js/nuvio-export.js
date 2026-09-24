@@ -11,8 +11,11 @@ export function buildNuvioExport({
   mappedAssignments = {},
   targetCollectionKey = "",
   folderImages = {},
-  folderTileShape = "LANDSCAPE",
+  folderTileShape = "POSTER",
   hideFolderTitles = true,
+  mediaMode = "movies",
+  mediaModes = {},
+  mediaDetections = {},
   createId = createNuvioId,
 } = {}) {
   return buildNuvioExportPayload({
@@ -30,6 +33,9 @@ export function buildNuvioExport({
     folderImages,
     folderTileShape,
     hideFolderTitles,
+    mediaMode,
+    mediaModes,
+    mediaDetections,
     createId,
   }).collections;
 }
@@ -47,8 +53,11 @@ export function buildNuvioExportPayload({
   mappedAssignments = {},
   targetCollectionKey = "",
   folderImages = {},
-  folderTileShape = "LANDSCAPE",
+  folderTileShape = "POSTER",
   hideFolderTitles = true,
+  mediaMode = "movies",
+  mediaModes = {},
+  mediaDetections = {},
   createId = createNuvioId,
 } = {}) {
   const report = createNuvioExportReport();
@@ -57,6 +66,7 @@ export function buildNuvioExportPayload({
   const requestedLists = sortNuvioLists(lists, sortMode || (sortAlpha ? "title-asc" : "selected"));
   const selectedLists = requestedLists.filter(isNuvioListExportable);
   report.skippedUnavailableListCount = requestedLists.length - selectedLists.length;
+  report.mediaDetectionFallbackCount = countMediaDetectionFallbacks(selectedLists, mediaMode, mediaModes, mediaDetections);
   const safeCoverUrl = getSafeHttpsUrl(coverUrl);
   const safeFolderCoverUrl = folderCoverUrl === null ? safeCoverUrl : getSafeHttpsUrl(folderCoverUrl);
   const folderDisplayOptions = {
@@ -66,7 +76,7 @@ export function buildNuvioExportPayload({
   let collections;
 
   if (mode === "split") {
-    collections = [...(existingCollections || []), ...createSplitNuvioCollections(selectedLists, splitAssignments, safeCoverUrl, safeFolderCoverUrl, folderImages, folderDisplayOptions, idFactory.create)];
+    collections = [...(existingCollections || []), ...createSplitNuvioCollections(selectedLists, splitAssignments, safeCoverUrl, safeFolderCoverUrl, folderImages, folderDisplayOptions, mediaMode, mediaModes, mediaDetections, idFactory.create)];
   } else {
     const newCollection = createNuvioCollection({
       title: collectionName || "My Collection",
@@ -75,6 +85,9 @@ export function buildNuvioExportPayload({
       folderCoverUrl: safeFolderCoverUrl,
       folderImages,
       folderDisplayOptions,
+      mediaMode,
+      mediaModes,
+      mediaDetections,
       createId: idFactory.create,
     });
 
@@ -83,7 +96,7 @@ export function buildNuvioExportPayload({
     } else if (mode === "existing") {
       collections = mergeFoldersIntoExistingCollection(existingCollections, newCollection.folders, targetCollectionKey, report);
     } else if (mode === "mapped") {
-      collections = mergeFoldersByListMapping(existingCollections, selectedLists, mappedAssignments, targetCollectionKey, safeFolderCoverUrl, folderImages, folderDisplayOptions, idFactory.create, report);
+      collections = mergeFoldersByListMapping(existingCollections, selectedLists, mappedAssignments, targetCollectionKey, safeFolderCoverUrl, folderImages, folderDisplayOptions, mediaMode, mediaModes, mediaDetections, idFactory.create, report);
     } else {
       collections = [...existingCollections, newCollection];
     }
@@ -157,6 +170,8 @@ function createNuvioExportReport() {
     folderCount: 0,
     skippedUnavailableListCount: 0,
     duplicateSourceFolderCount: 0,
+    mergedTraktSourceCount: 0,
+    mediaDetectionFallbackCount: 0,
     missingCollectionIdsFixed: 0,
     duplicateCollectionIdsFixed: 0,
     missingFolderIdsFixed: 0,
@@ -354,11 +369,19 @@ function isNuvioListExportable(result) {
   return status !== "unavailable" && status !== "unverified";
 }
 
-function createNuvioCollection({ title, lists, coverUrl, folderCoverUrl, folderImages = {}, folderDisplayOptions, createId }) {
+function createNuvioCollection({ title, lists, coverUrl, folderCoverUrl, folderImages = {}, folderDisplayOptions, mediaMode, mediaModes, mediaDetections, createId }) {
   return {
     id: createId("collection"),
     title,
-    folders: lists.map((result) => createNuvioFolder(result, getFolderCoverUrl(result, folderImages, folderCoverUrl), folderDisplayOptions, createId)),
+    folders: lists.map((result) => createNuvioFolder(
+      result,
+      getFolderCoverUrl(result, folderImages, folderCoverUrl),
+      folderDisplayOptions,
+      mediaMode,
+      mediaModes,
+      mediaDetections,
+      createId,
+    )),
     pinToTop: false,
     viewMode: "TABBED_GRID",
     showAllTab: false,
@@ -367,7 +390,7 @@ function createNuvioCollection({ title, lists, coverUrl, folderCoverUrl, folderI
   };
 }
 
-function createSplitNuvioCollections(lists, splitAssignments, coverUrl, folderCoverUrl, folderImages, folderDisplayOptions, createId) {
+function createSplitNuvioCollections(lists, splitAssignments, coverUrl, folderCoverUrl, folderImages, folderDisplayOptions, mediaMode, mediaModes, mediaDetections, createId) {
   return [...getNuvioSplitGroups(lists, splitAssignments)].map(([title, groupedLists]) => createNuvioCollection({
     title,
     lists: groupedLists,
@@ -375,6 +398,9 @@ function createSplitNuvioCollections(lists, splitAssignments, coverUrl, folderCo
     folderCoverUrl,
     folderImages,
     folderDisplayOptions,
+    mediaMode,
+    mediaModes,
+    mediaDetections,
     createId,
   }));
 }
@@ -409,7 +435,7 @@ function mergeFoldersIntoExistingCollection(existing, foldersToAdd, targetCollec
   return merged;
 }
 
-function mergeFoldersByListMapping(existing, lists, mappedAssignments, targetCollectionKey, coverUrl, folderImages, folderDisplayOptions, createId, report) {
+function mergeFoldersByListMapping(existing, lists, mappedAssignments, targetCollectionKey, coverUrl, folderImages, folderDisplayOptions, mediaMode, mediaModes, mediaDetections, createId, report) {
   if (!existing?.length) throw new Error("Provide existing Nuvio JSON before mapping lists.");
 
   const foldersByCollection = new Map();
@@ -417,7 +443,7 @@ function mergeFoldersByListMapping(existing, lists, mappedAssignments, targetCol
     const targetKey = mappedAssignments[getListSelectionKey(result)] || targetCollectionKey;
     if (!targetKey) throw new Error(`Choose a target collection for ${result.name || "a selected list"}.`);
     const folders = foldersByCollection.get(targetKey) || [];
-    folders.push(createNuvioFolder(result, getFolderCoverUrl(result, folderImages, coverUrl), folderDisplayOptions, createId));
+    folders.push(createNuvioFolder(result, getFolderCoverUrl(result, folderImages, coverUrl), folderDisplayOptions, mediaMode, mediaModes, mediaDetections, createId));
     foldersByCollection.set(targetKey, folders);
   });
 
@@ -436,13 +462,13 @@ function getNuvioCollectionKey(collection, index) {
   return collection?.id || String(index);
 }
 
-function createNuvioFolder(result, coverUrl, folderDisplayOptions, createId) {
+function createNuvioFolder(result, coverUrl, folderDisplayOptions, mediaMode, mediaModes, mediaDetections, createId) {
   return {
     id: createId("folder"),
     title: result.name || "Trakt List",
-    sources: [createNuvioTraktSource(result)],
+    sources: createNuvioTraktSources(result, mediaMode, mediaModes, mediaDetections),
     hideTitle: folderDisplayOptions?.hideTitle !== false,
-    tileShape: folderDisplayOptions?.tileShape || "LANDSCAPE",
+    tileShape: folderDisplayOptions?.tileShape || "POSTER",
     coverEmoji: "",
     focusGifUrl: "",
     heroVideoUrl: "",
@@ -486,35 +512,114 @@ function encodeUrlPathPart(value) {
 
 function getNuvioFolderTileShape(value) {
   const normalized = String(value || "").toUpperCase();
-  return normalized === "POSTER" ? "POSTER" : "LANDSCAPE";
+  return normalized === "LANDSCAPE" ? "LANDSCAPE" : "POSTER";
 }
 
-function createNuvioTraktSource(result) {
-  return {
-    title: result.name || "Trakt List",
+function createNuvioTraktSources(result, mediaMode, mediaModes, mediaDetections) {
+  const mediaTypes = getNuvioMediaTypes(result, mediaMode, mediaModes, mediaDetections);
+  const baseTitle = result.name || "Trakt List";
+  return mediaTypes.map((mediaType) => ({
+    title: mediaTypes.length > 1
+      ? `${baseTitle} ${mediaType === "TV" ? "Series" : "Movies"}`
+      : baseTitle,
     sortBy: "rank",
     sortHow: "asc",
     provider: "trakt",
-    mediaType: getNuvioMediaType(result),
+    mediaType,
     traktListId: Number(result.ids?.trakt || 0) || null,
-  };
+  }));
+}
+
+function getNuvioMediaTypes(result, mediaMode, mediaModes, mediaDetections) {
+  const mode = getNuvioMediaMode(result, mediaMode, mediaModes);
+  if (mode === "both") return ["MOVIE", "TV"];
+  if (mode === "series") return ["TV"];
+  if (mode === "movies") return ["MOVIE"];
+
+  const detection = mediaDetections?.[getListSelectionKey(result)];
+  const movieCount = Number(detection?.movieCount ?? detection?.movie_count ?? 0);
+  const showCount = Number(detection?.showCount ?? detection?.show_count ?? 0);
+  if (movieCount > 0 && showCount > 0) return ["MOVIE", "TV"];
+  if (showCount > 0) return ["TV"];
+  if (movieCount > 0) return ["MOVIE"];
+
+  return ["MOVIE", "TV"];
+}
+
+function getNuvioMediaMode(result, mediaMode, mediaModes) {
+  const key = getListSelectionKey(result);
+  const listMode = key ? mediaModes?.[key] : "";
+  const mode = String(listMode || mediaMode || "movies").toLowerCase();
+  return ["automatic", "both", "movies", "series"].includes(mode) ? mode : "movies";
+}
+
+function countMediaDetectionFallbacks(lists, mediaMode, mediaModes, mediaDetections) {
+  return (lists || []).filter((result) => {
+    if (getNuvioMediaMode(result, mediaMode, mediaModes) !== "automatic") return false;
+    const detection = mediaDetections?.[getListSelectionKey(result)];
+    const movieCount = Number(detection?.movieCount ?? detection?.movie_count ?? 0);
+    const showCount = Number(detection?.showCount ?? detection?.show_count ?? 0);
+    return movieCount <= 0 && showCount <= 0;
+  }).length;
 }
 
 function appendUniqueNuvioFolders(existingFolders, foldersToAdd, report) {
-  const signatures = new Set(existingFolders.map(getNuvioFolderSignature).filter(Boolean));
-  const uniqueFolders = [];
+  const output = [...existingFolders];
 
   for (const folder of foldersToAdd) {
+    const traktListId = getSingleTraktListId(folder);
+    if (traktListId) {
+      const existingIndex = output.findIndex((candidate) => folderContainsTraktListId(candidate, traktListId));
+      if (existingIndex >= 0) {
+        const existingFolder = output[existingIndex];
+        const existingSources = Array.isArray(existingFolder?.sources) ? existingFolder.sources : [];
+        const signatures = new Set(existingSources.map(getNuvioSourceSignature).filter(Boolean));
+        const missingSources = (Array.isArray(folder?.sources) ? folder.sources : [])
+          .filter((source) => {
+            const signature = getNuvioSourceSignature(source);
+            return signature && !signatures.has(signature);
+          });
+
+        if (!missingSources.length) {
+          if (report) report.duplicateSourceFolderCount += 1;
+          continue;
+        }
+
+        output[existingIndex] = {
+          ...existingFolder,
+          sources: [...existingSources, ...missingSources],
+        };
+        if (report) report.mergedTraktSourceCount += missingSources.length;
+        continue;
+      }
+    }
+
     const signature = getNuvioFolderSignature(folder);
-    if (signature && signatures.has(signature)) {
+    if (signature && output.some((candidate) => getNuvioFolderSignature(candidate) === signature)) {
       if (report) report.duplicateSourceFolderCount += 1;
       continue;
     }
-    if (signature) signatures.add(signature);
-    uniqueFolders.push(folder);
+    output.push(folder);
   }
 
-  return [...existingFolders, ...uniqueFolders];
+  return output;
+}
+
+function getSingleTraktListId(folder) {
+  const ids = new Set(
+    (Array.isArray(folder?.sources) ? folder.sources : [])
+      .filter((source) => String(source?.provider || "").toLowerCase() === "trakt")
+      .map((source) => Number(source?.traktListId))
+      .filter((id) => Number.isFinite(id) && id > 0),
+  );
+  return ids.size === 1 ? [...ids][0] : null;
+}
+
+function folderContainsTraktListId(folder, listId) {
+  return (Array.isArray(folder?.sources) ? folder.sources : []).some((source) => (
+    String(source?.provider || "").toLowerCase() === "trakt"
+      && Number(source?.traktListId) === Number(listId)
+  ));
 }
 
 function getNuvioFolderSignature(folder) {
@@ -533,9 +638,9 @@ function getCollectionFolders(collection) {
 function getNuvioSourceSignature(source) {
   if (!source) return "";
 
-  if (source.provider === "trakt" && source.traktListId) {
+  if (String(source.provider || "").toLowerCase() === "trakt" && source.traktListId) {
     return JSON.stringify({
-      mediaType: source.mediaType || "",
+      mediaType: normalizeTraktMediaType(source.mediaType),
       provider: "trakt",
       traktListId: Number(source.traktListId),
     });
@@ -551,11 +656,9 @@ function getNuvioSourceSignature(source) {
   });
 }
 
-function getNuvioMediaType(result) {
-  const value = String(result?.nuvioMediaType || result?.mediaType || "").toUpperCase();
-  if (value === "TV" || value === "SHOW" || value === "SERIES") return "TV";
-  if (value === "MIXED" || value === "UNKNOWN") return "MOVIE";
-  return "MOVIE";
+function normalizeTraktMediaType(value) {
+  const normalized = String(value || "MOVIE").trim().toUpperCase();
+  return normalized === "TV" || normalized === "SHOW" || normalized === "SERIES" ? "TV" : "MOVIE";
 }
 
 function createNuvioId(prefix) {
