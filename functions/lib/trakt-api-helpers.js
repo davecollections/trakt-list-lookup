@@ -8,7 +8,7 @@ export function sortLists(lists, sort, order) {
   const sorted = [...lists].sort((a, b) => {
     if (sort === "title") return compareText(a.name, b.name);
     if (sort === "items") return compareNumber(b.item_count, a.item_count);
-    if (sort === "likes") return compareNumber(b.like_count, a.like_count);
+    if (sort === "likes") return compareNumber(getListLikeCount(b), getListLikeCount(a));
     if (sort === "updated") return compareNumber(Date.parse(b.updated_at || b.updated), Date.parse(a.updated_at || a.updated));
     return 0;
   });
@@ -123,6 +123,21 @@ export function normalizeOptionalCount(value) {
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
+export function normalizeListMetrics(list) {
+  if (!list) return null;
+  return {
+    ...list,
+    like_count: getListLikeCount(list),
+    comment_count: normalizeOptionalCount(list.comment_count) ?? undefined,
+  };
+}
+
+function getListLikeCount(list) {
+  return normalizeOptionalCount(list?.like_count)
+    ?? normalizeOptionalCount(list?.likes)
+    ?? undefined;
+}
+
 export function withListAvailability(list, status = "available", message = "") {
   return {
     ...list,
@@ -140,7 +155,6 @@ export function shouldValidateListAvailability(list) {
 export function isListAvailabilitySuspicious(list) {
   if (!list?.ids?.trakt) return true;
   if (isNonPublicList(list)) return true;
-  if (list._availabilitySignals?.likesNotFound) return true;
 
   const username = getListUsername(list);
   if (!username || isUnknownOwner(username)) return true;
@@ -257,8 +271,8 @@ export function normalizeList(list) {
     description: list.description || "",
     privacy: list.privacy || "",
     item_count: list.item_count,
-    like_count: list.like_count,
-    comment_count: list.comment_count,
+    like_count: getListLikeCount(list),
+    comment_count: normalizeOptionalCount(list.comment_count) ?? undefined,
     updated_at: list.updated_at || list.updated || "",
     ids: {
       trakt: ids.trakt,
@@ -272,7 +286,7 @@ export function normalizeList(list) {
     ownerDisplayName,
     url,
     canOpen: canRoute,
-    canPreview: canRoute,
+    canPreview: availability.isAvailable && Boolean(ids.trakt),
     availabilityStatus: availability.status,
     isAvailable: availability.isAvailable,
     isExportable: availability.isExportable,
@@ -288,13 +302,13 @@ function getAvailabilityOwnerDisplayName(status, fallback) {
 
 export function normalizeGlobalListEntry(entry) {
   if (!entry) return null;
-  const list = entry.list || entry;
+  const list = normalizeListMetrics(entry.list || entry);
   if (!list) return null;
 
   return {
     ...list,
-    like_count: normalizeOptionalCount(entry.like_count) ?? normalizeOptionalCount(list.like_count) ?? undefined,
-    comment_count: normalizeOptionalCount(entry.comment_count) ?? normalizeOptionalCount(list.comment_count) ?? undefined,
+    like_count: normalizeOptionalCount(entry.like_count) ?? list.like_count,
+    comment_count: normalizeOptionalCount(entry.comment_count) ?? list.comment_count,
   };
 }
 

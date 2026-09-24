@@ -22,8 +22,8 @@ import {
   validateListAvailability,
 } from "../lib/trakt-list-service.js";
 import {
-  enrichListsWithLikeCounts,
   getListItems,
+  getListItemsByRoute,
   getTraktClientId,
 } from "../lib/trakt-client.js";
 
@@ -35,7 +35,7 @@ const MAX_QUERY_LENGTH = 220;
 const SORT_REQUEST_COST = 8;
 const QUICK_USERS_TIMEOUT_MS = 1200;
 
-export async function onRequestGet({ request, env }) {
+export async function onRequestGet({ request, env, waitUntil }) {
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode") || "search";
   const sort = normalizeSort(url.searchParams.get("sort"));
@@ -54,26 +54,41 @@ export async function onRequestGet({ request, env }) {
     return json({ error: "TRAKT_CLIENT_ID is not configured in Cloudflare." }, 500);
   }
 
+  const cached = await getCachedApiResponse(request);
+  if (cached) return cached;
+
   try {
     if (mode === "items") {
+      const rawListId = (url.searchParams.get("id") || "").trim();
+      const listId = parseTraktListId(rawListId);
       const username = (url.searchParams.get("user") || "").trim();
       const slug = (url.searchParams.get("slug") || "").trim();
       const limit = clampPositiveInteger(url.searchParams.get("limit"), ITEM_LIMIT, MAX_ITEM_LIMIT);
-      if (!username || !slug) {
-        return json({ error: "Missing Trakt username or list slug." }, 400);
-      }
-      if (!isSafePathSegment(username) || !isSafePathSegment(slug)) {
-        return json({ error: "Invalid Trakt username or list slug." }, 400);
+
+      if (rawListId && !listId) {
+        return json({ error: "Invalid Trakt list ID." }, 400);
       }
 
-      const payload = await getListItems(username, slug, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
+      let payload;
+      if (listId) {
+        payload = await getListItems(listId, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
+      } else {
+        if (!username || !slug) {
+          return json({ error: "Missing Trakt list ID or username/list slug." }, 400);
+        }
+        if (!isSafePathSegment(username) || !isSafePathSegment(slug)) {
+          return json({ error: "Invalid Trakt username or list slug." }, 400);
+        }
+        payload = await getListItemsByRoute(username, slug, page, Math.min(limit, MAX_ITEM_LIMIT), clientId);
+      }
+
       const items = shouldIncludePosters(url)
         ? await enrichItemsWithTmdbPosters(payload.data.map(normalizeListItem).filter(Boolean), env)
         : payload.data.map(normalizeListItem).filter(Boolean);
-      return json({
+      return cacheSuccessfulApiResponse(request, json({
         items,
         pagination: payload.pagination,
-      }, 200, true);
+      }, 200, true), waitUntil);
     }
 
     if (!query && !isGlobalListMode(mode)) {
@@ -104,10 +119,7 @@ export async function onRequestGet({ request, env }) {
     const quickUsersPromise = mode !== "url" && !directListId
       ? getQuickUsers(mode, query, payload, clientId)
       : null;
-    const enrichedLists = sort && mode !== "url" && !directListId
-      ? payload.data
-      : await enrichListsWithLikeCounts(payload.data, clientId);
-    const lists = await validateListAvailability(enrichedLists, clientId);
+    const lists = await validateListAvailability(payload.data, clientId);
     const quickUsersPayload = mode === "url" || directListId
       ? { ...payload, quickUserLists: lists }
       : payload;
@@ -121,11 +133,53 @@ export async function onRequestGet({ request, env }) {
     };
     if (quickUsers) responsePayload.quickUsers = quickUsers;
 
-    return json(responsePayload, 200, true);
+    return cacheSuccessfulApiResponse(request, json(responsePayload, 200, true), waitUntil);
   } catch (error) {
     const status = error.status || 502;
-    return json({ error: getPublicErrorMessage(error, status) }, status);
+    const headers = status === 429 && error.retryAfter
+      ? { "Retry-After": error.retryAfter }
+      : {};
+    return json({ error: getPublicErrorMessage(error, status) }, status, false, headers);
   }
+}
+
+async function getCachedApiResponse(request) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return null;
+
+  try {
+    return await cache.match(getCacheKey(request));
+  } catch (error) {
+    console.warn("Could not read Trakt API response cache", {
+      message: error.message,
+    });
+    return null;
+  }
+}
+
+async function cacheSuccessfulApiResponse(request, response, waitUntil) {
+  const cache = globalThis.caches?.default;
+  if (!cache || !response.ok) return response;
+
+  const write = cache.put(getCacheKey(request), response.clone()).catch((error) => {
+    console.warn("Could not write Trakt API response cache", {
+      message: error.message,
+    });
+  });
+
+  if (typeof waitUntil === "function") {
+    waitUntil(write);
+  } else {
+    await write;
+  }
+
+  return response;
+}
+
+function getCacheKey(request) {
+  return new Request(request.url, {
+    method: "GET",
+  });
 }
 
 function isGlobalListMode(mode) {
