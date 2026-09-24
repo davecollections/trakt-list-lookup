@@ -85,8 +85,8 @@ assert.doesNotMatch(indexHtml, /id="nuvio-folder-image-mode"/);
 assert.doesNotMatch(indexHtml, /Folder images/);
 assert.match(nuvioUiJs, /auto poster images found/);
 assert.match(indexHtml, /Folder tile shape/);
-assert.match(indexHtml, /data-folder-tile-shape="LANDSCAPE"/);
-assert.match(indexHtml, /data-folder-tile-shape="POSTER"/);
+assert.match(indexHtml, /class="nuvio-mode-pill" data-folder-tile-shape="LANDSCAPE" aria-pressed="false">Landscape/);
+assert.match(indexHtml, /class="nuvio-mode-pill is-active" data-folder-tile-shape="POSTER" aria-pressed="true">Poster/);
 assert.match(indexHtml, /Folder titles/);
 assert.match(indexHtml, /data-folder-title-mode="show"/);
 assert.match(indexHtml, /data-folder-title-mode="hide"/);
@@ -194,6 +194,7 @@ assert.equal(freshExport[0].folders.length, 3);
 assert.equal(freshExport[0].folders[0].sources[0].provider, "trakt");
 assert.equal(freshExport[0].backdropImageUrl, "https://example.com/cover.jpg");
 assert.equal(freshExport[0].folders[0].sources[0].mediaType, "MOVIE");
+assert.equal(freshExport[0].folders[0].tileShape, "POSTER");
 
 nextId = 0;
 const fallbackTitleExport = buildNuvioExport({
