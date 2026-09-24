@@ -11,7 +11,7 @@ export function buildNuvioExport({
   mappedAssignments = {},
   targetCollectionKey = "",
   folderImages = {},
-  folderTileShape = "LANDSCAPE",
+  folderTileShape = "POSTER",
   hideFolderTitles = true,
   mediaMode = "movies",
   mediaModes = {},
@@ -53,7 +53,7 @@ export function buildNuvioExportPayload({
   mappedAssignments = {},
   targetCollectionKey = "",
   folderImages = {},
-  folderTileShape = "LANDSCAPE",
+  folderTileShape = "POSTER",
   hideFolderTitles = true,
   mediaMode = "movies",
   mediaModes = {},
@@ -468,7 +468,7 @@ function createNuvioFolder(result, coverUrl, folderDisplayOptions, mediaMode, me
     title: result.name || "Trakt List",
     sources: createNuvioTraktSources(result, mediaMode, mediaModes, mediaDetections),
     hideTitle: folderDisplayOptions?.hideTitle !== false,
-    tileShape: folderDisplayOptions?.tileShape || "LANDSCAPE",
+    tileShape: folderDisplayOptions?.tileShape || "POSTER",
     coverEmoji: "",
     focusGifUrl: "",
     heroVideoUrl: "",
@@ -512,7 +512,7 @@ function encodeUrlPathPart(value) {
 
 function getNuvioFolderTileShape(value) {
   const normalized = String(value || "").toUpperCase();
-  return normalized === "POSTER" ? "POSTER" : "LANDSCAPE";
+  return normalized === "LANDSCAPE" ? "LANDSCAPE" : "POSTER";
 }
 
 function createNuvioTraktSources(result, mediaMode, mediaModes, mediaDetections) {
