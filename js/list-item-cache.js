@@ -14,8 +14,9 @@ export async function fetchPosterPreviewItems(result, {
   targetCount = DEFAULT_ITEM_PAGE_LIMIT,
   pageLimit = DEFAULT_ITEM_PAGE_LIMIT,
   maxPages = 1,
+  requirePoster = true,
 } = {}) {
-  const posterItems = [];
+  const previewItems = [];
   let page = 1;
   let pageCount = 1;
   let scanned = 0;
@@ -25,7 +26,7 @@ export async function fetchPosterPreviewItems(result, {
     return { items: [], scanned, total };
   }
 
-  while (posterItems.length < targetCount && page <= pageCount && page <= maxPages) {
+  while (previewItems.length < targetCount && page <= pageCount && page <= maxPages) {
     const payload = await fetchCachedListItemsPage(result, { page, limit: pageLimit });
     const items = payload.items || [];
     const pagination = payload.pagination || {};
@@ -33,14 +34,14 @@ export async function fetchPosterPreviewItems(result, {
     scanned += items.length;
     total = pagination.item_count || total || items.length;
     pageCount = pagination.page_count || pageCount;
-    posterItems.push(...items.filter((item) => item.poster));
+    previewItems.push(...items.filter((item) => !requirePoster || item.poster));
 
     if (!items.length) break;
     page += 1;
   }
 
   return {
-    items: posterItems.slice(0, targetCount),
+    items: previewItems.slice(0, targetCount),
     scanned,
     total,
   };
