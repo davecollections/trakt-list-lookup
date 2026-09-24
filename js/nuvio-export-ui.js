@@ -1,3 +1,4 @@
+import { fetchTraktListMediaComposition } from "./api-client.js";
 import { formatNumber, slugifyFilename } from "./formatting.js";
 import { canFetchListItems, fetchFirstPosterUrl } from "./list-item-cache.js";
 import { closeModal, isModalOpen, openModal } from "./modal-utils.js";
@@ -5,10 +6,12 @@ import { buildNuvioExportPayload, getListSelectionKey, getSafeHttpsUrl, normaliz
 
 const FOLDER_IMAGE_MAX_PAGES = 3;
 const FOLDER_IMAGE_CONCURRENCY = 3;
+const MEDIA_DETECTION_CONCURRENCY = 3;
 const MAX_EXISTING_JSON_BYTES = 2 * 1024 * 1024;
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const DEFAULT_MERGE_MODE = "new";
 const DEFAULT_SORT_MODE = "title-asc";
+const DEFAULT_MEDIA_MODE = "automatic";
 const DEFAULT_FOLDER_TILE_SHAPE = "LANDSCAPE";
 const DEFAULT_FOLDER_TITLE_MODE = "hide";
 const FOLDER_ARTWORK_MODE_DEFAULT = "default";
@@ -25,6 +28,8 @@ export function createNuvioExportUi({ selection }) {
   const coverUrlInput = document.querySelector("#nuvio-cover-url");
   const coverStatus = document.querySelector("#nuvio-cover-status");
   const sortModeSelect = document.querySelector("#nuvio-sort-mode");
+  const mediaModeSelect = document.querySelector("#nuvio-media-mode");
+  const mediaStatus = document.querySelector("#nuvio-media-status");
   const folderTileShapeButtons = [...document.querySelectorAll("[data-folder-tile-shape]")];
   const folderTitleModeButtons = [...document.querySelectorAll("[data-folder-title-mode]")];
   const folderImageStatus = document.querySelector("#nuvio-folder-image-status");
@@ -64,6 +69,7 @@ export function createNuvioExportUi({ selection }) {
     mapped: document.querySelector("#nuvio-mapped-mode-description"),
   };
   const folderImageCache = new Map();
+  const mediaDetectionCache = new Map();
   const folderArtworkChoices = new Map();
   let importSources = [];
   let importSourceCounter = 0;
@@ -82,6 +88,7 @@ export function createNuvioExportUi({ selection }) {
   collectionNameInput.addEventListener("input", update);
   coverUrlInput.addEventListener("input", update);
   sortModeSelect.addEventListener("change", update);
+  mediaModeSelect.addEventListener("change", update);
   folderTileShapeButtons.forEach((button) => {
     button.addEventListener("click", () => {
       folderTileShape = button.dataset.folderTileShape || DEFAULT_FOLDER_TILE_SHAPE;
@@ -218,6 +225,7 @@ export function createNuvioExportUi({ selection }) {
       selectedArtworkSignature = nextArtworkSignature;
       updateMergeControls();
       renderFolderArtworkOverrides();
+      refreshMediaDetections();
       refreshGeneratedOutput();
       if (shouldRefreshFolderImages) refreshFolderImages();
     } catch (error) {
@@ -239,7 +247,7 @@ export function createNuvioExportUi({ selection }) {
       output.value = payload.json;
       updateExportSummary(payload);
       renderExportStatus(payload);
-      setJsonActionsDisabled(false);
+      setJsonActionsDisabled(getMediaMode() === DEFAULT_MEDIA_MODE && hasSelectedMediaDetectionLoading());
     } catch (error) {
       latestPayload = null;
       output.value = `Could not build JSON: ${error.message}`;
@@ -261,6 +269,8 @@ export function createNuvioExportUi({ selection }) {
       folderImages: getFolderImageObject(),
       folderTileShape,
       hideFolderTitles: folderTitleMode !== "show",
+      mediaMode: getMediaMode(),
+      mediaDetections: getMediaDetectionObject(),
       sortMode: sortModeSelect.value,
       splitAssignments: selection.splitAssignmentObject(),
       mappedAssignments: selection.mappedAssignmentObject(),
@@ -925,6 +935,127 @@ export function createNuvioExportUi({ selection }) {
     return getSelectedListsForExport().map((result) => getListSelectionKey(result)).filter(Boolean).join("|");
   }
 
+  function getMediaMode() {
+    const value = String(mediaModeSelect.value || DEFAULT_MEDIA_MODE).toLowerCase();
+    return ["automatic", "both", "movies", "series"].includes(value) ? value : DEFAULT_MEDIA_MODE;
+  }
+
+  function getMediaDetectionObject() {
+    return Object.fromEntries(getSelectedListsForExport().flatMap((result) => {
+      const key = getListSelectionKey(result);
+      const detection = key ? mediaDetectionCache.get(key) : null;
+      if (!key || !detection || detection.status === "loading") return [];
+      return [[key, detection]];
+    }));
+  }
+
+  function hasSelectedMediaDetectionLoading() {
+    if (getMediaMode() !== DEFAULT_MEDIA_MODE) return false;
+    return getSelectedListsForExport().some((result) => {
+      const key = getListSelectionKey(result);
+      if (!key) return false;
+      const detection = mediaDetectionCache.get(key);
+      return !detection || detection.status === "loading";
+    });
+  }
+
+  async function refreshMediaDetections() {
+    const selected = getSelectedListsForExport().filter((result) => getListSelectionKey(result));
+    if (getMediaMode() !== DEFAULT_MEDIA_MODE) {
+      updateMediaDetectionStatus();
+      return;
+    }
+
+    const missing = selected.filter((result) => !mediaDetectionCache.has(getListSelectionKey(result)));
+    if (!missing.length) {
+      updateMediaDetectionStatus();
+      return;
+    }
+
+    missing.forEach((result) => {
+      mediaDetectionCache.set(getListSelectionKey(result), {
+        status: "loading",
+        movieCount: 0,
+        showCount: 0,
+      });
+    });
+    updateMediaDetectionStatus();
+    setJsonActionsDisabled(true);
+
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(MEDIA_DETECTION_CONCURRENCY, missing.length) }, async () => {
+      while (cursor < missing.length) {
+        const result = missing[cursor];
+        cursor += 1;
+        const key = getListSelectionKey(result);
+        try {
+          const payload = await fetchTraktListMediaComposition(result.ids?.trakt);
+          mediaDetectionCache.set(key, {
+            status: "resolved",
+            movieCount: Number(payload.movie_count || 0),
+            showCount: Number(payload.show_count || 0),
+          });
+        } catch {
+          mediaDetectionCache.set(key, {
+            status: "failed",
+            movieCount: 0,
+            showCount: 0,
+          });
+        }
+      }
+    });
+
+    await Promise.all(workers);
+    updateMediaDetectionStatus();
+    refreshGeneratedOutput();
+  }
+
+  function updateMediaDetectionStatus() {
+    const selected = getSelectedListsForExport().filter((result) => getListSelectionKey(result));
+    const mode = getMediaMode();
+
+    if (!selected.length) {
+      mediaStatus.textContent = "";
+      return;
+    }
+
+    if (mode !== DEFAULT_MEDIA_MODE) {
+      const label = mode === "both" ? "Movies & Series" : mode === "series" ? "Series" : "Movies";
+      mediaStatus.textContent = `All selected lists will export as ${label}.`;
+      return;
+    }
+
+    const detections = selected.map((result) => mediaDetectionCache.get(getListSelectionKey(result)));
+    const loadingCount = detections.filter((entry) => !entry || entry.status === "loading").length;
+    if (loadingCount) {
+      mediaStatus.textContent = `Detecting media for ${formatNumber(loadingCount)} selected list${loadingCount === 1 ? "" : "s"}...`;
+      return;
+    }
+
+    let movies = 0;
+    let series = 0;
+    let both = 0;
+    let fallback = 0;
+    detections.forEach((entry) => {
+      const movieCount = Number(entry?.movieCount || 0);
+      const showCount = Number(entry?.showCount || 0);
+      if (movieCount > 0 && showCount > 0) both += 1;
+      else if (showCount > 0) series += 1;
+      else if (movieCount > 0) movies += 1;
+      else fallback += 1;
+    });
+
+    const parts = [];
+    if (movies) parts.push(`${formatNumber(movies)} Movies`);
+    if (series) parts.push(`${formatNumber(series)} Series`);
+    if (both) parts.push(`${formatNumber(both)} Movies & Series`);
+    const detected = parts.length ? `Detected: ${parts.join(" · ")}.` : "";
+    const fallbackText = fallback
+      ? ` ${formatNumber(fallback)} list${fallback === 1 ? "" : "s"} could not be determined and will use Both.`
+      : "";
+    mediaStatus.textContent = `${detected}${fallbackText}`.trim();
+  }
+
   function resetExportForm() {
     closeImportHelp();
     closeImportManage();
@@ -936,6 +1067,7 @@ export function createNuvioExportUi({ selection }) {
     collectionNameInput.value = "";
     coverUrlInput.value = "";
     sortModeSelect.value = DEFAULT_SORT_MODE;
+    mediaModeSelect.value = DEFAULT_MEDIA_MODE;
     folderTileShape = DEFAULT_FOLDER_TILE_SHAPE;
     folderTitleMode = DEFAULT_FOLDER_TITLE_MODE;
     syncFolderDisplayButtons();
