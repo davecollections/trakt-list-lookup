@@ -73,6 +73,10 @@ assert.match(indexHtml, /Collection details/);
 assert.match(indexHtml, /Hero\/backdrop image URL/);
 assert.match(indexHtml, /Folder order/);
 assert.match(indexHtml, /Sorts generated folders, not the titles inside Trakt lists\./);
+assert.match(indexHtml, /Media type/);
+assert.match(indexHtml, /id="nuvio-media-mode"/);
+assert.match(indexHtml, /Automatic \(recommended\)/);
+assert.match(indexHtml, /Top creators on this page/);
 assert.match(indexHtml, /Artwork defaults/);
 assert.match(indexHtml, /Auto poster images/);
 assert.doesNotMatch(indexHtml, /id="nuvio-folder-image-mode"/);
@@ -264,12 +268,8 @@ assert.equal(mixedImportPayload.collections[0].folders[0].sources[1].provider, "
 
 nextId = 0;
 const seriesExport = buildNuvioExport({
-  lists: [
-    {
-      ...list("IMDB: Top Rated TV Shows", 2143363),
-      nuvioMediaType: "TV",
-    },
-  ],
+  lists: [list("IMDB: Top Rated TV Shows", 2143363)],
+  mediaMode: "series",
   createId,
 });
 assert.equal(seriesExport[0].folders[0].sources[0].mediaType, "TV");
@@ -289,6 +289,72 @@ const uncertainMediaExport = buildNuvioExport({
   createId,
 });
 assert.deepEqual(uncertainMediaExport[0].folders.map((folder) => folder.sources[0].mediaType), ["MOVIE", "MOVIE"]);
+
+nextId = 0;
+const automaticMediaExport = buildNuvioExportPayload({
+  lists: [
+    list("Movies Only", 201),
+    list("Series Only", 202),
+    list("Mixed List", 203),
+  ],
+  mediaMode: "automatic",
+  mediaDetections: {
+    201: { status: "resolved", movieCount: 14, showCount: 0 },
+    202: { status: "resolved", movieCount: 0, showCount: 9 },
+    203: { status: "resolved", movieCount: 7, showCount: 4 },
+  },
+  sortMode: "selected",
+  createId,
+});
+assert.deepEqual(
+  automaticMediaExport.collections[0].folders.map((folder) => folder.sources.map((source) => source.mediaType)),
+  [["MOVIE"], ["TV"], ["MOVIE", "TV"]],
+);
+assert.deepEqual(automaticMediaExport.collections[0].folders[2].sources, [
+  {
+    title: "Mixed List Movies",
+    sortBy: "rank",
+    sortHow: "asc",
+    provider: "trakt",
+    mediaType: "MOVIE",
+    traktListId: 203,
+  },
+  {
+    title: "Mixed List Series",
+    sortBy: "rank",
+    sortHow: "asc",
+    provider: "trakt",
+    mediaType: "TV",
+    traktListId: 203,
+  },
+]);
+assert.equal(automaticMediaExport.report.mediaDetectionFallbackCount, 0);
+
+nextId = 0;
+const automaticFallbackPayload = buildNuvioExportPayload({
+  lists: [list("Unclassified List", 204)],
+  mediaMode: "automatic",
+  mediaDetections: {
+    204: { status: "failed", movieCount: 0, showCount: 0 },
+  },
+  createId,
+});
+assert.deepEqual(
+  automaticFallbackPayload.collections[0].folders[0].sources.map((source) => source.mediaType),
+  ["MOVIE", "TV"],
+);
+assert.equal(automaticFallbackPayload.report.mediaDetectionFallbackCount, 1);
+const automaticFallbackStatus = getNuvioExportStatusModel(automaticFallbackPayload);
+assert.equal(automaticFallbackStatus.tone, "warning");
+assert.ok(automaticFallbackStatus.messages.some((message) => message.includes("Media detection fallback")));
+
+nextId = 0;
+const explicitBothExport = buildNuvioExport({
+  lists: [list("Forced Both", 205)],
+  mediaMode: "both",
+  createId,
+});
+assert.deepEqual(explicitBothExport[0].folders[0].sources.map((source) => source.mediaType), ["MOVIE", "TV"]);
 
 nextId = 0;
 const imageExport = buildNuvioExport({
@@ -510,6 +576,30 @@ const duplicateSafeStatus = getNuvioExportStatusModel(duplicateSafePayload);
 assert.equal(duplicateSafeStatus.title, "Export ready with warnings");
 assert.equal(duplicateSafeStatus.tone, "warning");
 assert.ok(duplicateSafeStatus.messages.includes("Already-existing Trakt list skipped: 1 selected list already exists or would duplicate existing output."));
+
+nextId = 0;
+const existingMediaUpgradePayload = buildNuvioExportPayload({
+  lists: [list("Comedy Nights", 101)],
+  existing: existingWithDuplicate,
+  mode: "existing",
+  targetCollectionKey: "collection-a",
+  mediaMode: "automatic",
+  mediaDetections: {
+    101: { status: "resolved", movieCount: 12, showCount: 5 },
+  },
+  createId,
+});
+assert.equal(existingMediaUpgradePayload.collections[0].folders.length, 1);
+assert.equal(existingMediaUpgradePayload.collections[0].folders[0].id, "existing-folder");
+assert.equal(existingMediaUpgradePayload.collections[0].folders[0].coverImageUrl, "https://example.com/existing-artwork.jpg");
+assert.deepEqual(
+  existingMediaUpgradePayload.collections[0].folders[0].sources.map((source) => source.mediaType),
+  ["MOVIE", "TV"],
+);
+assert.equal(existingMediaUpgradePayload.report.mergedTraktSourceCount, 1);
+assert.equal(existingMediaUpgradePayload.report.duplicateSourceFolderCount, 0);
+const existingMediaUpgradeStatus = getNuvioExportStatusModel(existingMediaUpgradePayload);
+assert.ok(existingMediaUpgradeStatus.messages.some((message) => message.includes("missing media source added")));
 
 nextId = 0;
 const existingWithTwoDuplicateTraktLists = [
