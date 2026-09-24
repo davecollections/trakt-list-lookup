@@ -20,7 +20,7 @@ const sortButtons = document.querySelectorAll(".results-header [data-sort]");
 const pageSizeSelect = document.querySelector("#page-size-select");
 
 
-const ITEMS_PREVIEW_LIMIT = 15;
+const ITEMS_PREVIEW_LIMIT = 50;
 const POSTER_SAMPLE_LIMIT = 3;
 
 const state = {
