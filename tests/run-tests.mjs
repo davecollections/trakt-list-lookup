@@ -4,3 +4,6 @@ await import("./results-view.test.mjs");
 await import("./selection-state.test.mjs");
 await import("./trakt-api-handler.test.mjs");
 await import("./trakt-api-helpers.test.mjs");
+await import("./dingo-worker.test.mjs");
+await import("./dingo-budget.test.mjs");
+await import("./shared-trakt-budget.test.mjs");

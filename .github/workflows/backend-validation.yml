@@ -1,0 +1,38 @@
+name: Backend validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Check out exact feature head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Run regression suites
+        run: npm test
+      - name: Check source and frontend contracts
+        run: npm run check
+      - name: Check shared client in workerd without live upstream calls
+        run: npm run test:workerd
+      - name: Validate Worker configuration without deployment
+        run: |
+          npx --yes wrangler@4.145.0 deploy --dry-run --config wrangler.dingo.toml --env= --outdir .wrangler/ci-root
+          npx --yes wrangler@4.145.0 deploy --dry-run --config wrangler.dingo.toml --env=infrastructure --outdir .wrangler/ci-infrastructure

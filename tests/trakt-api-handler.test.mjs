@@ -576,6 +576,8 @@ function callHandler(url, testEnv, headers = {}) {
 function env() {
   return {
     TRAKT_CLIENT_ID: "test-client-id",
+    TRAKT_CREDENTIAL_SCOPE: "shared",
+    TRAKT_BUDGET: { idFromName: (name) => name, get: () => ({ reserve: async () => ({ allowed: true }) }) },
   };
 }
 

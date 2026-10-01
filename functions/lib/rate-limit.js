@@ -3,35 +3,49 @@ const CLEANUP_INTERVAL_MS = 60 * 1000;
 const DEFAULT_LIMIT = 180;
 const MAX_LIMIT = 600;
 
-const buckets = new Map();
-let lastCleanup = 0;
+export const checkRateLimit = createRateLimiter();
 
-export function checkRateLimit(request, env = {}, cost = 1) {
-  const limit = getRateLimit(env.API_RATE_LIMIT_PER_MINUTE);
-  const requestCost = getRequestCost(cost, limit);
-  const now = Date.now();
-  cleanupExpiredBuckets(now);
+export function createRateLimiter({ maxBuckets = Infinity, clock = Date.now } = {}) {
+  const buckets = new Map();
+  let lastCleanup = 0;
+  return function check(request, env = {}, cost = 1) {
+    const limit = getRateLimit(env.API_RATE_LIMIT_PER_MINUTE);
+    const requestCost = getRequestCost(cost, limit);
+    const now = clock();
+    cleanupExpiredBuckets(now);
 
-  const key = getClientKey(request);
-  const bucket = buckets.get(key);
+    const key = getClientKey(request);
+    const bucket = buckets.get(key);
 
-  if (!bucket || bucket.resetAt <= now) {
-    buckets.set(key, {
-      count: requestCost,
-      resetAt: now + WINDOW_MS,
-    });
+    if (!bucket || bucket.resetAt <= now) {
+      if (!bucket && buckets.size >= maxBuckets) {
+        return { allowed: false, headers: { "Retry-After": "60" } };
+      }
+      buckets.set(key, {
+        count: requestCost,
+        resetAt: now + WINDOW_MS,
+      });
+      return { allowed: true };
+    }
+
+    if (bucket.count + requestCost > limit) {
+      return {
+        allowed: false,
+        headers: getRateLimitHeaders(limit, 0, bucket.resetAt, now),
+      };
+    }
+
+    bucket.count += requestCost;
     return { allowed: true };
-  }
+  };
 
-  if (bucket.count + requestCost > limit) {
-    return {
-      allowed: false,
-      headers: getRateLimitHeaders(limit, 0, bucket.resetAt, now),
-    };
+  function cleanupExpiredBuckets(now) {
+    if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
+    lastCleanup = now;
+    for (const [key, bucket] of buckets) {
+      if (bucket.resetAt <= now) buckets.delete(key);
+    }
   }
-
-  bucket.count += requestCost;
-  return { allowed: true };
 }
 
 function getRateLimit(value) {
@@ -57,13 +71,4 @@ function getRateLimitHeaders(limit, remaining, resetAt, now) {
     "X-RateLimit-Remaining": String(Math.max(0, remaining)),
     "X-RateLimit-Reset": String(Math.ceil(resetAt / 1000)),
   };
-}
-
-function cleanupExpiredBuckets(now) {
-  if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
-  lastCleanup = now;
-
-  for (const [key, bucket] of buckets) {
-    if (bucket.resetAt <= now) buckets.delete(key);
-  }
 }

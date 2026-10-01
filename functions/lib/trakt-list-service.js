@@ -1,3 +1,4 @@
+import { isAccountingFailure } from "./trakt-budget.js";
 import {
   RESULT_LIMIT,
   getRouteUsername,
@@ -29,14 +30,14 @@ const AVAILABILITY_VALIDATION_CONCURRENCY = 4;
 const AVAILABILITY_ITEM_LIMIT = 1;
 const AVAILABILITY_VALIDATION_TIMEOUT_MS = 1000;
 
-export async function getSortedLists(mode, query, page, limit, sort, order, clientId) {
+export async function getSortedLists(mode, query, page, limit, sort, order, clientId, options = {}) {
   const fetchLimit = SORT_FETCH_LIMIT;
-  const firstPage = await getListPayload(mode, query, 1, fetchLimit, clientId);
+  const firstPage = await getListPayload(mode, query, 1, fetchLimit, clientId, options);
   const pageCount = Math.min(firstPage.pagination?.page_count || 1, Math.ceil(SORT_MAX_ITEMS / fetchLimit), MAX_PAGE);
   const pages = [firstPage];
 
   for (let nextPage = 2; nextPage <= pageCount; nextPage += 1) {
-    pages.push(await getListPayload(mode, query, nextPage, fetchLimit, clientId));
+    pages.push(await getListPayload(mode, query, nextPage, fetchLimit, clientId, options));
   }
 
   let lists = pages.flatMap((payload) => payload.data).slice(0, SORT_MAX_ITEMS);
@@ -56,22 +57,22 @@ export async function getSortedLists(mode, query, page, limit, sort, order, clie
   };
 }
 
-export async function getListPayload(mode, query, page, limit, clientId) {
-  if (mode === "search") return searchLists(query, page, limit, clientId);
-  if (mode === "user") return getUserLists(query, page, limit, clientId);
-  if (mode === "popular" || mode === "trending") return getGlobalLists(mode, page, limit, clientId);
+export async function getListPayload(mode, query, page, limit, clientId, options = {}) {
+  if (mode === "search") return searchLists(query, page, limit, clientId, options);
+  if (mode === "user") return getUserLists(query, page, limit, clientId, options);
+  if (mode === "popular" || mode === "trending") return getGlobalLists(mode, page, limit, clientId, options);
   throw httpError("Unsupported sorted search mode.", 400);
 }
 
-export async function searchLists(query, page, limit, clientId) {
+export async function searchLists(query, page, limit, clientId, options = {}) {
   const params = new URLSearchParams({
     query,
     page: String(page),
     limit: String(limit),
   });
-  const payload = await traktFetch(`/search/list?${params.toString()}`, clientId);
+  const payload = await traktFetch(`/search/list?${params.toString()}`, clientId, options);
   const data = rankSearchResults(payload.data, query)
-    .map((item) => normalizeListMetrics(item.list))
+    .map((item) => normalizeListMetrics(item.list, options))
     .filter(Boolean);
   return {
     data,
@@ -79,26 +80,26 @@ export async function searchLists(query, page, limit, clientId) {
   };
 }
 
-export async function getGlobalLists(kind, page, limit, clientId) {
+export async function getGlobalLists(kind, page, limit, clientId, options = {}) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
-  const payload = await traktFetch(`/lists/${kind}?${params.toString()}`, clientId);
+  const payload = await traktFetch(`/lists/${kind}?${params.toString()}`, clientId, options);
   return {
-    data: payload.data.map(normalizeGlobalListEntry).filter(Boolean),
+    data: payload.data.map((entry) => normalizeGlobalListEntry(entry, options)).filter(Boolean),
     pagination: payload.pagination,
   };
 }
 
-export async function getUserLists(username, page, limit, clientId) {
+export async function getUserLists(username, page, limit, clientId, options = {}) {
   const parsed = parseUserListQuery(username);
   if (!isSafePathSegment(parsed.username)) {
     throw httpError("Invalid Trakt username.", 400);
   }
 
   if (parsed.filter) {
-    return getFilteredUserLists(parsed.username, parsed.filter, clientId);
+    return getFilteredUserLists(parsed.username, parsed.filter, clientId, options);
   }
 
   const safeUsername = encodeURIComponent(parsed.username);
@@ -106,18 +107,18 @@ export async function getUserLists(username, page, limit, clientId) {
     page: String(page),
     limit: String(limit),
   });
-  const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
+  const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId, options);
   return {
     ...payload,
-    data: payload.data.map(normalizeListMetrics).filter(Boolean),
+    data: payload.data.map((list) => normalizeListMetrics(list, options)).filter(Boolean),
   };
 }
 
-export async function resolveListUrl(value, clientId) {
-  const directId = parseTraktListId(value);
-  if (directId) return resolveListId(directId, clientId);
+export async function resolveListUrl(value, clientId, options = {}) {
+  const directId = parseTraktListId(value, options);
+  if (directId) return resolveListId(directId, clientId, options);
 
-  const parsed = parseTraktListUrl(value);
+  const parsed = parseTraktListUrl(value, options);
   if (!parsed) {
     throw httpError("That does not look like a supported Trakt list URL.", 400);
   }
@@ -125,8 +126,8 @@ export async function resolveListUrl(value, clientId) {
   if (parsed.kind === "user-list") {
     const username = encodeURIComponent(parsed.username);
     const slug = encodeURIComponent(parsed.slug);
-    const payload = await traktFetch(`/users/${username}/lists/${slug}`, clientId);
-    const list = withListAvailability(normalizeListMetrics(payload.data), "available");
+    const payload = await traktFetch(`/users/${username}/lists/${slug}`, clientId, options);
+    const list = withListAvailability(normalizeListMetrics(payload.data, options), "available");
     return {
       data: [list],
       quickUserLists: [list],
@@ -135,26 +136,27 @@ export async function resolveListUrl(value, clientId) {
   }
 
   if (parsed.kind === "list-id") {
-    return resolveListId(parsed.id, clientId);
+    return resolveListId(parsed.id, clientId, options);
   }
 
   throw httpError("Unsupported Trakt list URL.", 400);
 }
 
-export async function resolveListId(id, clientId) {
-  const listId = parseTraktListId(id);
+export async function resolveListId(id, clientId, options = {}) {
+  const listId = parseTraktListId(id, options);
   if (!listId) {
     throw httpError("Invalid Trakt list ID.", 400);
   }
 
   try {
-    const payload = await fetchListDetailById(listId, clientId, { quietNotFound: true });
+    const payload = await fetchListDetailById(listId, clientId, { ...options, quietNotFound: true });
     return {
-      data: [withListAvailability(normalizeListMetrics(payload.data), "available")],
-      quickUserLists: [withListAvailability(normalizeListMetrics(payload.data), "available")],
+      data: [withListAvailability(normalizeListMetrics(payload.data, options), "available")],
+      quickUserLists: [withListAvailability(normalizeListMetrics(payload.data, options), "available")],
       pagination: singleResultPagination(),
     };
   } catch (error) {
+    if (isAccountingFailure(error)) throw error;
     if (error.status === 404) {
       throw httpError("No public list found for this Trakt list ID.", 404);
     }
@@ -162,7 +164,7 @@ export async function resolveListId(id, clientId) {
   }
 }
 
-export async function validateListAvailability(lists, clientId) {
+export async function validateListAvailability(lists, clientId, options = {}) {
   const validationCache = new Map();
   return mapWithConcurrency(lists || [], AVAILABILITY_VALIDATION_CONCURRENCY, async (list) => {
     if (!list) return list;
@@ -177,15 +179,16 @@ export async function validateListAvailability(lists, clientId) {
 
     const id = String(list.ids.trakt);
     if (!validationCache.has(id)) {
-      validationCache.set(id, validateSuspiciousListAvailability(list, clientId));
+      validationCache.set(id, validateSuspiciousListAvailability(list, clientId, options));
     }
     return validationCache.get(id);
   });
 }
 
-async function validateSuspiciousListAvailability(list, clientId) {
+async function validateSuspiciousListAvailability(list, clientId, options = {}) {
   try {
     const detail = await fetchListDetailById(list.ids.trakt, clientId, {
+      ...options,
       quietNotFound: true,
       timeoutMs: AVAILABILITY_VALIDATION_TIMEOUT_MS,
     });
@@ -194,12 +197,13 @@ async function validateSuspiciousListAvailability(list, clientId) {
       return withListAvailability(merged, "unavailable", "Unavailable or not public");
     }
 
-    const itemsAvailability = await verifyListItemsAvailability(merged, clientId);
+    const itemsAvailability = await verifyListItemsAvailability(merged, clientId, options);
     if (itemsAvailability.status !== "available") {
       return withListAvailability(merged, itemsAvailability.status, itemsAvailability.message);
     }
     return withListAvailability(merged, "available");
   } catch (error) {
+    if (isAccountingFailure(error)) throw error;
     if (error.status === 404) {
       return withListAvailability(list, "unavailable", "Unavailable or not public");
     }
@@ -300,7 +304,7 @@ function normalizeCount(value) {
   return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
-async function getFilteredUserLists(username, filter, clientId) {
+async function getFilteredUserLists(username, filter, clientId, options = {}) {
   const safeUsername = encodeURIComponent(username);
   const terms = normalizeSearchText(filter).split(" ").filter(Boolean);
   const results = [];
@@ -314,7 +318,7 @@ async function getFilteredUserLists(username, filter, clientId) {
       page: String(page),
       limit: String(fetchLimit),
     });
-    const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId);
+    const payload = await traktFetch(`/users/${safeUsername}/lists?${params.toString()}`, clientId, options);
     pageCount = Math.min(
       payload.pagination?.page_count || 1,
       Math.ceil(USER_FILTER_MAX_ITEMS / USER_FILTER_FETCH_LIMIT),
@@ -323,7 +327,7 @@ async function getFilteredUserLists(username, filter, clientId) {
     scannedItems += payload.data.length;
 
     for (const rawList of payload.data) {
-      const list = normalizeListMetrics(rawList);
+      const list = normalizeListMetrics(rawList, options);
       if (list && listMatchesTerms(list, terms)) results.push(list);
       if (results.length >= RESULT_LIMIT) break;
     }
@@ -342,16 +346,17 @@ async function getFilteredUserLists(username, filter, clientId) {
   };
 }
 
-function fetchListDetailById(id, clientId, { quietNotFound = false, timeoutMs = 0 } = {}) {
+function fetchListDetailById(id, clientId, { quietNotFound = false, timeoutMs = 0, ...options } = {}) {
   const quietStatuses = quietNotFound ? [404] : [];
   return traktFetch(`/lists/${encodeURIComponent(id)}`, clientId, {
+    ...options,
     quietStatuses,
     quietNetworkErrors: timeoutMs > 0,
     timeoutMs,
   });
 }
 
-async function verifyListItemsAvailability(list, clientId) {
+async function verifyListItemsAvailability(list, clientId, options = {}) {
   const listId = parseTraktListId(list?.ids?.trakt);
   if (!listId) {
     return {
@@ -367,6 +372,7 @@ async function verifyListItemsAvailability(list, clientId) {
 
   try {
     await traktFetch(`/lists/${encodeURIComponent(listId)}/items/movie,show,episode,season?${params.toString()}`, clientId, {
+      ...options,
       quietStatuses: [404],
       quietNetworkErrors: true,
       timeoutMs: AVAILABILITY_VALIDATION_TIMEOUT_MS,
@@ -376,6 +382,7 @@ async function verifyListItemsAvailability(list, clientId) {
       message: "",
     };
   } catch (error) {
+    if (isAccountingFailure(error)) throw error;
     if (error.status === 404) {
       return {
         status: "unavailable",

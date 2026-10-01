@@ -117,24 +117,30 @@ export function getPositiveInteger(value, fallback) {
   return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
-export function normalizeOptionalCount(value) {
+export function normalizeOptionalCount(value, { strict = false } = {}) {
+  if (strict && value !== undefined && value !== null && (!Number.isSafeInteger(value) || value < 0)) {
+    throw Object.assign(new Error("Invalid Trakt count."), { status: 502 });
+  }
   if (value === undefined || value === null || value === "") return null;
   const number = Number.parseInt(value, 10);
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
-export function normalizeListMetrics(list) {
+export function normalizeListMetrics(list, options = {}) {
+  if (options.strict && (!list || typeof list !== "object" || Array.isArray(list))) {
+    throw Object.assign(new Error("Invalid Trakt list."), { status: 502 });
+  }
   if (!list) return null;
   return {
     ...list,
-    like_count: getListLikeCount(list),
-    comment_count: normalizeOptionalCount(list.comment_count) ?? undefined,
+    like_count: getListLikeCount(list, options),
+    comment_count: normalizeOptionalCount(list.comment_count, options) ?? undefined,
   };
 }
 
-function getListLikeCount(list) {
-  return normalizeOptionalCount(list?.like_count)
-    ?? normalizeOptionalCount(list?.likes)
+function getListLikeCount(list, options = {}) {
+  return normalizeOptionalCount(list?.like_count, options)
+    ?? normalizeOptionalCount(list?.likes, options)
     ?? undefined;
 }
 
@@ -194,12 +200,25 @@ export function isSafePathSegment(value) {
   return /^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/.test(value);
 }
 
-export function parseTraktListId(value) {
+export function parseTraktListId(value, { strict = false } = {}) {
+  if (strict && typeof value !== "string" && typeof value !== "number") return "";
+  if (strict && !Number.isSafeInteger(Number(value))) return "";
   const text = String(value || "").trim();
   return /^[1-9]\d{0,19}$/.test(text) ? text : "";
 }
 
-export function getPagination(response) {
+export function getPagination(response, { strict = false } = {}) {
+  if (strict) {
+    const result = {};
+    for (const field of ["page", "limit", "page_count", "item_count"]) {
+      const value = response.headers.get("x-pagination-" + field.replace("_", "-"));
+      if (value === null) result[field] = null;
+      else if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || (Number(value) === 0 && ["page", "limit"].includes(field))) {
+        throw Object.assign(new Error("Invalid Trakt pagination."), { status: 502 });
+      } else result[field] = Number(value);
+    }
+    return result;
+  }
   const page = getPositiveInteger(response.headers.get("x-pagination-page"), 1);
   const limit = getPositiveInteger(response.headers.get("x-pagination-limit"), RESULT_LIMIT);
   const itemCount = getPositiveInteger(response.headers.get("x-pagination-item-count"), 0);
@@ -224,7 +243,8 @@ export function singleResultPagination() {
   };
 }
 
-export function parseTraktListUrl(value) {
+export function parseTraktListUrl(value, { strict = false } = {}) {
+  if (strict && (typeof value !== "string" || /[\\\s%]/.test(value) || /\/\.{1,2}(?:\/|$)/.test(value))) return null;
   let url;
   try {
     url = new URL(value);
@@ -232,6 +252,9 @@ export function parseTraktListUrl(value) {
     return null;
   }
 
+  if (strict && (url.protocol !== "https:" || url.username || url.password || url.port || url.search || url.hash)) return null;
+  if (strict && !/^\/(?:lists\/[1-9]\d*|users\/[A-Za-z0-9][A-Za-z0-9_.-]{0,120}\/lists\/[A-Za-z0-9][A-Za-z0-9_.-]{0,120})\/?$/.test(url.pathname)) return null;
+  if (strict && !["trakt.tv", "www.trakt.tv", "app.trakt.tv"].includes(url.hostname)) return null;
   const host = url.hostname.replace(/^www\./, "");
   if (!SUPPORTED_TRAKT_HOSTS.has(host)) return null;
 
@@ -247,7 +270,7 @@ export function parseTraktListUrl(value) {
   if (parts[0] === "lists" && parts[1] && /^\d+$/.test(parts[1])) {
     return {
       kind: "list-id",
-      id: parts[1],
+      id: strict ? parseTraktListId(parts[1], { strict: true }) : parts[1],
     };
   }
 
@@ -300,15 +323,18 @@ function getAvailabilityOwnerDisplayName(status, fallback) {
   return fallback;
 }
 
-export function normalizeGlobalListEntry(entry) {
+export function normalizeGlobalListEntry(entry, options = {}) {
+  if (options.strict && (!entry || typeof entry !== "object" || Array.isArray(entry))) {
+    throw Object.assign(new Error("Invalid Trakt list entry."), { status: 502 });
+  }
   if (!entry) return null;
-  const list = normalizeListMetrics(entry.list || entry);
+  const list = normalizeListMetrics(options.strict && Object.hasOwn(entry, "list") ? entry.list : entry.list || entry, options);
   if (!list) return null;
 
   return {
     ...list,
-    like_count: normalizeOptionalCount(entry.like_count) ?? list.like_count,
-    comment_count: normalizeOptionalCount(entry.comment_count) ?? list.comment_count,
+    like_count: normalizeOptionalCount(entry.like_count, options) ?? list.like_count,
+    comment_count: normalizeOptionalCount(entry.comment_count, options) ?? list.comment_count,
   };
 }
 
