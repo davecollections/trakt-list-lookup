@@ -162,7 +162,7 @@ The tool checks for broken or unavailable Trakt list records where practical.
 
 This is a static Cloudflare Pages site with Pages Functions under `functions/`.
 
-Required Cloudflare variable:
+Required server-side Cloudflare secret (never commit its value):
 
 ```text
 TRAKT_CLIENT_ID=your_trakt_api_client_id
@@ -197,11 +197,11 @@ TRAKT_CLIENT_ID=your_trakt_api_client_id
 TMDB_READ_ACCESS_TOKEN=your_tmdb_read_access_token
 ```
 
-Then run from the repository directory:
+For the shared backend, run both configurations from the repository directory:
 
 ```powershell
 cd "C:\path\to\trakt-list-lookup"
-npx.cmd wrangler@latest pages dev . --port 8158 --ip 127.0.0.1
+npx.cmd --yes wrangler@4.145.0 pages dev . -c wrangler.toml -c wrangler.dingo.toml --port 8158 --ip 127.0.0.1
 ```
 
 Use `npx.cmd` in Windows PowerShell if `npx` is blocked by execution policy. The Wrangler startup output should say `Compiled Worker successfully`.
@@ -215,6 +215,7 @@ Run:
 ```powershell
 npm test
 npm run check
+npm run test:workerd
 git diff --check
 ```
 
@@ -222,7 +223,8 @@ git diff --check
 
 The live site is deployed with Cloudflare Pages from GitHub changes.
 
-Manual deployment, if needed:
+Production changes are owner-gated. Follow the [shared-budget deployment order](docs/DINGO_TRAKT_API.md#owner-state-and-future-deployment-order-do-not-execute-during-b1)
+before publishing the new Pages binding. The existing manual command, only after approval, is:
 
 ```powershell
 wrangler pages deploy .
@@ -241,3 +243,13 @@ Public list data is supplied by Trakt. Trakt List Lookup is an independent tool 
 Poster previews and automatic folder artwork may use TMDB metadata where available. This product uses the TMDB API but is not endorsed or certified by TMDB.
 
 Trakt List Lookup is an independent community tool for Nuvio collections and is not affiliated with or endorsed by Nuvio.
+
+## Dingo service (local owner review)
+
+The separate, restricted Dingo Worker contract and deployment prerequisites are in
+[docs/DINGO_TRAKT_API.md](docs/DINGO_TRAKT_API.md). It is not deployed; the existing
+standalone Pages endpoint keeps its features and now participates in the same
+450-unit Trakt budget. Both require explicit TRAKT_CREDENTIAL_SCOPE=shared and
+the shared TRAKT_BUDGET binding. See the contract for the owner-gated deployment
+order and local multi-Worker command; a Pages-only local session cannot make
+accounted Trakt calls without the external coordinator.

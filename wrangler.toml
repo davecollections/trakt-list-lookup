@@ -2,3 +2,13 @@ name = "trakt-list-lookup"
 pages_build_output_dir = "."
 compatibility_date = "2026-05-16"
 
+
+# Existing Pages project; the class is owned by dingo-api, never by Pages.
+# Deploy dingo-api infrastructure before publishing this binding.
+[vars]
+TRAKT_CREDENTIAL_SCOPE = "shared"
+
+[[durable_objects.bindings]]
+name = "TRAKT_BUDGET"
+class_name = "DingoTraktBudget"
+script_name = "dingo-api"

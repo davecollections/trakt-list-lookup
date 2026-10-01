@@ -1,0 +1,60 @@
+# LOCAL OWNER-REVIEW CONFIGURATION. Deploying this would bind the custom domain.
+name = "dingo-api"
+main = "worker/dingo/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = "api.dingo.build"
+custom_domain = true
+
+[vars]
+# Owner-approved scope: the existing application is shared with standalone Pages.
+TRAKT_CREDENTIAL_SCOPE = "shared"
+ALLOW_LOOPBACK_ORIGINS = "false"
+
+[[durable_objects.bindings]]
+name = "TRAKT_BUDGET"
+class_name = "DingoTraktBudget"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DingoTraktBudget"]
+
+# Custom structured logs exclude queries, paths with IDs, bodies, headers and secrets.
+[observability.logs]
+enabled = true
+invocation_logs = false
+head_sampling_rate = 1
+
+# Local-only environment: never deployed by B1.
+[env.local]
+name = "dingo-api-local"
+workers_dev = false
+preview_urls = false
+routes = []
+
+[env.local.vars]
+TRAKT_CREDENTIAL_SCOPE = "shared"
+ALLOW_LOOPBACK_ORIGINS = "true"
+
+[[env.local.durable_objects.bindings]]
+name = "TRAKT_BUDGET"
+class_name = "DingoTraktBudget"
+
+# First production infrastructure stage, only after separate owner approval.
+# Same Worker name/class/namespace as root; no public hostname until Pages is wired.
+[env.infrastructure]
+name = "dingo-api"
+workers_dev = false
+preview_urls = false
+routes = []
+
+[env.infrastructure.vars]
+TRAKT_CREDENTIAL_SCOPE = "shared"
+ALLOW_LOOPBACK_ORIGINS = "false"
+
+[[env.infrastructure.durable_objects.bindings]]
+name = "TRAKT_BUDGET"
+class_name = "DingoTraktBudget"
