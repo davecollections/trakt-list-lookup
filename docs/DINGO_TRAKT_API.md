@@ -99,6 +99,17 @@ List contains only:
 - updated_at: upstream UTC ISO timestamp or null;
 - availability: unverified, available, or unavailable.
 
+Returned List ids.slug is metadata, separate from Resolve/input path segments.
+Missing or null values remain null; a nonempty string of up to 1000 UTF-16 code
+units is preserved exactly, without trimming or truncation. Empty strings, other
+types, longer strings, and control characters (C0, DEL and C1) are rejected as
+INVALID_UPSTREAM_RESPONSE. This 1000-unit ceiling is Dingo defensive output
+policy, not a claimed Trakt maximum. Unicode, spaces and punctuation may remain
+as metadata without being usable in a route. A user/slug URL is constructed only
+when both the creator route username and list slug satisfy the existing ASCII
+safe-segment grammar (max 121 characters); otherwise the canonical numeric List
+ID supplies the numeric-list URL. Resolve/input and item slug rules are unchanged.
+
 Discovery is unverified without an explicit successful resolve. Explicit
 non-public metadata is unavailable; resolve rejects it. A successful resolve
 establishes public metadata access, not a guarantee that future items will work.
