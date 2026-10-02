@@ -105,6 +105,12 @@ function slug(value) {
   return result;
 }
 
+function listMetadataSlug(value) {
+  const result = optionalText(value, 1000);
+  if (result !== null && (!result || /[\u0000-\u001f\u007f-\u009f]/.test(result))) throw badUpstream();
+  return result;
+}
+
 // A versioned data projection: unlike standalone presentation, never invents
 // labels, zero counts or discovery-time availability. Transport stays shared.
 export function listMetadata(raw, resolved = false) {
@@ -113,7 +119,7 @@ export function listMetadata(raw, resolved = false) {
   const user = list.user === undefined || list.user === null ? {} : object(list.user);
   const trakt = id(ids.trakt);
   if (trakt === null) throw badUpstream();
-  const listSlug = slug(ids.slug);
+  const listSlug = listMetadataSlug(ids.slug);
   const username = optionalText(user.username, 121);
   const name = optionalText(user.name, 500);
   const routeUsername = getRouteUsername(list) || null;
@@ -125,7 +131,7 @@ export function listMetadata(raw, resolved = false) {
     name: optionalText(list.name, 1000), description: optionalText(list.description),
     ids: { trakt, slug: listSlug },
     creator: { username, name, slug: routeUsername },
-    url: routeUsername && listSlug ? "https://trakt.tv/users/" + encodeURIComponent(routeUsername)
+    url: routeUsername && listSlug && isSafePathSegment(listSlug) ? "https://trakt.tv/users/" + encodeURIComponent(routeUsername)
       + "/lists/" + encodeURIComponent(listSlug) : trakt ? "https://trakt.tv/lists/" + trakt : null,
     item_count: normalizeOptionalCount(list.item_count, strict),
     like_count: normalizeOptionalCount(list.like_count, strict),

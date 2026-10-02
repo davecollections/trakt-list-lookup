@@ -99,6 +99,121 @@ try {
     assert.equal(response.headers.get("Content-Security-Policy"), null);
     assert.equal(response.headers.get("Vary"), "Origin");
   });
+  await check("returned list slug boundaries preserve metadata and use only route-safe URLs", async () => {
+    for (const length of [121, 122, 169, 171, 1000]) {
+      const value = "a".repeat(length);
+      const h = harness(() => paged([{ list: list({ ids: { trakt: 123, slug: value } }) }]));
+      const response = await h.request("/v1/trakt/search?mode=keyword&q=unit");
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.apiVersion, 1);
+      assert.equal(body.lists[0].ids.slug, value);
+      assert.equal(body.lists[0].url, length <= 121
+        ? "https://trakt.tv/users/unit-user/lists/" + value : "https://trakt.tv/lists/123");
+      assert.equal(h.calls.length, 1);
+      assert.deepEqual(h.reservations, [1]);
+    }
+  });
+  await check("returned list metadata is nullable and independent of route character grammar", async () => {
+    for (const value of [undefined, null, " fête / collection! ", " "]) {
+      const ids = value === undefined ? { trakt: 123 } : { trakt: 123, slug: value };
+      const h = harness(() => paged([{ list: list({ ids }) }]));
+      const response = await h.request("/v1/trakt/search?mode=keyword&q=unit");
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.apiVersion, 1);
+      assert.equal(body.lists[0].ids.slug, value ?? null);
+      assert.equal(body.lists[0].url, "https://trakt.tv/lists/123");
+    }
+    for (const user of [{ username: "unit-user" }, {}]) {
+      const h = harness(() => paged([{ list: list({ user }) }]));
+      const response = await h.request("/v1/trakt/search?mode=keyword&q=unit");
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.lists[0].ids.slug, "unit-list");
+      assert.equal(body.lists[0].url, user.username
+        ? "https://trakt.tv/users/unit-user/lists/unit-list" : "https://trakt.tv/lists/123");
+    }
+  });
+  await check("invalid list metadata slugs fail closed without successful caching", async () => {
+    for (const value of ["a".repeat(1001), "", 123, false, {}, [],
+      "unit\u0000list", "unit\u001flist", "unit\u007flist", "unit\u0085list", "unit\u009flist"]) {
+      const h = harness(() => paged([{ list: list({ ids: { trakt: 123, slug: value } }) }]));
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await h.request("/v1/trakt/search?mode=keyword&q=unit");
+        assert.equal(response.status, 502);
+        assert.deepEqual(await response.json(), { apiVersion: 1,
+          error: { code: "INVALID_UPSTREAM_RESPONSE", message: "Trakt returned an invalid response." } });
+      }
+      assert.equal(h.cached.size, 0);
+      assert.equal(h.calls.length, 2);
+      assert.deepEqual(h.reservations, [1, 1]);
+    }
+  });
+  await check("Resolve route segments retain their input grammar and 121-character boundary", async () => {
+    for (const value of ["unit-list", "a".repeat(121)]) {
+      const h = harness((url) => {
+        assert.equal(url.pathname, "/users/unit-user/lists/" + value);
+        return json(list({ ids: { trakt: 123, slug: value } }));
+      });
+      const response = await h.request("/v1/trakt/resolve?value="
+        + encodeURIComponent("https://trakt.tv/users/unit-user/lists/" + value));
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).list.url, "https://trakt.tv/users/unit-user/lists/" + value);
+      assert.equal(h.calls.length, 1);
+      assert.deepEqual(h.reservations, [1]);
+    }
+    const h = harness();
+    for (const value of [
+      "https://trakt.tv/users/unit-user/lists/" + "a".repeat(122),
+      "https://trakt.tv/users/" + "a".repeat(122) + "/lists/unit-list",
+      "https://trakt.tv/users/unit-user/lists/bad%2Fsegment",
+      "https://trakt.tv/users/bad%2Fuser/lists/unit-list",
+    ]) assert.equal((await h.request("/v1/trakt/resolve?value=" + encodeURIComponent(value))).status, 400);
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.reservations.length, 0);
+  });
+  await check("item and show slugs retain their existing nullable route-safe contract", async () => {
+    for (const field of ["slug", "show_slug"]) {
+      for (const value of [null, "a".repeat(121), "a".repeat(122), "bad/segment", ""]) {
+        const row = { type: "episode", episode: { title: "Unit episode", ids: {} }, show: { ids: {} } };
+        if (field === "slug") row.episode.ids.slug = value;
+        else row.show.ids.slug = value;
+        const h = harness(() => paged([row], 1, 1, 15));
+        const response = await h.request("/v1/trakt/lists/123/items");
+        const valid = value === null || value.length === 121;
+        assert.equal(response.status, valid ? 200 : 502);
+        const body = await response.json();
+        if (valid) assert.equal(body.items[0].ids[field], value);
+        else {
+          assert.equal(body.error.code, "INVALID_UPSTREAM_RESPONSE");
+          assert.equal(h.cached.size, 0);
+        }
+      }
+    }
+  });
+  await check("Keyword projects all 30 rows with five known long-slug lengths", async () => {
+    const values = Array.from({ length: 30 }, (_, index) => index < 25
+      ? "unit-list-" + index : "a".repeat(index === 29 ? 171 : 169));
+    const rows = values.map((value, index) => ({ list: list({ ids: { trakt: 123 + index, slug: value } }) }));
+    const h = harness(() => paged(rows));
+    const response = await h.request("/v1/trakt/search?mode=keyword&q=unit&page=1&limit=30");
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.apiVersion, 1);
+    assert.equal(body.lists.length, 30);
+    assert.deepEqual(body.pagination, { page: 1, limit: 30, page_count: 1, item_count: 30 });
+    for (let index = 0; index < values.length; index++) {
+      const result = body.lists.find((entry) => entry.ids.trakt === 123 + index);
+      assert.ok(result);
+      assert.equal(result.ids.slug, values[index]);
+      assert.equal(result.url, index < 25 ? "https://trakt.tv/users/unit-user/lists/" + values[index]
+        : "https://trakt.tv/lists/" + (123 + index));
+    }
+    assert.equal(h.calls.length, 1);
+    assert.deepEqual(h.reservations, [1]);
+    assert.equal(h.cached.size, 1);
+  });
   await check("filtered user is bounded to three calls, with one complete reservation", async () => {
     const h = harness((url, n) => {
       assert.equal(url.pathname, "/users/unit-user/lists");
