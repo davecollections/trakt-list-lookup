@@ -134,7 +134,7 @@ export function createDingoHandler({
         : counts.show_count > 0 ? "show-only" : "zero";
       result = { id: Number(op.id), media: { status: "known", composition, ...counts } };
     } else if (op.route === "items") {
-      const payload = await getListItems(op.id, 1, op.limit, clientId, options);
+      const payload = await getListItems(op.id, 1, op.limit, clientId, options, op.sourcePreview);
       result = { id: Number(op.id), sample: "first-page", items: arrayPayload(payload.data, op.limit).map(itemSample),
         pagination: payload.pagination };
     } else {

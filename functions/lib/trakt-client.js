@@ -76,13 +76,19 @@ async function fetchTraktPayload(path, clientId, { quietStatuses = [], quietNetw
   };
 }
 
-export async function getListItems(listId, page, limit, clientId, options = {}) {
+export async function getListItems(listId, page, limit, clientId, options = {}, sourcePreview = null) {
   const safeListId = encodeURIComponent(listId);
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
-  return traktFetch(`/lists/${safeListId}/items/movie,show,episode,season?${params.toString()}`, clientId, options);
+  // Dingo's route parser supplies the strictly validated optional source context.
+  if (sourcePreview) {
+    params.set("sort_by", sourcePreview.sortBy);
+    params.set("sort_how", sourcePreview.sortHow);
+  }
+  const type = sourcePreview ? encodeURIComponent(sourcePreview.type) : "movie,show,episode,season";
+  return traktFetch(`/lists/${safeListId}/items/${type}?${params.toString()}`, clientId, options);
 }
 
 export async function getListMediaComposition(listId, clientId, options = {}) {

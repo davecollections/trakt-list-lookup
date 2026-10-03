@@ -1,7 +1,31 @@
 # Dingo Trakt API v1 (B1)
 
+## C #284 sorted Source Preview
+
+The existing combined first-page request `/v1/trakt/lists/123/items?page=1&limit=50`
+remains unchanged (including default limit 15). An optional source context requires
+all three parameters together: `type=movie|show`, `sort_by=rank|added|title|released|runtime|popularity|percentage|votes`,
+and `sort_how=asc|desc`. Values are exact; partial contexts, aliases, duplicate or
+unknown parameters, unsafe IDs, page 2 and limits outside 1–50 are rejected.
+
+For example, `?page=1&limit=50&type=movie&sort_by=title&sort_how=desc` dispatches
+one GET to `/lists/123/items/movie?page=1&limit=50&sort_by=title&sort_how=desc`.
+TV maps to `show`; the same query is forwarded to `/lists/123/items/show`.
+No metadata/composition request is added. Cost remains one shared-budget unit on
+a cold operation, zero on a cache hit or coalesced follower. Cache identity includes
+the entire validated context. The response shape and received item order are unchanged.
+No local sorting, new route, CORS, credential, OAuth, write, or deployment change.
+
+The optional source context supports Builder C Source Edit Preview. Deployment and
+live production acceptance are tracked separately through
+[service #27](https://github.com/davecollections/trakt-list-lookup/issues/27) and
+[Builder #284](https://github.com/davecollections/tmdb-id-lookup/issues/284).
+
+
 Status: **dingo-api is deployed**; Builder B3 consumes the production API.
-The existing `/items` endpoint awaits Builder C integration; C is not complete.
+Builder C uses the existing `/items` route for discovery/media Preview and the
+optional source context for Source Edit Preview. Deployment/live acceptance of
+the current source version remains separately gated.
 Tracking: [Trakt #22](https://github.com/davecollections/trakt-list-lookup/issues/22),
 product parent [Dingo #276](https://github.com/davecollections/tmdb-id-lookup/issues/276).
 
@@ -11,7 +35,7 @@ participate in the same shared Trakt budget. Builder native Trakt sources and
 production API integration are complete through
 [B3 #282 / PR #283](https://github.com/davecollections/tmdb-id-lookup/pull/283).
 [C #284](https://github.com/davecollections/tmdb-id-lookup/issues/284) owns the
-remaining Builder Preview, Source Edit sorting, credits and final acceptance.
+Builder Preview, Source Edit sorting, credits and final acceptance.
 The records below retain the original B1 rollout and acceptance history; they do
 not imply that deployment or B3 integration is still pending.
 
@@ -49,7 +73,7 @@ Unknown paths return 404; invalid inputs return 400 before cache/reservation/fet
 | /v1/trakt/browse | kind=popular or trending, page, limit | 1 |
 | /v1/trakt/resolve | value=numeric ID or supported URL | 1 |
 | /v1/trakt/lists/ID/media | none | 2 |
-| /v1/trakt/lists/ID/items | page=1, limit | 1 |
+| /v1/trakt/lists/ID/items | page=1, limit; optional all-or-none type, sort_by, sort_how | 1 |
 
 Search/browse default to page=1 and limit=30, with page 1–25 and limit 1–50.
 Filtered-user queries use the existing bounded scan of at most 250 entries in
@@ -59,9 +83,12 @@ An optional leading @ on a username is normalized. The special account alias me
 is rejected. Keyword search uses the existing ranking within one fetched page;
 browse preserves the upstream ordering.
 
-Items default to 15, max 50, and only page 1. They are a discovery sample, not an
-exact physical MOVIE/TV Source Preview or an exhaustive export. No posters,
-artwork, TMDB enrichment, automatic media requests, or item prefetch is performed.
+Items default to 15, max 50, and only page 1. Without source context they are a
+combined discovery sample. With validated source context they are a bounded
+first-page physical MOVIE/TV Source Preview using Trakt's returned ordering for
+the requested media, sort and direction. Neither mode is an exhaustive export.
+No posters, artwork, TMDB enrichment, automatic media requests, or item prefetch
+is performed.
 
 IDs are canonical positive decimal integers up to Number.MAX_SAFE_INTEGER.
 Text is trimmed, whitespace-normalized, limited to 220 input characters, and
