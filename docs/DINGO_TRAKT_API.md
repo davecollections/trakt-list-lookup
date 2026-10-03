@@ -1,13 +1,19 @@
 # Dingo Trakt API v1 (B1)
 
-Status: local acceptance and regression validation passed; **not deployed**.
+Status: **dingo-api is deployed**; Builder B3 consumes the production API.
+The existing `/items` endpoint awaits Builder C integration; C is not complete.
 Tracking: [Trakt #22](https://github.com/davecollections/trakt-list-lookup/issues/22),
 product parent [Dingo #276](https://github.com/davecollections/tmdb-id-lookup/issues/276).
 
-The intended Worker is **dingo-api**, at **https://api.dingo.build**.
-The standalone Pages site and its /api/trakt endpoint retain their deployment and
-features, apart from deliberate shared-budget enforcement. Dingo Builder clients, native Trakt sources, UI, and production traffic
-migration are separate future work.
+The production Worker is **dingo-api**, at **https://api.dingo.build**.
+The standalone Pages site and its /api/trakt endpoint retain their features and
+participate in the same shared Trakt budget. Builder native Trakt sources and
+production API integration are complete through
+[B3 #282 / PR #283](https://github.com/davecollections/tmdb-id-lookup/pull/283).
+[C #284](https://github.com/davecollections/tmdb-id-lookup/issues/284) owns the
+remaining Builder Preview, Source Edit sorting, credits and final acceptance.
+The records below retain the original B1 rollout and acceptance history; they do
+not imply that deployment or B3 integration is still pending.
 
 ## Architecture and reuse
 
@@ -412,7 +418,12 @@ credential reference, deployment or production mutation in that workflow.
 Hosted results must be checked on the actual pushed head; local success alone
 is not hosted-CI evidence.
 
-## Owner state and future deployment order (do not execute during B1)
+## Historical B1 owner state and deployment sequence
+
+The following owner-state snapshot and planned sequence are the original
+pre-deployment B1 record, preserved unchanged. That rollout has since completed;
+the current deployed/integrated status is stated above. This history does not
+authorize any new deployment or configuration change.
 
 Owner-confirmed: dingo.build is Active in the intended Cloudflare account;
 api.dingo.build has not been manually created; one existing Trakt application

@@ -223,8 +223,10 @@ git diff --check
 
 The live site is deployed with Cloudflare Pages from GitHub changes.
 
-Production changes are owner-gated. Follow the [shared-budget deployment order](docs/DINGO_TRAKT_API.md#owner-state-and-future-deployment-order-do-not-execute-during-b1)
-before publishing the new Pages binding. The existing manual command, only after approval, is:
+Production changes remain owner-gated. The shared-budget rollout is complete;
+its [historical deployment sequence](docs/DINGO_TRAKT_API.md#historical-b1-owner-state-and-deployment-sequence)
+is retained for context, not as pending setup. The existing manual command,
+only after separate deployment approval, is:
 
 ```powershell
 wrangler pages deploy .
@@ -244,12 +246,17 @@ Poster previews and automatic folder artwork may use TMDB metadata where availab
 
 Trakt List Lookup is an independent community tool for Nuvio collections and is not affiliated with or endorsed by Nuvio.
 
-## Dingo service (local owner review)
+## Dingo service (deployed)
 
-The separate, restricted Dingo Worker contract and deployment prerequisites are in
-[docs/DINGO_TRAKT_API.md](docs/DINGO_TRAKT_API.md). It is not deployed; the existing
-standalone Pages endpoint keeps its features and now participates in the same
-450-unit Trakt budget. Both require explicit TRAKT_CREDENTIAL_SCOPE=shared and
-the shared TRAKT_BUDGET binding. See the contract for the owner-gated deployment
-order and local multi-Worker command; a Pages-only local session cannot make
-accounted Trakt calls without the external coordinator.
+The restricted **dingo-api** Worker is deployed at **https://api.dingo.build**.
+Builder [B3 #282 / PR #283](https://github.com/davecollections/tmdb-id-lookup/pull/283)
+uses this production API. The `/items` endpoint already exists; its Builder
+[C #284](https://github.com/davecollections/tmdb-id-lookup/issues/284) integration
+is not yet implemented.
+
+The standalone Pages endpoint retains its features and shares the same 450-unit
+Trakt budget. Both require explicit TRAKT_CREDENTIAL_SCOPE=shared and the shared
+TRAKT_BUDGET binding. [The contract](docs/DINGO_TRAKT_API.md) retains the historical
+rollout and acceptance records, along with the local multi-Worker command.
+A Pages-only local session cannot make accounted Trakt calls without the external
+coordinator. Further deployment remains separately owner-gated.
