@@ -18,7 +18,7 @@ export function parseRoute(url) {
   if (!route) throw failure(404, "NOT_FOUND", "Unknown API route.");
   const allowed = {
     search: ["mode", "q", "page", "limit"], browse: ["kind", "page", "limit"],
-    resolve: ["value"], media: [], items: ["page", "limit"],
+    resolve: ["value"], media: [], items: ["page", "limit", "type", "sort_by", "sort_how"],
   }[route];
   const params = url.searchParams;
   for (const key of params.keys()) {
@@ -47,6 +47,16 @@ export function parseRoute(url) {
   if (["search", "browse", "items"].includes(route)) {
     result.page = integer("page", 1, route === "items" ? 1 : 25);
     result.limit = integer("limit", route === "items" ? 15 : 30, 50);
+  }
+  if (route === "items" && ["type", "sort_by", "sort_how"].some(key => params.has(key))) {
+    const type = params.get("type"), sortBy = params.get("sort_by"), sortHow = params.get("sort_how");
+    if (!["movie", "show"].includes(type)
+        || !["rank", "added", "title", "released", "runtime", "popularity", "percentage", "votes"].includes(sortBy)
+        || !["asc", "desc"].includes(sortHow)) throw badInput();
+    result.sourcePreview = { type, sortBy, sortHow };
+    canonical.set("type", type);
+    canonical.set("sort_by", sortBy);
+    canonical.set("sort_how", sortHow);
   }
   if (route === "search") {
     result.mode = params.get("mode");

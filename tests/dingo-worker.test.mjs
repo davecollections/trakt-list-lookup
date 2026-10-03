@@ -255,6 +255,65 @@ try {
     assert.equal(body.items[0].images, undefined);
     assert.equal(h.calls.length, 1);
   });
+  const sourceSorts = ["rank", "added", "title", "released", "runtime", "popularity", "percentage", "votes"];
+  for (const type of ["movie", "show"]) for (const sortBy of sourceSorts) for (const sortHow of ["asc", "desc"]) {
+    await check(`sorted items ${type}/${sortBy}/${sortHow}: exact URL, ordered projection, cost one`, async () => {
+      const h = harness(url => {
+        assert.equal(url.pathname, `/lists/123/items/${type}`);
+        assert.equal(url.search, `?page=1&limit=50&sort_by=${sortBy}&sort_how=${sortHow}`);
+        return paged([9, 2, 5].map(id => ({ type, rank: id, [type]: { title: `Item ${id}`, year: 2000, ids: { trakt: id, tmdb: id }, images: { private: true } } })), 99, 1, 50, 2);
+      });
+      const path = `/v1/trakt/lists/123/items?page=1&limit=50&type=${type}&sort_by=${sortBy}&sort_how=${sortHow}`;
+      const response = await h.request(path), body = await response.json();
+      assert.equal(response.status, 200);
+      assert.deepEqual(Object.keys(body).sort(), ["apiVersion", "id", "items", "pagination", "sample"]);
+      assert.deepEqual(body.items.map(item => item.ids.tmdb), [9, 2, 5]);
+      assert.ok(body.items.every(item => !Object.hasOwn(item, "images")));
+      assert.equal(h.calls.length, 1);
+      assert.deepEqual(h.reservations, [1]);
+      assert.equal((await h.request(path)).status, 200);
+      assert.equal(h.calls.length, 1);
+    });
+  }
+  await check("source context rejects partial, noncanonical, duplicate and unknown parameters before accounting", async () => {
+    const h = harness();
+    const valid = "type=movie&sort_by=title&sort_how=desc";
+    const invalid = ["type=movie", "sort_by=title&sort_how=asc", "type=movie&sort_by=title", "type=movie&sort_how=asc",
+      ...["season", "episode", "movie,show", "../movie", "MOVIE", " movie", ""].map(type => `type=${encodeURIComponent(type)}&sort_by=title&sort_how=asc`),
+      ...["random", "Title", "title ", ""].map(sort => `type=movie&sort_by=${encodeURIComponent(sort)}&sort_how=asc`),
+      ...["ascending", "DESC", " desc", ""].map(how => `type=movie&sort_by=title&sort_how=${encodeURIComponent(how)}`),
+      ...["type=movie", "sort_by=title", "sort_how=desc", "page=1&page=1", "limit=50&limit=50", "page=2", "limit=51", "unknown=x"].map(extra => valid + "&" + extra)];
+    for (const query of invalid) assert.equal((await h.request("/v1/trakt/lists/123/items?" + query)).status, 400, query);
+    assert.equal(h.calls.length, 0); assert.deepEqual(h.reservations, []);
+  });
+  await check("combined and every sorted media/direction context have distinct normalized cache keys", async () => {
+    const h = harness(() => paged([]), { handler: { throttle: () => ({ allowed: true }) } });
+    const paths = ["/v1/trakt/lists/123/items?page=1&limit=50"];
+    for (const type of ["movie", "show"]) for (const sort of sourceSorts) for (const how of ["asc", "desc"]) paths.push(`/v1/trakt/lists/123/items?type=${type}&sort_by=${sort}&sort_how=${how}&limit=50&page=1`);
+    for (const path of paths) assert.equal((await h.request(path)).status, 200);
+    assert.equal(h.cached.size, 33); assert.equal(h.calls.length, 33); assert.deepEqual(h.reservations, Array(33).fill(1));
+    for (const path of paths) assert.equal((await h.request(path)).status, 200);
+    assert.equal(h.calls.length, 33);
+    assert.equal((await h.request("/v1/trakt/lists/123/items?sort_how=asc&sort_by=rank&type=movie&limit=50")).status, 200);
+    assert.equal(h.calls.length, 33);
+  });
+  await check("sorted in-flight requests coalesce and retain cost one", async () => {
+    let release, started;
+    const signal = new Promise(resolve => { started = resolve; });
+    const h = harness(async () => { started(); await new Promise(resolve => { release = resolve; }); return paged([]); });
+    const path = "/v1/trakt/lists/123/items?type=show&sort_by=votes&sort_how=desc";
+    const first = h.request(path); await signal; const second = h.request(path); release();
+    assert.ok((await Promise.all([first, second])).every(response => response.status === 200));
+    assert.equal(h.calls.length, 1); assert.deepEqual(h.reservations, [1]);
+  });
+  for (const status of [404, 429, 500]) await check(`sorted items preserves sanitized ${status} handling and accounting`, async () => {
+    const h = harness(() => json({ private: "never expose this" }, { "Retry-After": "60" }, status));
+    const response = await h.request("/v1/trakt/lists/123/items?type=movie&sort_by=title&sort_how=desc");
+    assert.equal(response.status, status === 500 ? 502 : status);
+    assert.ok(!(await response.text()).includes("never expose"));
+    assert.equal(h.cached.size, 0); assert.equal(h.calls.length, 1); assert.deepEqual(h.reservations, [1]);
+    if (status === 429) assert.equal(response.headers.get("Retry-After"), "60");
+  });
   await check("unknown values stay null and zero is retained", async () => {
     const h = harness(() => json([list({ item_count: 0, likes: 0, user: undefined, description: undefined })]));
     const body = await (await h.request("/v1/trakt/search?mode=user&q=unit-user")).json();

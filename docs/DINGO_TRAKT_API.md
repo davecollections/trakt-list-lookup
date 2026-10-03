@@ -1,5 +1,25 @@
 # Dingo Trakt API v1 (B1)
 
+## C #284 sorted Source Preview — local owner review
+
+The existing combined first-page request `/v1/trakt/lists/123/items?page=1&limit=50`
+remains unchanged (including default limit 15). An optional source context requires
+all three parameters together: `type=movie|show`, `sort_by=rank|added|title|released|runtime|popularity|percentage|votes`,
+and `sort_how=asc|desc`. Values are exact; partial contexts, aliases, duplicate or
+unknown parameters, unsafe IDs, page 2 and limits outside 1–50 are rejected.
+
+For example, `?page=1&limit=50&type=movie&sort_by=title&sort_how=desc` dispatches
+one GET to `/lists/123/items/movie?page=1&limit=50&sort_by=title&sort_how=desc`.
+TV maps to `show`; the same query is forwarded to `/lists/123/items/show`.
+No metadata/composition request is added. Cost remains one shared-budget unit on
+a cold operation, zero on a cache hit or coalesced follower. Cache identity includes
+the entire validated context. The response shape and received item order are unchanged.
+No local sorting, new route, CORS, credential, OAuth, write, or deployment change.
+
+This extension is uncommitted and not deployed. Builder Source Edit acceptance against
+the deployed extension requires a later owner-authorized integration/deployment gate.
+
+
 Status: **dingo-api is deployed**; Builder B3 consumes the production API.
 The existing `/items` endpoint awaits Builder C integration; C is not complete.
 Tracking: [Trakt #22](https://github.com/davecollections/trakt-list-lookup/issues/22),
